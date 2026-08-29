@@ -9,3 +9,7 @@ Mercariから必要なデータを取得する3方式を、`docs/todo.md` に定
 | `playwright/` | Playwright経由 | 検索レスポンス取得、ページング、Headless動作 |
 
 PoC間で実装を共有しすぎず、取得できる項目、エラー、速度、再現手順を方式ごとに記録します。
+
+共通条件は [`common/conditions.json`](common/conditions.json)、測定方法は
+[`docs/poc-validation.md`](../docs/poc-validation.md)、結果の書式は
+[`common/result-template.md`](common/result-template.md) を使用します。

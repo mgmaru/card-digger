@@ -28,6 +28,9 @@ playwright-report/
 test-results/
 blob-report/
 
+# PoC raw responses may contain session or seller data
+poc/**/artifacts/
+
 # Logs and temporary files
 *.log
 tmp/

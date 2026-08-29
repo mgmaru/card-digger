@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "search": {
+    "keyword": "ポケカ 引退品",
+    "status": "on_sale",
+    "sort": {
+      "field": "created_time",
+      "order": "asc"
+    },
+    "category": null,
+    "minPriceYen": null,
+    "maxPriceYen": null,
+    "authMode": "anonymous",
+    "locale": "ja-JP",
+    "timezone": "Asia/Tokyo"
+  },
+  "collection": {
+    "minimumUniqueItemCount": 100,
+    "maximumUniqueItemCount": 1000,
+    "maximumPageCount": 20,
+    "sellerSampleSize": 10,
+    "oldListingAgeDays": 365
+  },
+  "stability": {
+    "searchTrialCount": 5,
+    "attemptTimeoutSeconds": 60,
+    "automaticRetryCount": 0,
+    "concurrency": 1,
+    "minimumRequestIntervalSeconds": 2,
+    "consecutiveSafetyErrorLimit": 3
+  },
+  "acceptance": {
+    "minimumSearchSuccessRate": 0.8,
+    "minimumRequiredFieldCoverage": 1.0,
+    "minimumImageUrlCoverage": 0.95,
+    "minimumCreatedAtCoverage": 0.95,
+    "minimumSellerIdCoverage": 0.95,
+    "minimumSellerNameCoverage": 0.9
+  }
+}

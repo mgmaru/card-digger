@@ -8,6 +8,7 @@
 
 - [アプリコンセプト](docs/concept.md)
 - [開発ロードマップ / TODO](docs/todo.md)
+- [Phase 0 共通検証プロトコル](docs/poc-validation.md)
 
 ## リポジトリ構成
 
@@ -18,6 +19,7 @@ card-digger/
 │   ├── concept.md
 │   └── todo.md
 ├── poc/
+│   ├── common/        # 共通条件・結果テンプレート
 │   ├── mercari/       # marvinody/mercari の検証
 │   ├── mercapi/       # kynacio/mercapi の検証
 │   └── playwright/    # ブラウザ経由方式の検証
