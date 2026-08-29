@@ -1,0 +1,11 @@
+# Proof of Concept
+
+Mercariから必要なデータを取得する3方式を、`docs/todo.md` に定義した共通条件で比較します。
+
+| ディレクトリ | 検証対象 | 主な確認事項 |
+|---|---|---|
+| `mercari/` | `marvinody/mercari` | `created_time + ASC`、ページング、Seller ID |
+| `mercapi/` | `kynacio/mercapi` | 商品検索、商品詳細、Seller Profile・商品一覧 |
+| `playwright/` | Playwright経由 | 検索レスポンス取得、ページング、Headless動作 |
+
+PoC間で実装を共有しすぎず、取得できる項目、エラー、速度、再現手順を方式ごとに記録します。
