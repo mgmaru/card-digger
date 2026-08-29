@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "search": {
     "keyword": "ポケカ 引退品",
     "status": "on_sale",
@@ -18,8 +18,42 @@
     "minimumUniqueItemCount": 100,
     "maximumUniqueItemCount": 1000,
     "maximumPageCount": 20,
+    "itemDetailSampleSize": 20,
     "sellerSampleSize": 10,
     "oldListingAgeDays": 365
+  },
+  "imageFetch": {
+    "sampleSize": 20,
+    "method": "GET",
+    "authMode": "anonymous",
+    "timeoutSeconds": 30,
+    "followRedirects": true,
+    "maximumRedirectCount": 5,
+    "acceptedHttpStatusMinimum": 200,
+    "acceptedHttpStatusMaximum": 299,
+    "minimumBodyBytes": 1,
+    "maximumBodyBytes": 20971520,
+    "requireDecode": true,
+    "allowSessionAssistedSupplementaryTest": true,
+    "allowedContentTypePrefixes": [
+      "image/"
+    ],
+    "decodableFormats": [
+      "jpeg",
+      "png",
+      "webp",
+      "gif",
+      "avif"
+    ]
+  },
+  "sellerListings": {
+    "statuses": [
+      "on_sale",
+      "sold_out"
+    ],
+    "targetUniqueItemCountPerStatus": 20,
+    "maximumUniqueItemCountPerStatus": 100,
+    "maximumPageCountPerStatus": 5
   },
   "stability": {
     "searchTrialCount": 5,
@@ -33,8 +67,12 @@
     "minimumSearchSuccessRate": 0.8,
     "minimumRequiredFieldCoverage": 1.0,
     "minimumImageUrlCoverage": 0.95,
+    "minimumImageBodyFetchCoverage": 0.95,
     "minimumCreatedAtCoverage": 0.95,
+    "minimumItemConditionCoverage": 0.95,
+    "minimumLikeCountCoverage": 0.95,
     "minimumSellerIdCoverage": 0.95,
-    "minimumSellerNameCoverage": 0.9
+    "minimumSellerNameCoverage": 0.9,
+    "minimumSellerListingEndpointSuccessRatePerStatus": 0.9
   }
 }
