@@ -407,6 +407,7 @@ flowchart LR
 
 - [x] Python Adapter + 管理下の`mercapi` Forkという境界を決定する
 - [x] Fork、Adapter、Applicationの責務を分離する
+- [x] [Forkの作成・更新・依存固定・切戻し手順を文書化する](../development/mercapi-fork-operations.md)
 - [x] Domain型と`MarketplacePort`のContractを決定する
 - [x] 検索を最大10ページ・1,000件・30秒に制限する
 - [x] Seller商品を状態ごとに最大5ページ・100件・30秒に制限する

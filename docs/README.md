@@ -9,6 +9,7 @@
 3. [開発ロードマップ / TODO](planning/todo.md)
 4. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
 5. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
+6. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
 
 ## ディレクトリ
 
@@ -20,6 +21,8 @@ docs/
 │   └── mvp-spec.md
 ├── planning/
 │   └── todo.md
+├── development/
+│   └── mercapi-fork-operations.md
 └── phase-0/
     ├── poc-validation.md
     ├── phase-0-e-selection.md
@@ -39,6 +42,13 @@ Phase横断の作業順、進捗、未完了Taskを置く。
 
 - [todo.md](planning/todo.md): 開発ロードマップとチェックリスト
 
+### `development/`
+
+Phaseをまたいで利用する開発・依存更新・Repository運用の手順を置く。
+
+- [mercapi-fork-operations.md](development/mercapi-fork-operations.md):
+  Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
+
 ### `phase-0/`
 
 Mercari取得方式の技術検証、選定、Adapter設計を置く。
@@ -51,6 +61,7 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 
 - Productの振る舞い・受入条件は`product/`
 - Phaseをまたぐ計画・進捗は`planning/`
+- Phaseをまたぐ開発・依存・Repositoryの運用手順は`development/`
 - 特定Phaseだけで使う調査・技術判断・実装仕様は`phase-N/`
 - PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
 - `docs/`直下には、このIndex以外の文書を増やさない

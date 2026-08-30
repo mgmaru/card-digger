@@ -7,6 +7,7 @@
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
 - Product側の挙動: [MVP実装仕様](../product/mvp-spec.md)
+- Repository運用: [mercapi Fork運用手順](../development/mercapi-fork-operations.md)
 
 この文書はPhase 0-Fの正本とする。実装中に判断が分かれた場合は、コードだけで挙動を決めず、
 この文書とTODOを先に更新する。
@@ -85,6 +86,8 @@ Card Digger固有の次の処理はForkへ入れない。
 
 ## 4. 管理下Forkの作成・更新手順
 
+作成、Remote設定、upstream取込、依存SHA更新、切戻しの実作業は
+[mercapi Fork運用手順](../development/mercapi-fork-operations.md)を正本とする。
 実装開始前にGitHub上で`kynacio/mercapi`をForkし、Card Diggerとは別Repositoryとして管理する。
 
 ```text
@@ -95,27 +98,8 @@ mgmaru/mercapi
 card-digger
 ```
 
-作業手順は次で固定する。
-
-1. GitHub上で`mgmaru/mercapi`を作成する
-2. ForkをCard Diggerとは別DirectoryへCloneする
-3. Fork元を`upstream` Remoteとして登録する
-4. `feat/seller-items-pagination` Branchを作成する
-5. Fixture Testを先に追加する
-6. Public APIとResponse Modelを実装する
-7. ForkのBranchをPushする
-8. 必要なら`kynacio/mercapi`へPull Requestを作る
-9. Card Diggerから、Test済みのFork commit SHAを指定する
-
-```bash
-git clone https://github.com/mgmaru/mercapi.git
-cd mercapi
-git remote add upstream https://github.com/kynacio/mercapi.git
-git switch -c feat/seller-items-pagination
-```
-
-Fork元の変更は自動で取り込まない。`upstream`更新を取り込む場合は、固定Fixture、ForkのUnit Test、
-Card DiggerのContract Test、低頻度のライブ検証を通してから依存SHAを更新する。
+Fork元の変更は自動で取り込まず、Card DiggerもForkのBranchではなくTest済みcommit SHAへ固定する。
+upstreamからForkへの取込と、ForkからCard Diggerへの依存更新を別々にレビュー・検証する。
 
 ## 5. Forkへ追加するPublic API
 
