@@ -2,7 +2,8 @@
 
 > 掘り出し物を効率よく探索するためのMercari検索・出品者分析アプリ。
 >
-> 最初の目標はアプリを完成させることではなく、**Mercariから必要なデータを安定して取得できる方式を1つ選定すること**。
+> 最初の目標だったMercari取得方式の選定はPhase 0-Eで完了した。現在は、選定した
+> **`kynacio/mercapi`方式をMercari Adapterとして安全に分離すること**が次の目標。
 
 ---
 
@@ -341,6 +342,8 @@ JSON Responseを取得
 
 # Phase 0-E — Mercari取得方式を1つ選定する
 
+**完了: 2026-08-30。** 詳細は[選定結果](phase-0-e-selection.md)に記録した。
+
 ## 原則
 
 MVPでは3方式を併用しない。
@@ -365,19 +368,25 @@ Mercari Adapterとして実装
 6. 実装・保守が簡単
 7. 性能が実用範囲内
 
-## 現時点の仮説
+## 選定結果
 
-### 本採用候補
+- [x] 本採用を、検証済みコミットを基準にした管理下の`kynacio/mercapi` Forkへ決定する
+- [x] Seller商品の状態別Filterと`max_pager_id`ページングをForkの公開APIへ追加する
+- [x] Playwrightは仕様調査・障害診断用PoCに限定し、MVPの実行経路には含めない
+- [x] `marvinody/mercari`は不採用とする
+- [x] 全方式で未達だったServer側の古い順を、採用方式の制約として記録する
+- [x] Phase 0-F、Phase 1、公開前に必要な追加検証を定義する
 
-1. `kynacio/mercapi`
-2. Playwrightベースの独自Adapter
-3. `marvinody/mercari`
+**選定: `kynacio/mercapi`方式。** 検索、商品詳細、画像、Seller Profileを安定して取得でき、
+Seller商品一覧もEndpointレベルでは状態別にページングできた。固定版の公開`items()`はそのまま
+使わず、管理下のForkで`status`、`max_pager_id`、`pager_id`、`meta.has_next`を公開する。
 
-### 古い順検索のPoC順
+Playwrightは必要データを取得できるが、Web画面の3状態一括取得、Browser / DOM / 通信Interceptの
+保守範囲、検索速度を理由に本採用しない。Applicationが障害時に自動でPlaywrightへ切り替わる構成も
+採らず、安全停止後の診断にだけ利用する。
 
-1. `marvinody/mercari`
-2. `mercapi`
-3. Playwright
+なお3方式ともServer側の古い順にはならない。MVPの古い順は、取得上限と打ち切り理由を保持したうえで
+「取得した範囲内で古い順」として提供し、Mercari全体の最古順とは扱わない。
 
 ---
 
@@ -393,6 +402,13 @@ flowchart LR
 
 ## TODO
 
+- [ ] 検証済み`mercapi`コミットを基準に管理下のForkを用意し、依存をcommit SHAで固定する
+- [ ] `SellerItemsPage`に`items`、`hasNext`、`nextMaxPagerId`を定義する
+- [ ] Seller一覧の状態Filter、`max_pager_id`、`pager_id`、`meta.has_next`を公開APIへ追加する
+- [ ] Sellerページングの正常系・終端・空Response・Cursor欠落・重複をFixture Testする
+- [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端をライブ検証する
+- [ ] 検索の取得ページ数・件数・最古日時・打ち切り理由を返す型を定義する
+- [ ] Server側の古い順を前提にせず、取得範囲内だけをClient側でソートする
 - [ ] `MarketplaceItem` 型を定義する
 - [ ] `Seller` 型を定義する
 - [ ] `SellerItem` 型を定義する
@@ -400,6 +416,7 @@ flowchart LR
 - [ ] Seller取得Interfaceを定義する
 - [ ] Adapterを実装する
 - [ ] 外部ライブラリ固有型をDomain層へ漏らさない
+- [ ] Adapter外からForkのPrivate Memberを参照しない
 - [ ] Mock Adapterを用意する
 
 ### 型イメージ
@@ -452,10 +469,11 @@ type SellerItem = MarketplaceItem;
 - [ ] 販売中のみフィルター
 - [ ] 最低価格
 - [ ] 最高価格
-- [ ] 古い順
+- [ ] 取得範囲内の古い順
 - [ ] 新しい順
 - [ ] 価格の安い順
 - [ ] 価格の高い順
+- [ ] 取得ページ数・件数・最古日時・打ち切り理由の表示
 
 ---
 
@@ -597,7 +615,7 @@ TCG比率             6.3%
 ```mermaid
 flowchart TD
     A[ポケカ 引退品を検索] --> B[画像一覧]
-    B --> C[古い順などで絞り込み]
+    B --> C[取得範囲内の古い順などで絞り込み]
     C --> D[気になる商品を選択]
     D --> E[Sellerの商品一覧]
     E --> F[ポケカ / TCG専門性を確認]
@@ -609,7 +627,7 @@ flowchart TD
 
 - [ ] 商品を検索できる
 - [ ] 商品画像を一覧表示できる
-- [ ] 古い順に表示できる
+- [ ] 取得範囲内で古い順に表示できる
 - [ ] 元商品ページへ移動できる
 - [ ] Seller情報を確認できる
 - [ ] Sellerの商品一覧を確認できる
@@ -747,19 +765,19 @@ Marketplace
 現時点では以下だけに集中する。
 
 ```text
-[1] GitHub Repository作成
+[1] GitHub Repository作成（完了）
         ↓
-[2] marvinody/mercariで古い順PoC
+[2] marvinody/mercariで古い順PoC（完了）
         ↓
-[3] mercapiで商品 + Seller取得PoC
+[3] mercapiで商品 + Seller取得PoC（完了）
         ↓
-[4] 必要ならPlaywright PoC
+[4] Playwright PoC（完了）
         ↓
-[5] 比較表を完成
+[5] 比較表を完成（完了）
         ↓
-[6] Mercari取得方式を1つ選定
+[6] Mercari取得方式を1つ選定（完了: mercapi）
         ↓
-[7] Mercari Adapter作成
+[7] Mercari Adapter作成（現在）
         ↓
 [8] Search MVP開始
 ```
