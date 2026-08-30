@@ -3,6 +3,7 @@
 ## 結論
 
 - 実行日: **2026-08-30 13:55:34〜13:57:59 JST**
+- Sellerページング追加検証: **2026-08-30 17:08:19〜17:09:19 JST**
 - 判定: **`条件付き`**
 - 要約:
   - 匿名検索は5回すべて成功し、各試行で118件を取得した。401 / 403 / 429、Timeout、Parse Error、Challengeは発生しなかった。
@@ -10,8 +11,10 @@
   - 商品の基本項目、Seller ID、商品詳細20件のコンディション・いいね数、匿名画像GET・デコード20件、Seller Profile 10人はすべて100%取得できた。
   - Seller商品一覧Endpointは10人すべて正常に解析でき、販売中206件、売却済み43件、`trading` 17件を確認した。販売中・売却済みとして分類した249件は、ID、タイトル、価格、URL、画像URL、出品日時、状態、いいね数をすべて取得できた。
   - ただし`SORT_CREATED_TIME + ORDER_ASC`は古い順にならなかった。825件の隣接日時に495回の逆転があり、上流ライブラリ自身もこの組み合わせを公式Webアプリ非対応として警告する。
-  - Seller商品一覧の公開メソッドは`on_sale,trading,sold_out`を合計30件まで一括取得する仕様で、状態Filterとページング引数がない。10人中8人が30件上限に達し、2ページ目も終端も判定できなかった。売却済み20件へ到達したSellerは0 / 10人だった。
-  - 必要フィールドを扱える点ではPhase 0-Aより明確に優れるが、アプリの主要要件である古い順検索とSeller一覧の十分なページングは未達である。Phase 0-Cと比較するまで本採用は決定しない。
+  - Seller商品一覧の公開メソッドは`on_sale,trading,sold_out`を合計30件まで一括取得する仕様で、状態Filterとページング引数がない。10人中8人が30件上限に達し、公開メソッドだけでは2ページ目も終端も判定できなかった。売却済み20件へ到達したSellerは0 / 10人だった。
+  - 追加検証では、Mercari Webが同じEndpointを`max_pager_id`でページングし、Responseの`meta.has_next`で続きを判定することを確認した。Playwrightで5ページ、150ユニーク件、重複0件を観測し、31件目以降を取得できた。
+  - 観測したParameterを固定版`mercapi`のDPoP署名機構へ渡す補足試験では、`on_sale`と`sold_out`を別々に各2ページ、60ユニーク件、重複0件取得できた。30件はMercari API自体の総取得上限ではなく、`mercapi`公開メソッドと応答モデルの実装不足である。
+  - 必要フィールドを扱える点ではPhase 0-Aより明確に優れ、SellerページングもWrapper拡張で実現できる見込みが立った。ただし公開メソッドだけでは未達で、古い順検索も解決していない。Phase 0-Cと比較するまで本採用は決定しない。
 
 ## 判定根拠
 
@@ -24,10 +27,11 @@
 | 必要な商品情報を取得できる | 一覧100 / 100、詳細20 / 20、画像20 / 20 | ○ |
 | Seller Profileへ辿れる | 10 / 10成功 | ○ |
 | Seller商品一覧を取得できる | Endpoint応答10 / 10、249件を状態別取得 | ○ |
-| Seller商品一覧を十分にページングできる | 30件固定、公開ページングなし。終端判定2 / 10のみ | **×** |
+| Seller商品一覧を十分にページングできる | 公開メソッドは不可。追加検証では5ページ・150件、状態別各2ページ・60件を取得 | **公開× / Endpoint○** |
 
-基本データの取得能力は採用候補水準だが、探索機能の中核に未解決の制約があるため、判定を
-`採用候補`ではなく`条件付き`とした。
+基本データの取得能力は採用候補水準であり、SellerページングはWrapperを拡張すれば実現できる見込みが
+立った。ただし固定版の公開メソッドだけでは利用できず、古い順検索も未解決であるため、判定は
+`採用候補`ではなく`条件付き`のままとした。
 
 ## 実行環境
 
@@ -37,7 +41,7 @@
 | OS / Architecture | `Linux 6.18.33.2-microsoft-standard-WSL2 / x86_64` |
 | Runtime | `Python 3.11.9` |
 | Library / commit | `mercapi==0.4.2` / `20ba68fd42677997c4c91b4e4eb17c1e7e387efa` |
-| Direct dependencies | 固定コミットの`mercapi`, `Pillow==11.3.0` |
+| Direct dependencies | 固定コミットの`mercapi`, `Pillow==11.3.0`, `playwright==1.55.0` |
 | 主な推移依存 | `httpx==0.27.2`, `ecdsa==0.19.2`, `python-jose==3.5.0`, `cryptography==50.0.1` |
 | Browser mode | `N/A` |
 | Login / Cookie / Token / Proxy | すべて不要。ライブラリが一時鍵とDPoPを生成 |
@@ -45,6 +49,19 @@
 | 全体実行時間 | **144.40秒** |
 
 検証開始時点のHEADを記録した。作業ツリーにはPhase 0-Bの未コミットファイルがある。
+
+### Sellerページング追加検証の環境
+
+| 項目 | 値 |
+|---|---|
+| 検証開始時のGit commit | `af4185818ca950e1f32e90a0fda6ba9024b4ae98` |
+| Runtime | `Python 3.11.9` |
+| Browser / mode | `Google Chrome 144.0.7559.109` / Headless |
+| Playwright | `1.55.0` |
+| mercapi / httpx | `0.4.2` / `0.27.2` |
+| Login / Cookie / Token / Proxy | ログイン、永続Cookie、Token、Proxyは不要。ブラウザの匿名Sessionと`mercapi`の一時鍵・DPoPを使用 |
+| Browser Command | `poc/mercapi/.venv/bin/python poc/mercapi/seller_paging_probe.py --max-scrolls 12` |
+| 状態別補足Command | `poc/mercapi/.venv/bin/python poc/mercapi/seller_status_paging_probe.py` |
 
 ## 検索条件
 
@@ -62,6 +79,7 @@
 - `mercapi`の`SearchRequestData._allowed_sorting`は`SORT_CREATED_TIME + ORDER_ASC`をサポート対象に含めず、`SORT_CREATED_TIME`の定義にも「正しい順序は保証されない」とある。主要要件の確認のため値は変更せず送信し、クライアント側ソートを行わず実順序を測定した。
 - 主要停止条件を1ページ目で満たした場合だけ2ページ目を補足取得する実装だが、今回は7ページ目まで主要測定が続いたため補足リクエストは発生していない。
 - `Mercapi.items(profile_id)`は`status=on_sale,trading,sold_out`、`limit=30`を固定し、状態・Cursor・Offsetを引数に公開しない。各Sellerへの1回の応答をPoC側で状態別に分類した。
+- Sellerページング追加検証のブラウザ内通信はWebアプリ自身が制御するため、個々のResourceの同時実行数を1には固定できない。画像・動画・Fontを遮断して不要な通信を減らし、「もっと見る」の操作間隔は2.2秒とした。状態別補足試験は同時実行数1、開始間隔2秒、自動再試行なしとした。
 - HTTP Timeoutと受動的なStatus観測をPoC側で追加した。TLS検証、Header、DPoP、認証を回避する変更は行っていない。
 - 日時は上流モデルの`datetime`を`Asia/Tokyo`のRFC 3339へ正規化した。
 
@@ -244,16 +262,16 @@ SellerのID、名前、写真、自己紹介は`result.md`へ掲載せず、Git�
 
 | Seller標本 | 応答 | 合計 | 販売中 | 売却済み | Trading | 20件到達（販売中 / 売却済み） | 終端判定 |
 |---:|---|---:|---:|---:|---:|---|---|
-| 1 | 成功 | 30 | 26 | 3 | 1 | ○ / × | 不可（30件上限） |
-| 2 | 成功 | 30 | 30 | 0 | 0 | ○ / × | 不可（30件上限） |
-| 3 | 成功 | 30 | 28 | 2 | 0 | ○ / × | 不可（30件上限） |
-| 4 | 成功 | 30 | 22 | 0 | 8 | ○ / × | 不可（30件上限） |
-| 5 | 成功 | 30 | 23 | 2 | 5 | ○ / × | 不可（30件上限） |
+| 1 | 成功 | 30 | 26 | 3 | 1 | ○ / × | 不可（公開メソッド30件） |
+| 2 | 成功 | 30 | 30 | 0 | 0 | ○ / × | 不可（公開メソッド30件） |
+| 3 | 成功 | 30 | 28 | 2 | 0 | ○ / × | 不可（公開メソッド30件） |
+| 4 | 成功 | 30 | 22 | 0 | 8 | ○ / × | 不可（公開メソッド30件） |
+| 5 | 成功 | 30 | 23 | 2 | 5 | ○ / × | 不可（公開メソッド30件） |
 | 6 | 成功 | 2 | 2 | 0 | 0 | × / × | 2件で終端と推定 |
-| 7 | 成功 | 30 | 21 | 7 | 2 | ○ / × | 不可（30件上限） |
-| 8 | 成功 | 30 | 30 | 0 | 0 | ○ / × | 不可（30件上限） |
+| 7 | 成功 | 30 | 21 | 7 | 2 | ○ / × | 不可（公開メソッド30件） |
+| 8 | 成功 | 30 | 30 | 0 | 0 | ○ / × | 不可（公開メソッド30件） |
 | 9 | 成功 | 24 | 13 | 10 | 1 | × / × | 24件で終端と推定 |
-| 10 | 成功 | 30 | 11 | 19 | 0 | × / × | 不可（30件上限） |
+| 10 | 成功 | 30 | 11 | 19 | 0 | × / × | 不可（公開メソッド30件） |
 
 - `on_sale` 一覧Endpoint応答成功率: **10 / 10（100%）**
 - `sold_out` 一覧Endpoint応答成功率: **10 / 10（100%）**
@@ -268,6 +286,193 @@ SellerのID、名前、写真、自己紹介は`result.md`へ掲載せず、Git�
 
 「Endpointが正常応答したか」と「必要件数をページングできたか」を分けて評価した。売却済み0件のSellerでも
 正常に解析できた一覧応答はEndpoint成功と数える一方、20件到達やページング成功には数えていない。
+
+## Seller商品一覧の30件上限・ページング追加検証
+
+### 結論
+
+追加検証によって、30件で止まった原因を次のように切り分けられた。
+
+1. Mercariの商品一覧Endpoint自体は31件目以降を返せる。
+2. 1回のResponseは`limit=30`で区切られ、`meta.has_next`が次ページの有無を示す。
+3. 次のRequestには、直前ページ末尾の商品が持つ`pager_id`を`max_pager_id`として渡す。
+4. 固定版`mercapi`は`max_pager_id`を受け取らず、Responseの`meta.has_next`と商品の`pager_id`も公開モデルへ保持しない。
+
+したがって、**30件はMercari API自体の総取得上限ではない**。固定版`mercapi`の公開`items()`が
+最初の30件だけを取得し、ページングに必要な情報を捨てていることが直接原因である。
+
+### 対象Sellerの選定
+
+既存のSeller標本10人から、次の条件を満たす標本5を自動選定した。
+
+- `mercapi`の一覧取得が成功している
+- 30件上限へ到達している
+- Profileの`num_sell_items`が30を超えている
+- 条件を満たす標本の中で`num_sell_items`が最大（8,704件）
+
+Seller ID、Seller名、商品IDの全件はGit管理外Artifactだけに保存し、この文書には掲載しない。
+実際の初回Responseが`meta.has_next: true`だったため、対象Sellerに31件目以降が存在することは
+Profileの累計値だけでなく、Endpointの応答でも確認できた。
+
+### Mercari Webの画面操作
+
+Sellerページを匿名・Headless Chromeで開いた。HTTP 200で表示され、CAPTCHA / Challengeは
+検出されなかった。商品は無限スクロールではなく、**「もっと見る」ボタン**で追加表示される構成だった。
+
+| 操作 | 画面上で確認した累計ユニーク商品 | 前回からの増加 |
+|---|---:|---:|
+| 初回表示 | 15 | 15 |
+| 「もっと見る」1回目 | 40 | 25 |
+| 「もっと見る」2回目 | 65 | 25 |
+| 「もっと見る」3回目 | 90 | 25 |
+| 「もっと見る」4回目 | 115 | 25 |
+
+スクロールだけでは商品は増えなかった。画面操作の停止理由は100ユニーク件以上への到達であり、
+「もっと見る」が消える終端までは操作していない。
+
+### 観測した商品一覧API
+
+初回表示で次の通信を確認した。値そのものを掲載する必要がないSeller IDはマスクしている。
+
+```text
+GET https://api.mercari.jp/items/get_items
+  seller_id=[MASKED]
+  limit=30
+  with_auction=true
+  exclude_archived_item=true
+  status=on_sale,trading,sold_out
+```
+
+Responseの要点は次のとおりだった。
+
+```text
+data: 30商品
+meta.has_next: true
+data[*].pager_id: 各商品に存在
+```
+
+「もっと見る」以降は、同じParameterへ次を追加していた。
+
+```text
+max_pager_id=<直前ページ末尾商品のpager_id>
+```
+
+`cursor`、`offset`、`pageToken`は使用されていなかった。ページ2〜5のすべてで、Requestの
+`max_pager_id`が直前ページ末尾の`pager_id`と一致した。
+
+### Playwrightで観測した31件目以降
+
+Webアプリは初期化中に初回商品一覧を2回要求した。`exclude_archived_item=true`を含む初回Requestを
+正規のページ1とし、同じ30商品を返したもう1回の初回Requestは集計から除外した。
+
+| Page | HTTP | Requestの続き指定 | 取得 | 新規 | 重複 | 販売中 | 取引中 | 売却済み | `has_next` |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---|
+| 1 | 200 | なし | 30 | 30 | 0 | 23 | 5 | 2 | `true` |
+| 2 | 200 | `max_pager_id` | 30 | 30 | 0 | 16 | 2 | 12 | `true` |
+| 3 | 200 | `max_pager_id` | 30 | 30 | 0 | 12 | 2 | 16 | `true` |
+| 4 | 200 | `max_pager_id` | 30 | 30 | 0 | 6 | 2 | 22 | `true` |
+| 5 | 200 | `max_pager_id` | 30 | 30 | 0 | 1 | 0 | 29 | `true` |
+
+- 正規の取得ページ数: **5ページ**
+- 全出現数 / ユニーク件数 / 重複: **150 / 150 / 0**
+- 状態内訳: **販売中58、取引中11、売却済み81**
+- 31件目以降: **取得成功**
+- 商品一覧EndpointのHTTP Error: **0件**
+- 5ページ目の`meta.has_next`: **`true`**
+
+5ページ目でも続きが存在したが、共通プロトコルのSeller一覧上限である5ページ・100ユニーク件を
+すでに超えたため停止した。このSellerの商品一覧の実終端までは確認していない。
+
+画面は115商品を表示した時点で停止した一方、APIは先読みを含め150ユニーク商品を返していた。
+Webアプリが初回15件、その後25件ずつ描画するBufferの厳密な内部実装は確認していないが、
+API Responseの商品IDを基準としたページング成否には影響しない。
+
+### 販売中・売却済みの状態別ページング
+
+ブラウザ画面には販売中・売却済みを切り替えるControlが見つからず、Webアプリ自身は
+`status=on_sale,trading,sold_out`を一括指定していた。そこで、ブラウザで確認したParameterを使い、
+固定版`mercapi`の内部HTTP ClientとDPoP署名機構で状態別の補足試験を行った。
+
+これは公開`Mercapi.items()`の挙動ではなく、**Wrapperへ小さな拡張を加えた場合にEndpointが応答するか**を
+確かめる試験である。各Requestは同時実行数1、開始間隔2秒、自動再試行なしとした。
+
+| 指定状態 | Page 1 | Page 2 | ユニーク | 重複 | Response内の状態 | HTTP Error | Page 2 Cursor |
+|---|---:|---:|---:|---:|---|---:|---|
+| `on_sale` | 30 | 30 | 60 | 0 | `on_sale` 60件のみ | 0 | 前ページ末尾と一致 |
+| `sold_out` | 30 | 30 | 60 | 0 | `sold_out` 60件のみ | 0 | 前ページ末尾と一致 |
+
+両状態とも2ページのHTTP Statusはすべて200で、Page 1・2とも`meta.has_next: true`だった。
+したがって、状態FilterとページングはEndpointレベルでは併用できる。
+
+### 原因となった固定版`mercapi`の実装
+
+固定コミット`20ba68f`の`Mercapi._items()`は次を固定している。
+
+```text
+limit=30
+status=on_sale,trading,sold_out
+```
+
+公開`items(profile_id)`には`status`、`max_pager_id`、`limit`を渡す引数がなく、Requestを1回送って
+終了する。また、`Items`モデルは商品配列だけを持ち、`SellerItem`モデルにも`pager_id`がない。
+そのため、Mercari側が返した`meta.has_next`と`pager_id`がモデル変換時に失われ、利用者は次のRequestを
+組み立てられない。
+
+### うまくいかなかった点と対処
+
+1. **スクロールでは追加表示されなかった**
+   - 原因: 画面が無限スクロールではなく「もっと見る」方式だった。
+   - 対処: 表示中のButtonを検出して2.2秒間隔でClickし、API通信と商品IDを記録した。
+2. **最初のランナーが想定時間内に終了しなかった**
+   - 原因: Playwrightの同期Response Callback内で`response.json()`を再入的に呼び、Dispatcherを待たせた可能性が高い。
+   - 対処: 試行を中断し、CallbackではResponse Objectだけを保持して、画面操作後に本文を解析する設計へ変更した。修正後は約15秒で完了した。
+3. **売却済み専用の画面Controlを確認できなかった**
+   - 原因: 現行Sellerページは3状態を一括取得して表示しており、確認したControl群に状態切替がなかった。
+   - 対処: Webで観測したEndpointとParameterを`mercapi`の署名機構から状態別に送る補足試験で確認した。
+4. **匿名Affiliate情報Endpointで403が2件発生した**
+   - `/services/affiliate/user/v1/current_user`が403を返したが、Seller Profileと商品一覧はHTTP 200で動作した。
+   - ログインや回避を試みず、そのまま記録した。商品一覧ページングの成否には影響しなかった。
+5. **画面表示件数とAPI取得件数が一致しなかった**
+   - 画面は115件、APIは150件だった。Webアプリの先読み・表示Bufferによる差と考えられるが、内部実装までは確定していない。
+   - ページング判定は画面Card数ではなく、API Responseの商品ID・重複・`has_next`を基準にした。
+
+### 修正案
+
+`mercapi`を採用する場合は、上流へのPull Requestまたは固定Forkで、少なくとも次を追加する。
+
+```text
+SellerItemsPage
+  items
+  hasNext
+  nextMaxPagerId
+
+items_page(
+  profile_id,
+  statuses,
+  limit=30,
+  max_pager_id=None,
+)
+```
+
+- `SellerItem.pager_id`を保持する
+- Responseの`meta.has_next`を保持する
+- 次ページは末尾商品の`pager_id`を`max_pager_id`として送る
+- `on_sale`、`trading`、`sold_out`を呼出側で指定可能にする
+- Page間の商品ID重複を検出する
+- `has_next=false`、空Response、末尾`pager_id`欠落時に安全に終了する
+- 既存`items(profile_id)`との後方互換を維持する
+
+Adapterから`api._client`や`api._sign_request`などのPrivate Memberを直接利用する方法は、今回の補足PoCでは
+動作したが、上流の内部変更に弱い。恒久対応としては公開APIの拡張を優先する。
+
+### 追加検証が必要な事項
+
+- 残りのSeller標本でも`max_pager_id`の意味と状態別Filterが同じか確認する
+- 商品数の少ないSellerで`meta.has_next=false`となり、正しく終端できるか確認する
+- 取得中に新規出品・削除・状態変更が起きた場合の重複や取りこぼしを測定する
+- `with_auction`と`exclude_archived_item`の有無が件数・状態・Cursorへ与える影響を確認する
+- Wrapper拡張後に固定Fixtureと自動ページングTestを追加する
+- `items()`のDocstringにある「all items」と実際の1ページ取得の差を上流へ報告する
 
 ## エラーとアクセス制限
 
@@ -293,11 +498,11 @@ SellerのID、名前、写真、自己紹介は`result.md`へ掲載せず、Git�
 
 | 項目 | 値・根拠 |
 |---|---|
-| 実コード行数 | `run.py`: 1,016行（空行と`#`開始行を除く。物理1,107行）。共通プロトコルの全測定・集計を含む |
-| テスト | `test_run.py`: 5件、70実コード行 |
-| 直接依存数 | 2（固定コミットの`mercapi`、`Pillow`） |
+| 実コード行数 | 本測定`run.py`: 1,016行（空行と`#`開始行を除く。物理1,107行）。追加検証Runner 2本: 物理730行 |
+| テスト | 9件（既存5件、Sellerページング追加4件） |
+| 直接依存数 | 3（固定コミットの`mercapi`、`Pillow`、`Playwright`） |
 | セットアップコマンド数 | 2（venv作成、requirements導入） |
-| Browser / Cookie / Token / 手作業 | 不要 |
+| Browser / Cookie / Token / 手作業 | 本測定は不要。追加検証だけSystem Chromeが必要。ログイン・永続Cookie・Token・手作業は不要 |
 | 独自実装 | 2秒Limiter、独立プロセス試行、正規化、停止条件、画像GET・デコード、Seller状態分類、計測・集計 |
 | Wrapper利用 | 検索、詳細、Profile、Seller一覧はすべて公開メソッドを利用。PoCは内部HTTP ClientへTimeoutとResponse hookだけ追加 |
 | 実装の複雑さ | **中**。測定ランナーは大きいが、API Payload・DPoP・レスポンスモデルをPoC側で再実装していない |
@@ -313,12 +518,13 @@ Phase 0-Aと異なり、現行レスポンスは検索、詳細、Profile、Sell
    - `SORT_CREATED_TIME + ORDER_ASC`を送信しても495 / 824組で日時が逆転した。
    - 上流実装もこの組み合わせを非対応として警告する。
    - クライアント側ソートは取得済み範囲しか並べ替えられず、未取得の古い商品を保証できない。
-2. **Seller一覧を状態別に要求できない**
+2. **公開メソッドではSeller一覧を状態別に要求できない**
    - 公開メソッドは販売中・取引中・売却済みを一括取得する。
-   - 状態ごとの取得枠を確保できず、売却済みは全Sellerで20件未満だった。
-3. **Seller一覧をページングできない**
-   - `limit=30`固定でCursor / Offset引数がない。
-   - 8 / 10人が上限に達し、2ページ目も終端も判定できなかった。
+   - 本測定では状態ごとの取得枠を確保できず、売却済みは全Sellerで20件未満だった。
+   - 追加検証ではEndpointへ状態を個別指定し、販売中・売却済みを各60件取得できた。
+3. **公開メソッドではSeller一覧をページングできない**
+   - `limit=30`固定で`max_pager_id`引数がなく、`meta.has_next`と商品`pager_id`もモデルに残らない。
+   - 追加検証では5ページ・150件を取得できたため、Mercari APIの制限ではなくWrapperの実装不足と判定した。
 4. **`trading`の共通状態がない**
    - 17件を`unknown`へ分離した。売却済みに含めるかはDomain定義が必要である。
 5. **検索結果の関連度にばらつきがある**
@@ -327,8 +533,8 @@ Phase 0-Aと異なり、現行レスポンスは検索、詳細、Profile、Sell
 ## 追加検証が必要な事項
 
 - Phase 0-Cで、ブラウザが実際に使用するSort / Cursorに古い順の代替があるか確認する。
-- Seller商品一覧通信をブラウザで観測し、状態別Filter、Cursor / Offset、30件超取得の可否を確認する。
-- `mercapi`を採用候補に残す場合は、Seller一覧の状態・ページング引数をWrapperへ追加可能か、小さな補足PoCで確認する。
+- Sellerページングを残りの標本と終端が近いSellerでも確認し、`meta.has_next=false`までの停止処理を検証する。
+- `mercapi`を採用候補に残す場合は、公開モデルと公開メソッドへ状態・`max_pager_id`・`has_next`を追加し、Fixture Testを作成する。
 - `trading`を`unknown`のまま扱うか、購入不可商品として`sold_out`側へまとめるかDomain設計時に決める。
 - Phase 0-Cを同じ端末・ネットワークで実行し、速度、安定性、取得率をPhase 0-A / 0-Bと比較する。
 - 公開・商用・継続取得へ進む前に、利用規約と許容される利用方法を改めて確認する。
@@ -341,8 +547,11 @@ Phase 0-Aと異なり、現行レスポンスは検索、詳細、Profile、Sell
 python3 -m venv poc/mercapi/.venv
 poc/mercapi/.venv/bin/python -m pip install -r poc/mercapi/requirements.txt
 poc/mercapi/.venv/bin/python poc/mercapi/run.py
+poc/mercapi/.venv/bin/python poc/mercapi/seller_paging_probe.py
+poc/mercapi/.venv/bin/python poc/mercapi/seller_status_paging_probe.py
 poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -v
 ```
 
-機械可読な測定結果は`poc/mercapi/artifacts/summary.json`へ生成される。このディレクトリはGit管理外で、
-画像Bodyは保存されない。
+機械可読な測定結果は`poc/mercapi/artifacts/summary.json`、追加検証は
+`seller-paging-probe.json`と`seller-status-paging-probe.json`へ生成される。このディレクトリは
+Seller IDや商品IDを含むためGit管理外で、画像Bodyは保存されない。
