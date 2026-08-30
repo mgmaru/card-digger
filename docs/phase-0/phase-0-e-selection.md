@@ -46,9 +46,9 @@ ApplicationやDomain層からForkの固有型やPrivate Memberを直接参照し
 
 次の同日実測結果を選定根拠とした。
 
-- [`marvinody/mercari`の結果](../poc/mercari/result.md)
-- [`kynacio/mercapi`の結果](../poc/mercapi/result.md)
-- [Playwrightの結果](../poc/playwright/result.md)
+- [`marvinody/mercari`の結果](../../poc/mercari/result.md)
+- [`kynacio/mercapi`の結果](../../poc/mercapi/result.md)
+- [Playwrightの結果](../../poc/playwright/result.md)
 - [共通検証プロトコル](poc-validation.md)
 
 3方式は、キーワード`ポケカ 引退品`、販売中、`created_time ASC`、匿名アクセス、5回の
@@ -57,7 +57,8 @@ Proxyなしで実行され、Phase 0-Bの本測定開始からPhase 0-Cの開始
 
 ## 選定基準ごとの判断
 
-優先順位は[`docs/todo.md`](todo.md)に定義した順番をそのまま使った。点数の合計ではなく、
+優先順位は[開発ロードマップ / TODO](../planning/todo.md)に定義した順番をそのまま使った。
+点数の合計ではなく、
 上位要件を満たした候補の中で、安定性、保守範囲、性能を比較した。
 
 | 優先 | 評価項目 | `mercari` | `mercapi` + 拡張 | Playwright | 判断 |
@@ -155,7 +156,7 @@ Phase 0-F / Phase 1では、次の制約を仕様とUIへ明示する。
 - [x] MVPでは定期監視を行わず、依存更新・Release前に低頻度のライブ検証を手動実行する
 
 詳細は[Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)と
-[MVP実装仕様](mvp-spec.md)へ記録した。
+[MVP実装仕様](../product/mvp-spec.md)へ記録した。
 
 ### 公開・商用・継続取得の前に必須
 

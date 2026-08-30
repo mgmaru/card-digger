@@ -2,8 +2,8 @@
 
 Phase 0-F以降のApplication本体を配置します。実装基準は次の文書です。
 
-- [Mercari Adapter実装仕様](../docs/phase-0-f-adapter-spec.md)
-- [MVP実装仕様](../docs/mvp-spec.md)
+- [Mercari Adapter実装仕様](../docs/phase-0/phase-0-f-adapter-spec.md)
+- [MVP実装仕様](../docs/product/mvp-spec.md)
 
 予定構成:
 

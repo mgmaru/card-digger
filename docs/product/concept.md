@@ -444,7 +444,7 @@ TCG関連
 > いずれもメルカリ公式API SDKではない。実際に採用する前にPoCで現在の動作確認が必要。
 >
 > **Phase 0-E更新:** 3方式の同条件PoC後、`kynacio/mercapi`方式を選定した。詳細は
-> [Mercari取得方式の選定結果](phase-0-e-selection.md)を参照。
+> [Mercari取得方式の選定結果](../phase-0/phase-0-e-selection.md)を参照。
 
 ## 比較
 
@@ -1125,7 +1125,7 @@ Mercari Adapter
 - Database、認証、Playwright FallbackはMVPへ含めない
 - Package Versionは実装開始時に確認し、Lockfileとcommit SHAで固定する
 
-Adapterの詳細は[Phase 0-F仕様](phase-0-f-adapter-spec.md)、画面・API・MVP範囲は
+Adapterの詳細は[Phase 0-F仕様](../phase-0/phase-0-f-adapter-spec.md)、画面・API・MVP範囲は
 [MVP実装仕様](mvp-spec.md)を参照する。
 
 ---
@@ -1299,4 +1299,5 @@ PlaywrightはMVPの実行経路に含めず、Mercari側の仕様変更を調査
 **「取得した範囲内で古い順」**として表示する。Mercari全体の販売中商品を漏れなく最古順で
 取得できるとは扱わない。
 
-選定の条件、追加検証、再選定基準は[Phase 0-Eの結果](phase-0-e-selection.md)に記録している。
+選定の条件、追加検証、再選定基準は
+[Phase 0-Eの結果](../phase-0/phase-0-e-selection.md)に記録している。

@@ -8,12 +8,12 @@ Seller商品の状態別ページングは、検証済みコミットを基準�
 
 ## ドキュメント
 
-- [アプリコンセプト](docs/concept.md)
-- [開発ロードマップ / TODO](docs/todo.md)
-- [Phase 0 共通検証プロトコル](docs/poc-validation.md)
-- [Phase 0-E Mercari取得方式の選定結果](docs/phase-0-e-selection.md)
-- [Phase 0-F Mercari Adapter実装仕様](docs/phase-0-f-adapter-spec.md)
-- [MVP実装仕様](docs/mvp-spec.md)
+- [ドキュメント一覧](docs/README.md)
+- [アプリコンセプト](docs/product/concept.md)
+- [MVP実装仕様](docs/product/mvp-spec.md)
+- [開発ロードマップ / TODO](docs/planning/todo.md)
+- [Phase 0-E Mercari取得方式の選定結果](docs/phase-0/phase-0-e-selection.md)
+- [Phase 0-F Mercari Adapter実装仕様](docs/phase-0/phase-0-f-adapter-spec.md)
 
 ## リポジトリ構成
 
@@ -21,11 +21,10 @@ Seller商品の状態別ページングは、検証済みコミットを基準�
 card-digger/
 ├── README.md
 ├── docs/
-│   ├── concept.md
-│   ├── todo.md
-│   ├── phase-0-e-selection.md
-│   ├── phase-0-f-adapter-spec.md
-│   └── mvp-spec.md
+│   ├── README.md
+│   ├── product/       # コンセプト・MVP仕様
+│   ├── planning/      # ロードマップ・TODO
+│   └── phase-0/       # PoC条件・選定・Adapter仕様
 ├── poc/
 │   ├── common/        # 共通条件・結果テンプレート
 │   ├── mercari/       # marvinody/mercari の検証
@@ -54,7 +53,7 @@ Phase 0-F実装開始前の時点では、リポジトリ共通の依存パッ�
 3. 選定方式をMercari Adapterの内側に閉じ込める仕様を確定した
 4. 検索・画像一覧・Seller分析を備えたMVPを実装する
 
-検証条件と採用基準の詳細は [TODO](docs/todo.md) を参照してください。
+検証条件と採用基準の詳細は[TODO](docs/planning/todo.md)を参照してください。
 
 ## 注意事項
 

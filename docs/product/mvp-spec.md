@@ -4,7 +4,7 @@
 
 - 決定日: **2026-08-30**
 - ステータス: **Phase 1の実装基準として採用**
-- 前提: [Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)
+- 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
 - 対象: Search MVP、Seller画面、Seller Knowledge Indicator
 
 この文書はMVPに含める機能、含めない機能、画面挙動、計算方法、完了条件の正本とする。
@@ -177,7 +177,7 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 
 ### 5.3 収集範囲
 
-[Adapter仕様の検索Policy](phase-0-f-adapter-spec.md#81-商品検索)を使用する。
+[Adapter仕様の検索Policy](../phase-0/phase-0-f-adapter-spec.md#81-商品検索)を使用する。
 
 - 100ユニーク件、かつ365日以上前の商品1件を最低目標にする
 - 最大10ページ、1,000ユニーク件、30秒

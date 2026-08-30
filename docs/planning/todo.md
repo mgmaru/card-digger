@@ -32,8 +32,8 @@ flowchart TD
 - [x] GitHubリポジトリを作成する
 - [x] READMEを作成する
 - [x] `docs/` を作成する
-- [x] `docs/concept.md` を配置する
-- [x] `docs/todo.md` を配置する
+- [x] `docs/product/concept.md`を配置する
+- [x] `docs/planning/todo.md`を配置する
 - [x] PoC用ディレクトリを作成する
 - [x] `.gitignore` を設定する
 - [x] 必須環境変数がないことを確認する（必要になった時点で `.env.example` を作成する）
@@ -60,8 +60,8 @@ card-digger/
 
 ## 0-2. 共通の検証条件を決める
 
-3方式を同じ条件で比較できるよう、[共通検証プロトコル](poc-validation.md) と
-機械可読な [`poc/common/conditions.json`](../poc/common/conditions.json) に固定した。
+3方式を同じ条件で比較できるよう、[共通検証プロトコル](../phase-0/poc-validation.md)と
+機械可読な[`poc/common/conditions.json`](../../poc/common/conditions.json)に固定した。
 
 > この節のチェックは「検証条件の定義が完了した」ことを表す。実測の完了はPhase 0-A〜0-Cで記録する。
 
@@ -149,7 +149,7 @@ GitHub:
 - [x] Sellerの販売中商品一覧を取得できるか確認する（非対応）
 - [x] Sellerの売却済み商品一覧を取得できるか確認する（非対応）
 - [x] 401 Unauthorizedが発生するか確認する（0件）
-- [x] [検証結果をMarkdownに記録する](../poc/mercari/result.md)
+- [x] [検証結果をMarkdownに記録する](../../poc/mercari/result.md)
 
 ## 判定
 
@@ -245,7 +245,7 @@ GitHub:
 - [x] Rate Limitを確認する（通常取得中の429は0件）
 - [x] 連続取得時の挙動を確認する（正式測定72リクエストすべてHTTP 200）
 - [x] APIレスポンス変更時の影響範囲を確認する
-- [x] [検証結果をMarkdownに記録する](../poc/mercapi/result.md)
+- [x] [検証結果をMarkdownに記録する](../../poc/mercapi/result.md)
 
 **判定: 条件付き。** 必要フィールド、詳細、画像、Seller Profile・商品一覧の取得は安定して
 成功した。一方、`created_time ASC`は古い順にならない。Seller商品一覧はEndpointレベルでは
@@ -310,7 +310,7 @@ JSON Responseを取得
 - [x] Browser起動コストを測定する（中央値64.37ms）
 - [x] Headlessで動作するか確認する（5 / 5成功）
 - [x] エラー時の再試行方法を確認する（正式0回、補足CLIとUnit Testを実装）
-- [x] [検証結果をMarkdownに記録する](../poc/playwright/result.md)
+- [x] [検証結果をMarkdownに記録する](../../poc/playwright/result.md)
 
 ---
 
@@ -342,7 +342,7 @@ JSON Responseを取得
 
 # Phase 0-E — Mercari取得方式を1つ選定する
 
-**完了: 2026-08-30。** 詳細は[選定結果](phase-0-e-selection.md)に記録した。
+**完了: 2026-08-30。** 詳細は[選定結果](../phase-0/phase-0-e-selection.md)に記録した。
 
 ## 原則
 
@@ -394,8 +394,8 @@ Playwrightは必要データを取得できるが、Web画面の3状態一括取
 
 採用方式が決まった後、アプリ側から直接ライブラリを呼ばない。
 
-実装の正本は[Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)、Product側の正本は
-[MVP実装仕様](mvp-spec.md)とする。
+実装の正本は[Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)、Product側の正本は
+[MVP実装仕様](../product/mvp-spec.md)とする。
 
 ```mermaid
 flowchart LR
@@ -457,7 +457,7 @@ flowchart LR
 - [ ] 検索を5回実行し、成功率と必須Field取得率を確認する
 - [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
 - [ ] ライブ受入検証結果をMarkdownへ記録する
-- [ ] [Adapter仕様のPhase 0-F完了条件](phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
+- [ ] [Adapter仕様のPhase 0-F完了条件](../phase-0/phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
 
 ---
 
@@ -468,7 +468,7 @@ flowchart LR
 商品画像とSeller情報を一つの画面で確認し、人間の探索時間を減らす。
 
 機能、画面挙動、API、Seller Knowledge、対象外、完了条件は
-[MVP実装仕様](mvp-spec.md)を正本とする。
+[MVP実装仕様](../product/mvp-spec.md)を正本とする。
 
 ## 1-0. Application基盤
 

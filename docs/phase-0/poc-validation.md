@@ -6,7 +6,7 @@
 
 一部の項目を取得できなくても、アクセス上の安全停止条件に該当しない限り、残りの項目の検証は継続する。取得不能・非対応・解析失敗も結果として残し、次の方式を試すための判断材料にする。
 
-実行時の正本は [`poc/common/conditions.json`](../poc/common/conditions.json) とする。この文書は値の意味と測定手順を定義する。
+実行時の正本は[`poc/common/conditions.json`](../../poc/common/conditions.json)とする。この文書は値の意味と測定手順を定義する。
 
 ## 2. 固定する検索条件
 
@@ -182,6 +182,6 @@ Rate Limitは通常のPoC実行中に受動的に観測する。制限値を特�
 
 ## 9. 結果の保存
 
-各PoCの結果は [`poc/common/result-template.md`](../poc/common/result-template.md) をコピーし、方式ごとのディレクトリへ `result.md` として保存する。
+各PoCの結果は[`poc/common/result-template.md`](../../poc/common/result-template.md)をコピーし、方式ごとのディレクトリへ`result.md`として保存する。
 
 生レスポンス、画像Body、スクリーンショット、Traceは各方式の `artifacts/` に一時保存できるが、Git管理外とする。結果MarkdownへCookie、Token、個人情報を転記せず、必要な例示データはマスクする。

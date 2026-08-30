@@ -6,7 +6,7 @@
 - ステータス: **実装基準として採用**
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
-- Product側の挙動: [MVP実装仕様](mvp-spec.md)
+- Product側の挙動: [MVP実装仕様](../product/mvp-spec.md)
 
 この文書はPhase 0-Fの正本とする。実装中に判断が分かれた場合は、コードだけで挙動を決めず、
 この文書とTODOを先に更新する。
@@ -401,7 +401,7 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 - [ ] ForkとAdapterの全自動Testが成功している
 - [ ] ライブ受入検証が合格し、結果文書が追加されている
 - [ ] Application / Domain層に`mercapi`型とPrivate Memberが漏れていない
-- [ ] [MVP実装仕様](mvp-spec.md)から利用できる状態になっている
+- [ ] [MVP実装仕様](../product/mvp-spec.md)から利用できる状態になっている
 
 ## 12. Phase 0-Fで実装しないもの
 

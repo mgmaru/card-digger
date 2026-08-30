@@ -1,0 +1,57 @@
+# Card Digger Documentation
+
+文書は目的別に整理している。最初にProduct仕様を読み、作業時はPlanningと対象Phaseの技術文書を参照する。
+
+## 推奨する読み順
+
+1. [アプリコンセプト](product/concept.md)
+2. [MVP実装仕様](product/mvp-spec.md)
+3. [開発ロードマップ / TODO](planning/todo.md)
+4. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
+5. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
+
+## ディレクトリ
+
+```text
+docs/
+├── README.md
+├── product/
+│   ├── concept.md
+│   └── mvp-spec.md
+├── planning/
+│   └── todo.md
+└── phase-0/
+    ├── poc-validation.md
+    ├── phase-0-e-selection.md
+    └── phase-0-f-adapter-spec.md
+```
+
+### `product/`
+
+アプリの価値、利用者、MVPの機能・画面・API・完了条件を置く。
+
+- [concept.md](product/concept.md): Productの目的、背景、将来像
+- [mvp-spec.md](product/mvp-spec.md): MVP実装時の機能範囲と受入条件の正本
+
+### `planning/`
+
+Phase横断の作業順、進捗、未完了Taskを置く。
+
+- [todo.md](planning/todo.md): 開発ロードマップとチェックリスト
+
+### `phase-0/`
+
+Mercari取得方式の技術検証、選定、Adapter設計を置く。
+
+- [poc-validation.md](phase-0/poc-validation.md): 3方式の共通検証条件
+- [phase-0-e-selection.md](phase-0/phase-0-e-selection.md): `mercapi`選定の根拠と制約
+- [phase-0-f-adapter-spec.md](phase-0/phase-0-f-adapter-spec.md): ForkとAdapterの実装仕様
+
+## 配置ルール
+
+- Productの振る舞い・受入条件は`product/`
+- Phaseをまたぐ計画・進捗は`planning/`
+- 特定Phaseだけで使う調査・技術判断・実装仕様は`phase-N/`
+- PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
+- `docs/`直下には、このIndex以外の文書を増やさない
+- 同じ決定を複数文書へ複製せず、正本へのLinkを置く
