@@ -1,0 +1,24 @@
+{
+  "name": "card-digger-playwright-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase 0-C Mercari acquisition proof of concept using Playwright",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "poc": "npm run build && node dist/src/run.js",
+    "test": "npm run build && node --test --test-isolation=none dist/**/*.test.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "playwright": "1.55.1",
+    "sharp": "0.35.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

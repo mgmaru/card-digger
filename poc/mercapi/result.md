@@ -465,6 +465,33 @@ items_page(
 Adapterから`api._client`や`api._sign_request`などのPrivate Memberを直接利用する方法は、今回の補足PoCでは
 動作したが、上流の内部変更に弱い。恒久対応としては公開APIの拡張を優先する。
 
+### 意思決定メモ（2026-08-30）
+
+Card Diggerでは、Sellerの商品構成からポケカ / TCG比率やSeller Knowledgeを算出する。最初の30件だけでは
+状態や出品時期に偏り、Seller全体の傾向を誤って評価する可能性がある。そのため、**固定版`mercapi`の
+公開メソッドをそのまま使う構成は、今回のアプリ要件を満たさない**と判断する。
+
+一方、Endpoint自体は`max_pager_id`でページングできるため、次の選択肢は残っている。
+
+1. `mercapi`へ状態Filter・ページングを追加し、上流へ提案または固定Forkで保守する
+2. Mercari Adapter内で独自にRequestを組み立てる
+3. Phase 0-CのPlaywright方式を採用する
+
+選択肢1・2は技術的に実現可能だが、非公開APIと`mercapi`のPrivate Memberへ依存する保守コストが増える。
+選択肢3もBrowser起動コスト、通信Intercept、DOM / Web実装変更への追従が必要になる。現時点では、どちらが
+より安定して保守できるかを判断する実測が不足している。
+
+したがって、**この時点では`mercapi`の採用・不採用を確定しない**。Phase 0-Cで同じ共通プロトコルを使い、
+特に次を確認してからPhase 0-D / 0-Eで決定する。
+
+- Seller商品を31件以上取得できるか
+- 販売中・売却済みを分けてページングできるか
+- `has_next=false`相当まで安全に終端判定できるか
+- 商品IDの重複・取りこぼしがないか
+- 匿名・Headless環境で安定するか
+- Browser起動時間、実装量、再試行、保守範囲が実用的か
+- `mercapi`を拡張する場合と比べて、アプリ本体へ持ち込む独自コードが少ないか
+
 ### 追加検証が必要な事項
 
 - 残りのSeller標本でも`max_pager_id`の意味と状態別Filterが同じか確認する
