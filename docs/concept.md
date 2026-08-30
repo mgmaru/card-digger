@@ -147,6 +147,9 @@ flowchart TD
 
 ところまでを最初の完成地点とする。
 
+実装時の機能範囲、取得上限、画面挙動、Seller Knowledgeの計算方法は
+[MVP実装仕様](mvp-spec.md)を正本とする。
+
 ### 必須機能
 
 #### 商品検索
@@ -175,12 +178,13 @@ flowchart TD
 │ ¥12,000             │
 │ 632日前             │
 │                     │
-│ Seller TCG率 5%     │
-│                     │
 │ [商品を見る]        │
-│ [出品者を見る]      │
+│ [Sellerを分析]      │
 └─────────────────────┘
 ```
+
+MVPでは検索結果の全Sellerを自動分析しない。Seller Knowledgeは、ユーザーが
+「Sellerを分析」を選んだ後のSeller画面だけに表示する。
 
 画像を一覧上で直接確認できることで、
 
@@ -211,10 +215,10 @@ flowchart TD
 - Seller ID
 - 評価
 - 評価件数
-- 現在の出品数
-- 売却済み商品数
-- 現在の出品一覧
-- 売却済み商品一覧（取得可能な場合）
+- Profile上の累計販売件数
+- 取得した販売中商品数（最大100件）
+- 取得した売却済み商品数（最大100件）
+- 販売中・売却済みの取得一覧と打ち切り理由
 - 各商品のタイトル
 - 価格
 - サムネイル
@@ -225,7 +229,7 @@ flowchart TD
 
 - ポケカ関連商品の件数
 - TCG関連商品の件数
-- 全出品に占めるポケカ / TCG比率
+- 取得した商品の中でのポケカ / TCG比率
 - `SAR` / `SR` / `PSA` / `旧裏` / `プロモ` などの専門用語利用
 
 を確認できるようにする。
@@ -239,15 +243,16 @@ MVPでは高度なAI判定までは行わず、出品者がポケカ・TCGに詳
 ```text
 Seller Knowledge
 ----------------
-全出品数       63
-ポケカ関連      3
-TCG関連         4
-TCG比率        6.3%
+分析対象       142
+ポケカ関連      63
+TCG関連         91
+TCG比率        64.1%
 
-専門用語利用   少ない
+専門用語あり    35
 
 推定:
-ポケカ専門性  低
+ポケカ専門性   高
+標本信頼度     高
 ```
 
 この値は購入可否を決めるものではなく、
@@ -256,9 +261,8 @@ TCG比率        6.3%
 
 を人間が判断するための補助情報とする。
 
-### あると便利な機能
+### MVP後に検討する機能
 
-- 最低価格 / 最高価格
 - 除外キーワード
 - 検索条件保存
 - お気に入り
@@ -407,7 +411,7 @@ Seller ID
 特に、Seller Knowledge Indicatorに使うため、
 
 ```text
-全商品
+取得した商品
  ↓
 ポケカ関連
  ↓
@@ -820,8 +824,9 @@ type MarketplaceItem = {
   price: number;
   url: string;
   imageUrls: string[];
-  createdAt?: Date;
-  status: "on_sale" | "sold_out" | "unknown";
+  createdAt: Date;
+  status: "on_sale" | "trading" | "sold_out" | "unknown";
+  sellerId: string;
 };
 ```
 
@@ -943,18 +948,18 @@ URL
 - 新しい順
 - 商品画像のグリッド表示
 - 元Mercari商品ページへのリンク
-- お気に入り
-- 検索条件保存
+- 取得範囲・最古日時・打ち切り理由の表示
 
 ### 出品者分析
 
 - Seller ID取得
 - 出品者プロフィール表示
-- 出品者の商品一覧
+- 販売中・売却済みを各最大100件取得
 - 商品サムネイル一覧
 - ポケカ関連商品数
 - TCG関連商品数
-- ポケカ / TCG出品比率
+- 取得範囲内のポケカ / TCG比率
+- 標本信頼度
 - 簡易Seller Knowledge Indicator
 - 出品者の元ページへのリンク
 
@@ -1100,34 +1105,28 @@ PoCと本番コードを分離することで、
 
 # 15. 技術選定について
 
-## PoC
-
-候補：
+Phase 0-E / 0-Fの設計で、MVPの基準構成を次に決定した。
 
 ```text
-Python
-├─ mercari
-└─ mercapi
-
-TypeScript
-└─ Playwright
+TypeScript + React + Vite
+          ↓
+Python + FastAPI
+          ↓
+MarketplacePort
+          ↓
+Mercari Adapter
+          ↓
+管理下のmercapi Fork
 ```
 
-既存ライブラリの多くがPythonのため、**Phase 0ではPythonも積極的に利用する**。
+- `mercapi`とAdapterはPython 3.11以上で同じProcessから利用する
+- Domain / Use caseをFastAPIから分離する
+- FrontendはMercari EndpointとFork固有型を参照しない
+- Database、認証、Playwright FallbackはMVPへ含めない
+- Package Versionは実装開始時に確認し、Lockfileとcommit SHAで固定する
 
-一方、Playwright検証やWebアプリ本体はTypeScriptとの相性がよい。
-
-そのため最初から言語を1つに固定せず、
-
-```text
-PoC
- ↓
-最も安定した取得方式を決定
- ↓
-本体技術を決定
-```
-
-とする。
+Adapterの詳細は[Phase 0-F仕様](phase-0-f-adapter-spec.md)、画面・API・MVP範囲は
+[MVP実装仕様](mvp-spec.md)を参照する。
 
 ---
 

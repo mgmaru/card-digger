@@ -394,60 +394,70 @@ Playwrightは必要データを取得できるが、Web画面の3状態一括取
 
 採用方式が決まった後、アプリ側から直接ライブラリを呼ばない。
 
+実装の正本は[Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)、Product側の正本は
+[MVP実装仕様](mvp-spec.md)とする。
+
 ```mermaid
 flowchart LR
     A[Application] --> B[Mercari Adapter]
     B --> C[採用した取得方式]
 ```
 
-## TODO
+## 0-F-0. 仕様確定
 
-- [ ] 検証済み`mercapi`コミットを基準に管理下のForkを用意し、依存をcommit SHAで固定する
-- [ ] `SellerItemsPage`に`items`、`hasNext`、`nextMaxPagerId`を定義する
-- [ ] Seller一覧の状態Filter、`max_pager_id`、`pager_id`、`meta.has_next`を公開APIへ追加する
-- [ ] Sellerページングの正常系・終端・空Response・Cursor欠落・重複をFixture Testする
-- [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端をライブ検証する
-- [ ] 検索の取得ページ数・件数・最古日時・打ち切り理由を返す型を定義する
-- [ ] Server側の古い順を前提にせず、取得範囲内だけをClient側でソートする
-- [ ] `MarketplaceItem` 型を定義する
-- [ ] `Seller` 型を定義する
-- [ ] `SellerItem` 型を定義する
-- [ ] 検索Interfaceを定義する
-- [ ] Seller取得Interfaceを定義する
-- [ ] Adapterを実装する
-- [ ] 外部ライブラリ固有型をDomain層へ漏らさない
-- [ ] Adapter外からForkのPrivate Memberを参照しない
+- [x] Python Adapter + 管理下の`mercapi` Forkという境界を決定する
+- [x] Fork、Adapter、Applicationの責務を分離する
+- [x] Domain型と`MarketplacePort`のContractを決定する
+- [x] 検索を最大10ページ・1,000件・30秒に制限する
+- [x] Seller商品を状態ごとに最大5ページ・100件・30秒に制限する
+- [x] `trading`を独立状態として保持し、MVPでは専用収集しないと決定する
+- [x] Error分類、1回だけの限定再試行、3回連続時の安全停止を決定する
+- [x] Phase 1のMVP範囲、Seller Knowledge、完了条件を決定する
+
+## 0-F-1. 管理下Forkを準備する
+
+- [ ] `kynacio/mercapi`のライセンスとFork・再配布条件を確認する
+- [ ] GitHub上に`mgmaru/mercapi` Forkを作成する
+- [ ] Fork元を`upstream` Remoteとして登録する
+- [ ] `feat/seller-items-pagination` Branchを作成する
+- [ ] 検証済みcommit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`を変更基点にする
+
+## 0-F-2. ForkへSellerページングを実装する
+
+- [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
+- [ ] Public APIで`status`、`limit`、`max_pager_id`を指定可能にする
+- [ ] Seller商品Modelへ`pager_id`を追加する
+- [ ] Responseの`meta.has_next`を保持する
+- [ ] `has_next=true`時だけ末尾`pager_id`を次Cursorとして返す
+- [ ] 空Response、Cursor欠落、未知Statusを検証する
+- [ ] 既存`items(profile_id)`の後方互換を維持する
+- [ ] 固定FixtureによるForkのUnit Testを追加する
+- [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する
+
+## 0-F-3. DomainとAdapterを実装する
+
+- [ ] Python 3.11以上のApplication Packageを`src/`へ作成する
+- [ ] `ListingStatus`、`ItemCondition`、`MarketplaceItem`、`Seller`を定義する
+- [ ] `PageInfo`、`SearchPage`、`SellerItemsPage`を定義する
+- [ ] `MarketplacePort`を定義する
+- [ ] Mercari Adapterの検索・詳細・Profile・Seller商品Pageを実装する
+- [ ] URL、価格、日時、状態を正規化する
+- [ ] 必須Field欠落とCursor不整合をParse Errorにする
+- [ ] 共通Error Codeと限定再試行を実装する
+- [ ] 検索・Seller商品の収集Policy、重複排除、停止理由を実装する
 - [ ] Mock Adapterを用意する
+- [ ] Domain / Application層へFork固有型を漏らさない
+- [ ] ForkのPrivate Memberを参照しない
 
-### 型イメージ
+## 0-F-4. Test・ライブ受入検証
 
-```ts
-type MarketplaceItem = {
-  id: string;
-  title: string;
-  price: number;
-  url: string;
-  imageUrls: string[];
-  createdAt?: Date;
-  listingStatus: "on_sale" | "sold_out" | "unknown";
-  itemCondition?: {
-    id?: string;
-    name?: string;
-    raw?: unknown;
-  };
-  likeCount?: number;
-  sellerId?: string;
-};
-
-type Seller = {
-  id: string;
-  name: string;
-  rating?: number;
-  ratingCount?: number;
-};
-
-type SellerItem = MarketplaceItem;
-```
+- [ ] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す
+- [ ] Adapterの正規化、Error、再試行、安全停止、収集上限をUnit Testする
+- [ ] `MarketplacePort`のContract TestをMercari / Mock Adapterの両方へ適用する
+- [ ] 検索を5回実行し、成功率と必須Field取得率を確認する
+- [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
+- [ ] ライブ受入検証結果をMarkdownへ記録する
+- [ ] [Adapter仕様のPhase 0-F完了条件](phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
 
 ---
 
@@ -456,6 +466,19 @@ type SellerItem = MarketplaceItem;
 ## 目的
 
 商品画像とSeller情報を一つの画面で確認し、人間の探索時間を減らす。
+
+機能、画面挙動、API、Seller Knowledge、対象外、完了条件は
+[MVP実装仕様](mvp-spec.md)を正本とする。
+
+## 1-0. Application基盤
+
+- [ ] BackendをPython + FastAPIで作成する
+- [ ] FrontendをTypeScript + React + Viteで作成する
+- [ ] FrontendがForkやMercari Endpointを直接参照しない構成にする
+- [ ] `POST /api/search`を実装する
+- [ ] `GET /api/sellers/{sellerId}/analysis`を実装する
+- [ ] Mercariへ接続しない`GET /api/health`を実装する
+- [ ] DatabaseとUser認証を導入しない
 
 ---
 
@@ -466,7 +489,7 @@ type SellerItem = MarketplaceItem;
 - [ ] Loading表示
 - [ ] エラー表示
 - [ ] 検索結果件数
-- [ ] 販売中のみフィルター
+- [ ] 販売中固定であることを表示し、状態切替Controlを設けない
 - [ ] 最低価格
 - [ ] 最高価格
 - [ ] 取得範囲内の古い順
@@ -517,10 +540,12 @@ type SellerItem = MarketplaceItem;
 - [ ] Seller名表示
 - [ ] 評価表示
 - [ ] 評価件数表示
-- [ ] 出品数表示
+- [ ] Profileの累計販売件数表示
 - [ ] SellerのMercariページへのリンク
-- [ ] 現在販売中の商品一覧
-- [ ] 売却済み商品一覧
+- [ ] 販売中商品を最大100件表示
+- [ ] 売却済み商品を最大100件表示
+- [ ] 状態ごとの取得件数・ページ数・打ち切り理由を表示
+- [ ] Seller分析のLoading・0件・部分成功・Errorを表示
 - [ ] 商品画像表示
 - [ ] 商品タイトル表示
 - [ ] 商品価格表示
@@ -536,12 +561,14 @@ type SellerItem = MarketplaceItem;
 
 ## MVPで使う簡易特徴量
 
-- [ ] 全出品数
+- [ ] 分析対象商品数
 - [ ] ポケカ関連商品数
 - [ ] TCG関連商品数
 - [ ] ポケカ出品率
 - [ ] TCG出品率
-- [ ] 専門用語の使用数
+- [ ] 専門用語を含む商品数・比率
+- [ ] 異なる専門用語数
+- [ ] 標本信頼度
 
 ### 専門用語候補
 
@@ -567,35 +594,43 @@ BOX
 Seller Knowledge
 -------------------------
 
-全出品              63
-ポケカ関連           3
-TCG関連              4
+分析対象             142
+ポケカ関連            63
+TCG関連               91
 
-ポケカ比率          4.8%
-TCG比率             6.3%
+ポケカ比率          44.4%
+TCG比率             64.1%
 
-専門用語            少ない
+専門用語あり         35
+異なる専門用語        7種類
 
-専門性              低
+専門性               高
+標本信頼度           高
 ```
 
 ### TODO
 
-- [ ] ポケカ判定キーワードを定義する
-- [ ] TCG判定キーワードを定義する
-- [ ] 専門用語一覧を定義する
+- [x] ポケカ判定キーワードを定義する
+- [x] TCG判定キーワードを定義する
+- [x] 専門用語一覧を定義する
+- [x] Titleの正規化方法を定義する
+- [x] `低 / 中 / 高`のScoreと標本信頼度を定義する
 - [ ] Seller商品を分類する
 - [ ] ポケカ比率を計算する
 - [ ] TCG比率を計算する
 - [ ] 専門用語出現数を計算する
 - [ ] `低 / 中 / 高` の簡易判定を実装する
+- [ ] `判定不能 / 低 / 中 / 高`の標本信頼度を実装する
+- [ ] 取得範囲と打ち切り有無を表示する
 - [ ] UIに表示する
 
 > Seller Knowledgeは購入判断ではなく、あくまで探索時の補助指標とする。
 
 ---
 
-# Phase 1-5 — 探索補助
+# MVP後 — 探索補助
+
+次はMVPへ含めない。MVPの利用結果から優先度を決める。
 
 - [ ] お気に入り
 - [ ] 確認済みフラグ
@@ -632,6 +667,11 @@ flowchart TD
 - [ ] Seller情報を確認できる
 - [ ] Sellerの商品一覧を確認できる
 - [ ] Seller Knowledgeを確認できる
+- [ ] 検索・Seller分析の取得範囲と停止理由を確認できる
+- [ ] Mercari全体の最古順・Seller全商品だと誤認させる表示がない
+- [ ] 外部取得Errorを0件や成功として隠さない
+- [ ] MobileとKeyboardで主要Flowを操作できる
+- [ ] Mock Adapterを使うE2E受入Flowが成功する
 - [ ] 人間が見る商品を効率的に絞れる
 
 ---
