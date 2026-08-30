@@ -1,0 +1,2 @@
+mercapi @ git+https://github.com/kynacio/mercapi.git@20ba68fd42677997c4c91b4e4eb17c1e7e387efa
+Pillow==11.3.0
