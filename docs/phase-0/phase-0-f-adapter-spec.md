@@ -3,11 +3,13 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
+- 最終更新日: **2026-08-31**
 - ステータス: **実装基準として採用**
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
 - Product側の挙動: [MVP実装仕様](../product/mvp-spec.md)
 - Repository運用: [mercapi Fork運用手順](../development/mercapi-fork-operations.md)
+- 追加検証: [Auction情報の追加検証計画](phase-0-f-auction-validation.md)
 
 この文書はPhase 0-Fの正本とする。実装中に判断が分かれた場合は、コードだけで挙動を決めず、
 この文書とTODOを先に更新する。
@@ -38,10 +40,16 @@ Phase 0-Fでは画面を作らない。PythonのDomain型、Interface、Adapter�
 | Application境界 | `MarketplacePort`だけを参照し、`mercapi`の型を参照しない |
 | Seller一覧 | `on_sale`と`sold_out`を別Request・別Cursorで取得する |
 | `trading` | Domain上は独立状態として保持する。MVPでは専用収集を行わない |
+| 販売形式 | `fixed_price` / `auction` / `unknown`をDomainで保持し、未知形状を通常出品へ寄せない |
+| Auction | 判定と価格Fieldの追加検証合格後に、検索・Seller一覧の両方で有効化する |
 | 古い順 | Server側の順序を信用せず、取得範囲内だけをApplication側でSortする |
 | 商品詳細 | Adapterに用意するが、MVP検索一覧では自動取得しない |
 | Playwright | 自動Fallbackに使わず、仕様調査・障害診断用PoCに限定する |
 | 永続化 | Phase 0-Fでは行わない。Cookie、Token、生Response、画像本体を保存しない |
+
+AuctionのDomain境界はこの文書で先に確保するが、Raw Fieldから`SaleFormat`と`price_yen`への
+Mappingは[Auction追加検証](phase-0-f-auction-validation.md)の結果を正本とする。結果文書が完成するまで、
+推測でMappingを実装せず、Phase 0-Fを完了扱いにしない。
 
 ## 3. 責務の境界
 
@@ -70,7 +78,9 @@ Card Digger固有の次の処理はForkへ入れない。
 ### 3.2 Mercari Adapterの責務
 
 - `mercapi`モデルをDomain型へ変換する
-- URL、日時、価格、販売状態を正規化する
+- URL、日時、価格、販売状態、販売形式を正規化する
+- Auctionの価格を取得時点のSnapshotとして扱い、確定落札額へ変換しない
+- 販売形式の未知形状を`SaleFormat.UNKNOWN`として保持する
 - 必須Field欠落を成功扱いにしない
 - `mercapi`例外・HTTP Errorを共通Errorへ分類する
 - `MarketplacePort`を実装する
@@ -80,7 +90,7 @@ Card Digger固有の次の処理はForkへ入れない。
 
 - 複数ページの収集と停止条件
 - 商品IDによる重複排除
-- Phase 1へ渡す取得範囲・最古日時・打ち切り理由のMetadata
+- Phase 1へ渡す取得範囲・最古・最新日時・取得時刻・打ち切り理由のMetadata
 - Seller Knowledgeの計算
 - Loadingと手動再実行
 
@@ -150,6 +160,11 @@ class ListingStatus(str, Enum):
     SOLD_OUT = "sold_out"
     UNKNOWN = "unknown"
 
+class SaleFormat(str, Enum):
+    FIXED_PRICE = "fixed_price"
+    AUCTION = "auction"
+    UNKNOWN = "unknown"
+
 @dataclass(frozen=True)
 class ItemCondition:
     id: str | None
@@ -164,6 +179,7 @@ class MarketplaceItem:
     image_urls: tuple[str, ...]
     created_at: datetime
     listing_status: ListingStatus
+    sale_format: SaleFormat
     seller_id: str
     item_condition: ItemCondition | None = None
     like_count: int | None = None
@@ -198,12 +214,17 @@ class SellerItemsPage:
 
 | 型 | 必須Field |
 |---|---|
-| `MarketplaceItem` | ID、Title、1円以上の価格、HTTPS URL、1件以上の画像URL、出品日時、状態、Seller ID |
+| `MarketplaceItem` | ID、Title、1円以上の価格、HTTPS URL、1件以上の画像URL、出品日時、状態、販売形式、Seller ID |
 | `Seller` | ID、名前、HTTPS Seller URL |
 | Page | `has_next`と整合するCursor |
 
 必須Fieldが欠けたRecordは黙って除外しない。Field名と操作を含むParse Errorとして、その取得操作を
-失敗させる。`item_condition`、`like_count`、評価、評価件数、販売件数だけはNullableとする。
+失敗させる。`SaleFormat.UNKNOWN`は未知形状を表す有効値であり、`FIXED_PRICE`へ変換しない。
+`item_condition`、`like_count`、評価、評価件数、販売件数だけはNullableとする。
+
+`price_yen`は、通常出品では販売価格、Auctionでは追加検証で特定した取得時点の現在価格とする。
+Auctionの開始価格や確定落札額で代用しない。検証で現在価格を安定して取得できない場合は、
+[追加検証計画の縮小方針](phase-0-f-auction-validation.md#62-合格しない場合)に従う。
 
 ## 7. Marketplace Interface
 
@@ -235,6 +256,8 @@ class MarketplacePort(Protocol):
 
 - `search_items_page`はMVPでは`on_sale`、カテゴリ・価格指定なし、
   `SORT_CREATED_TIME / ORDER_ASC`固定で要求する
+- Auction追加検証に合格した場合は`withAuction=true`で通常出品とAuctionを取得し、
+  販売形式Filterのための追加Requestは行わない
 - `SORT_CREATED_TIME / ORDER_ASC`は検証条件を維持するため送るだけで、順序保証には使わない
 - AdapterはServer側の古い順を保証しない
 - `get_item`は画面から明示的に必要になった場合だけ呼ぶ
@@ -268,8 +291,9 @@ class MarketplacePort(Protocol):
 5. 30秒へ到達した
 6. 安全停止または取得Errorが発生した
 
-検索結果には必ず、取得ページ数、取得ユニーク件数、重複件数、最古日時、365日以上の商品数、
-停止理由、Server側の完全な古い順ではないことを付与する。
+検索結果には必ず、取得ページ数、取得ユニーク件数、重複件数、最古・最新日時、取得時刻、
+365日以上の商品数、停止理由、Server側の完全な古い順ではないことを付与する。
+掲載日と販売形式のFilterは取得後にFrontendが適用し、この収集Policyの停止条件には使用しない。
 
 最大件数に達するPageが上限を超える場合は、Response順の先頭から上限までを採用し、残りを
 破棄した件数もMetadataへ記録する。Seller商品でも同じ規則を使う。
@@ -353,6 +377,9 @@ Proxy切替、複数Accountによる回避は行わない。
 
 - `mercapi`型がDomain型へ正規化される
 - `trading`を`unknown`や`sold_out`へ変換しない
+- 通常出品、Auction、未知形状をそれぞれ`SaleFormat`へ変換する
+- Auctionの取得時点価格を正規化し、開始価格や確定価格へ読み替えない
+- 検索とSeller商品で同じ販売形式Mappingを使用する
 - 必須Field欠落でParse Errorになる
 - ForkのPrivate Memberを使わない
 - 最大ページ・件数・時間・重複の各停止理由を判定できる
@@ -366,6 +393,8 @@ Proxy切替、複数Accountによる回避は行わない。
 
 - 検索5回の成功率80%以上。100%を優先する
 - 必須商品Field各100%
+- Auction追加検証が合格し、販売形式の判定が標本各100%一致する
+- Auction価格Fieldが商品ページの取得時点価格と95%以上一致する
 - 商品詳細20件のコンディション・いいね各95%以上
 - Seller Profile 10人の名前90%以上
 - 最大10 Sellerの`on_sale` / `sold_out`で、状態ごとに2ページ目取得または1ページ終端
@@ -379,6 +408,7 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 - [ ] 管理下のForkが作成され、ライセンスと著作権表示が維持されている
 - [ ] ForkのSellerページングPublic APIとUnit Testが完成している
 - [ ] Card DiggerがForkのTest済みcommit SHAへ固定されている
+- [ ] Auction追加検証の結果文書が完成し、合否とMappingが仕様へ反映されている
 - [ ] Domain型と`MarketplacePort`が定義されている
 - [ ] Mercari AdapterとMock Adapterが実装されている
 - [ ] 収集Policy、重複排除、停止理由、安全停止が実装されている
@@ -392,6 +422,7 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 - Web UIとHTTP API
 - Databaseと永続Cache
 - 定期実行・Background Job
+- Auctionの入札・購入・自動更新・Countdown・終了通知
 - Playwright Fallback
 - Seller Knowledge計算
 - 画像本体の保存・Proxy

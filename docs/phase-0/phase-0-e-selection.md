@@ -3,6 +3,7 @@
 ## 結論
 
 - 決定日: **2026-08-30**
+- 最終更新日: **2026-08-31**
 - 判定: **`kynacio/mercapi`方式を本採用**
 - 採用する構成: **検証済みコミット`20ba68fd42677997c4c91b4e4eb17c1e7e387efa`を基準にした管理下のFork + Mercari Adapter**
 - Playwrightの扱い: **仕様調査・障害診断用PoCとしてのみ保持し、MVPの実行経路には含めない**
@@ -145,14 +146,19 @@ Phase 0-F / Phase 1では、次の制約を仕様とUIへ明示する。
 - ライブ検証で最大10 Sellerについて、`on_sale`と`sold_out`を個別に取得し、各状態で
   2ページ目取得または1ページ終端を確認する
 - 商品検索、詳細、Profile、Seller一覧の必須FieldをContract Testで検証する
+- [Auction追加検証計画](phase-0-f-auction-validation.md)に従い、通常出品とAuctionの判定、
+  取得時点価格、終了予定時刻、Seller一覧への影響を確認する
 - Adapter外からFork固有型とPrivate Memberを参照していないことをテストする
 - 401 / 403 / 429 / Challengeの3回連続時に停止し、認証回避を試みないことを確認する
 
-### Phase 1開始前の仕様化（2026-08-30完了）
+### Phase 1開始前の仕様化（2026-08-31更新）
 
 - [x] 検索を最大10ページ・1,000件・30秒とし、打ち切り理由を保持する
 - [x] 「取得範囲内で古い順」というUI表記にする
 - [x] `trading`を独立状態として保持し、MVPでは専用収集しない
+- [x] 掲載開始日・終了日を取得範囲内のFrontend Filterとして追加する
+- [x] 販売形式を`fixed_price` / `auction` / `unknown`で保持し、未知形状を通常出品へ寄せない
+- [x] Auctionの表示・Filterを追加検証の合格後に有効化する
 - [x] MVPでは定期監視を行わず、依存更新・Release前に低頻度のライブ検証を手動実行する
 
 詳細は[Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)と

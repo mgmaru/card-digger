@@ -3,7 +3,8 @@
 > 掘り出し物を効率よく探索するためのMercari検索・出品者分析アプリ。
 >
 > 最初の目標だったMercari取得方式の選定はPhase 0-Eで完了した。現在は、選定した
-> **`kynacio/mercapi`方式をMercari Adapterとして安全に分離すること**が次の目標。
+> **`kynacio/mercapi`方式のAuction情報を追加検証し、Mercari Adapterとして安全に分離すること**が
+> 次の目標。
 
 ---
 
@@ -412,10 +413,28 @@ flowchart LR
 - [x] 検索を最大10ページ・1,000件・30秒に制限する
 - [x] Seller商品を状態ごとに最大5ページ・100件・30秒に制限する
 - [x] `trading`を独立状態として保持し、MVPでは専用収集しないと決定する
+- [x] 掲載開始日・終了日を取得範囲内のFrontend FilterとしてMVPへ追加する
+- [x] 販売形式を`fixed_price` / `auction` / `unknown`で保持する方針を決定する
+- [x] Auction対応を追加PoCの合格後に有効化するGateを定義する
 - [x] Error分類、1回だけの限定再試行、3回連続時の安全停止を決定する
 - [x] Phase 1のMVP範囲、Seller Knowledge、完了条件を決定する
 
-## 0-F-1. 管理下Forkを準備する
+## 0-F-1. Auction情報を追加検証する
+
+検証条件と合格基準は
+[Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)を正本とする。
+
+- [ ] 通常出品とAuctionを各10件以上取得する
+- [ ] 検索結果、商品詳細、商品ページの販売形式を照合する
+- [ ] `price`、開始価格、最高入札額、現在価格の対応を確認する
+- [ ] 入札件数、終了予定時刻、Timezone、欠落条件を確認する
+- [ ] 検索とSeller商品一覧で同じ販売形式判定を適用できるか確認する
+- [ ] `with_auction`がSeller商品の件数・状態・Cursorへ与える影響を確認する
+- [ ] 未知形状を`fixed_price`へ誤変換せず`unknown`にできるか確認する
+- [ ] `poc/mercapi/auction-result.md`へ実測結果を記録する
+- [ ] 合否と採用MappingをMVP仕様・Adapter仕様へ反映する
+
+## 0-F-2. 管理下Forkを準備する
 
 - [ ] `kynacio/mercapi`のライセンスとFork・再配布条件を確認する
 - [ ] GitHub上に`mgmaru/mercapi` Forkを作成する
@@ -423,7 +442,7 @@ flowchart LR
 - [ ] `feat/seller-items-pagination` Branchを作成する
 - [ ] 検証済みcommit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`を変更基点にする
 
-## 0-F-2. ForkへSellerページングを実装する
+## 0-F-3. ForkへSellerページングを実装する
 
 - [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
 - [ ] Public APIで`status`、`limit`、`max_pager_id`を指定可能にする
@@ -435,14 +454,16 @@ flowchart LR
 - [ ] 固定FixtureによるForkのUnit Testを追加する
 - [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する
 
-## 0-F-3. DomainとAdapterを実装する
+## 0-F-4. DomainとAdapterを実装する
 
 - [ ] Python 3.11以上のApplication Packageを`src/`へ作成する
-- [ ] `ListingStatus`、`ItemCondition`、`MarketplaceItem`、`Seller`を定義する
+- [ ] `ListingStatus`、`SaleFormat`、`ItemCondition`、`MarketplaceItem`、`Seller`を定義する
 - [ ] `PageInfo`、`SearchPage`、`SellerItemsPage`を定義する
 - [ ] `MarketplacePort`を定義する
 - [ ] Mercari Adapterの検索・詳細・Profile・Seller商品Pageを実装する
-- [ ] URL、価格、日時、状態を正規化する
+- [ ] URL、価格、日時、状態、販売形式を正規化する
+- [ ] Auctionの価格を追加検証で確定した取得時点価格へ正規化する
+- [ ] 未知の販売形式を`SaleFormat.UNKNOWN`として保持する
 - [ ] 必須Field欠落とCursor不整合をParse Errorにする
 - [ ] 共通Error Codeと限定再試行を実装する
 - [ ] 検索・Seller商品の収集Policy、重複排除、停止理由を実装する
@@ -450,12 +471,13 @@ flowchart LR
 - [ ] Domain / Application層へFork固有型を漏らさない
 - [ ] ForkのPrivate Memberを参照しない
 
-## 0-F-4. Test・ライブ受入検証
+## 0-F-5. Test・ライブ受入検証
 
 - [ ] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す
 - [ ] Adapterの正規化、Error、再試行、安全停止、収集上限をUnit Testする
 - [ ] `MarketplacePort`のContract TestをMercari / Mock Adapterの両方へ適用する
 - [ ] 検索を5回実行し、成功率と必須Field取得率を確認する
+- [ ] 通常出品・Auction・未知形状の販売形式と価格LabelをFixture Testする
 - [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
 - [ ] ライブ受入検証結果をMarkdownへ記録する
 - [ ] [Adapter仕様のPhase 0-F完了条件](../phase-0/phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
@@ -493,11 +515,16 @@ flowchart LR
 - [ ] 販売中固定であることを表示し、状態切替Controlを設けない
 - [ ] 最低価格
 - [ ] 最高価格
+- [ ] 掲載開始日
+- [ ] 掲載終了日
+- [ ] 掲載開始日だけ・終了日だけ・期間指定のFilter
+- [ ] `すべて`・`通常出品`・`オークション`の販売形式Filter
 - [ ] 取得範囲内の古い順
 - [ ] 新しい順
 - [ ] 価格の安い順
 - [ ] 価格の高い順
-- [ ] 取得ページ数・件数・最古日時・打ち切り理由の表示
+- [ ] 取得ページ数・件数・最古・最新日時・取得時刻・打ち切り理由の表示
+- [ ] 掲載日FilterがMercari全体を網羅しないことの表示
 
 ---
 
@@ -524,7 +551,8 @@ flowchart LR
 
 - [ ] 商品画像表示
 - [ ] タイトル表示
-- [ ] 価格表示
+- [ ] 販売形式Badge表示
+- [ ] 通常価格・Auction現在価格（取得時点）・形式不明のLabel表示
 - [ ] 出品日時表示
 - [ ] 経過日数表示
 - [ ] 元Mercariページへのリンク
@@ -664,12 +692,16 @@ flowchart TD
 - [ ] 商品を検索できる
 - [ ] 商品画像を一覧表示できる
 - [ ] 取得範囲内で古い順に表示できる
+- [ ] 取得範囲内で掲載開始日・終了日・期間を指定できる
+- [ ] 通常出品・Auctionを判別して絞り込める
+- [ ] Auction価格が取得時点の値であり、確定落札額ではないと確認できる
 - [ ] 元商品ページへ移動できる
 - [ ] Seller情報を確認できる
 - [ ] Sellerの商品一覧を確認できる
 - [ ] Seller Knowledgeを確認できる
 - [ ] 検索・Seller分析の取得範囲と停止理由を確認できる
-- [ ] Mercari全体の最古順・Seller全商品だと誤認させる表示がない
+- [ ] Mercari全体の最古順・指定期間の全件・Seller全商品だと誤認させる表示がない
+- [ ] Auctionを通常出品または確定価格だと誤認させる表示がない
 - [ ] 外部取得Errorを0件や成功として隠さない
 - [ ] MobileとKeyboardで主要Flowを操作できる
 - [ ] Mock Adapterを使うE2E受入Flowが成功する

@@ -6,6 +6,8 @@ Mercariから必要なデータを取得する3方式を、[`docs/planning/todo.
 3方式の検証と比較は完了し、Phase 0-Eでは`kynacio/mercapi`方式を選定しました。判断根拠、
 未解決の古い順要件、追加検証は
 [選定結果](../docs/phase-0/phase-0-e-selection.md)を参照してください。
+Phase 0-F開始前に必要なAuction情報の確認は
+[追加検証計画](../docs/phase-0/phase-0-f-auction-validation.md)を使用します。
 
 | ディレクトリ | 検証対象 | 主な確認事項 |
 |---|---|---|

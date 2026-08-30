@@ -3,8 +3,8 @@
 大量出品・引退品の中から、確認する価値が高いトレーディングカード商品を効率よく絞り込むための、マーケットプレイス検索・出品者分析ツールです。
 
 Phase 0-A〜0-Eの技術検証を完了し、Mercari取得には **`kynacio/mercapi`方式**を選定しました。
-Phase 0-FとMVPの実装仕様を確定し、現在は管理下の`mercapi` Forkを準備する段階です。
-Seller商品の状態別ページングは、検証済みコミットを基準にしたForkへ追加します。
+Phase 0-FとMVPの実装仕様を確定し、現在はAuction情報の追加検証と管理下の`mercapi` Forkを
+準備する段階です。Seller商品の状態別ページングは、検証済みコミットを基準にしたForkへ追加します。
 
 ## ドキュメント
 
@@ -14,6 +14,7 @@ Seller商品の状態別ページングは、検証済みコミットを基準�
 - [開発ロードマップ / TODO](docs/planning/todo.md)
 - [Phase 0-E Mercari取得方式の選定結果](docs/phase-0/phase-0-e-selection.md)
 - [Phase 0-F Mercari Adapter実装仕様](docs/phase-0/phase-0-f-adapter-spec.md)
+- [Phase 0-F Auction情報の追加検証計画](docs/phase-0/phase-0-f-auction-validation.md)
 
 ## リポジトリ構成
 

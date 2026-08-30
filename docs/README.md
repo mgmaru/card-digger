@@ -9,7 +9,8 @@
 3. [開発ロードマップ / TODO](planning/todo.md)
 4. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
 5. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
-6. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+6. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
+7. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
 
 ## ディレクトリ
 
@@ -26,6 +27,7 @@ docs/
 └── phase-0/
     ├── poc-validation.md
     ├── phase-0-e-selection.md
+    ├── phase-0-f-auction-validation.md
     └── phase-0-f-adapter-spec.md
 ```
 
@@ -55,6 +57,8 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 
 - [poc-validation.md](phase-0/poc-validation.md): 3方式の共通検証条件
 - [phase-0-e-selection.md](phase-0/phase-0-e-selection.md): `mercapi`選定の根拠と制約
+- [phase-0-f-auction-validation.md](phase-0/phase-0-f-auction-validation.md):
+  通常出品とAuctionの判定・価格・終了時刻を確認する追加検証計画
 - [phase-0-f-adapter-spec.md](phase-0/phase-0-f-adapter-spec.md): ForkとAdapterの実装仕様
 
 ## 配置ルール

@@ -3,8 +3,10 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
+- 最終更新日: **2026-08-31**
 - ステータス: **Phase 1の実装基準として採用**
 - 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
+- Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)
 - 対象: Search MVP、Seller画面、Seller Knowledge Indicator
 
 この文書はMVPに含める機能、含めない機能、画面挙動、計算方法、完了条件の正本とする。
@@ -105,6 +107,9 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 - 検索中のLoading表示
 - 商品IDによる重複排除
 - 最低価格・最高価格Filter
+- 掲載開始日・終了日Filter（Asia/Tokyoの日単位）
+- 販売形式（通常出品・オークション・不明）の保持とBadge表示
+- 販売形式Filter（Auction追加検証の合格後に有効化）
 - 取得範囲内の古い順・新しい順
 - 価格の安い順・高い順
 - 画像中心のResponsive Grid
@@ -144,6 +149,9 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 - 画像本体のBackend Proxy、保存、AI画像解析
 - 相場取得、利益計算、Opportunity Score
 - 自動購入、自動交渉
+- Card DiggerからのAuction入札・落札・購入
+- Auction価格・終了時刻の自動更新、Countdown、終了通知
+- 時・分・秒を指定する出品日時Filter
 - Playwrightへの自動Fallback
 - 複数Marketplace
 - 公開・商用Service化
@@ -160,11 +168,21 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 | 最低価格 | 未指定、または0以上の整数。単位は円 |
 | 最高価格 | 未指定、または0以上の整数。単位は円 |
 | 価格範囲 | 両方指定時は最低価格 `<=` 最高価格 |
+| 掲載開始日 | 未指定、または`YYYY-MM-DD`。Asia/Tokyoの当日00:00:00以降を残す |
+| 掲載終了日 | 未指定、または`YYYY-MM-DD`。Asia/Tokyoの翌日00:00:00未満を残す |
+| 掲載日期間 | 両方指定時は掲載開始日 `<=` 掲載終了日 |
 | 販売状態 | UIでは`on_sale`固定。変更Controlは設けない |
+| 販売形式 | `all`、`fixed_price`、`auction`。初期値は`all` |
 | Sort | `oldest`、`newest`、`price_asc`、`price_desc` |
 
-価格FilterとSortはFrontendが取得済み範囲へ適用し、BackendやMercariへ再Requestしない。
-初期Sortは`oldest`とする。
+価格、掲載日、販売形式のFilterとSortはFrontendが取得済み範囲へ適用し、BackendやMercariへ
+再Requestしない。初期Sortは`oldest`とする。
+
+掲載開始日だけなら指定日以降、掲載終了日だけなら指定日以前、両方なら指定期間内を表す。
+時刻指定はMVPへ含めず、日付境界を必ずAsia/Tokyoで計算する。
+
+販売形式Filterは[Auction追加検証](../phase-0/phase-0-f-auction-validation.md)の合格後に有効化する。
+不合格時の縮小方針は同文書の判定に従い、未知形式を通常出品として扱わない。
 
 ### 5.2 検索開始
 
@@ -184,6 +202,10 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 - すべてのMercari Requestは同時実行数1、開始間隔2秒以上
 - 取得順は古い順とみなさない
 - 上限を超えたPage内の商品はResponse順で上限件数まで採用する
+- 掲載日と販売形式の指定によって、Backendの取得範囲や停止条件を変更しない
+
+掲載日Filterは取得済み商品の絞り込みであり、Mercari全体の指定期間を網羅する検索ではない。
+指定期間に一致する商品が0件でも、Mercari上に0件だとは表示しない。
 
 ### 5.4 検索結果Metadata
 
@@ -201,6 +223,8 @@ type CollectionMeta = {
   duplicateCount: number;
   discardedByLimitCount: number;
   oldestCreatedAt: string | null;
+  newestCreatedAt: string | null;
+  collectedAt: string;
   oldListingCount: number;
   stopReason:
     | "target_reached"
@@ -222,13 +246,17 @@ type CollectionMeta = {
 - `truncated`: 目標到達、ページ・件数・時間上限で、続きが存在する可能性がある場合に`true`
 - `partial`: Errorまたは安全停止で予定した取得を完了できなかった場合に`true`
 - `errors`: 個人情報や生Responseを含めず、分類Codeと操作だけを返す
+- `oldestCreatedAt` / `newestCreatedAt`: 取得済み商品の最小・最大日時。Mercari全体の範囲ではない
+- `collectedAt`: Backendが収集を完了した時刻。RFC 3339のTimezone付き日時
 
 画面には最低限、次の文言を出す。
 
 ```text
 Mercariから 825件 / 7ページを取得
+取得した商品の掲載日時: 2025-08-20〜2026-08-31
+指定した掲載日に一致: 42件 / 825件
 取得した範囲内で古い順に表示しています
-Mercari全体の最古順ではありません
+Mercari全体の最古順・指定期間の全件ではありません
 停止理由: 365日以上前の商品へ到達
 ```
 
@@ -243,9 +271,18 @@ Mercari全体の最古順ではありません
 - `price_desc`: `priceYen`降順。同額は`createdAt`昇順
 - 最低価格: 以上を残す
 - 最高価格: 以下を残す
+- 掲載開始日: `createdAt >= 開始日の00:00:00 Asia/Tokyo`を残す
+- 掲載終了日: `createdAt < 終了日の翌日00:00:00 Asia/Tokyo`を残す
+- `all`: `SaleFormat.UNKNOWN`を含む全形式を残す
+- `fixed_price`: `SaleFormat.FIXED_PRICE`だけを残す
+- `auction`: `SaleFormat.AUCTION`だけを残す
 - Filter後件数と取得総数を分けて表示する
 
 `createdAt`は必須Fieldであり、欠落Itemを末尾へ回して成功扱いにはしない。
+販売形式の判定に必要なFieldが未知形状なら`SaleFormat.UNKNOWN`とし、通常出品へ含めない。
+
+通常出品とAuctionを混在させて価格順にした場合、通常出品は販売価格、Auctionは取得時点の
+現在価格で比較する。形式と価格の意味をCard上で区別し、確定落札額とは表示しない。
 
 ### 5.6 商品Card
 
@@ -253,13 +290,15 @@ Mercari全体の最古順ではありません
 
 - 先頭画像1枚。画像取得失敗時はPlaceholder
 - Title。2〜3行で省略し、完全なTitleはAccessible NameまたはTooltipで確認可能にする
-- 価格（日本円）
+- 販売形式Badge（`通常出品`、`オークション`、`形式不明`）
+- 通常出品は「価格」、Auctionは「現在価格（取得時点）」、不明は「価格（取得時点）」
 - 出品日時（Asia/Tokyo）
 - 検索実行時点からの経過日数
 - 「Mercariで商品を見る」外部Link
 - 「Sellerを分析」Link
 
 MVPでは検索CardごとにSeller分析を自動実行しない。Seller TCG率はSeller画面を開いた後だけ表示する。
+Auctionの残り時間Countdownと自動更新は行わず、最新情報はMercariで確認するよう表示する。
 
 ## 6. Seller画面
 
@@ -283,7 +322,8 @@ MVPでは検索CardごとにSeller分析を自動実行しない。Seller TCG率
 - 状態ごとのPage数、終端または打ち切り理由
 - Seller Knowledge
 
-Seller商品Cardには画像、Title、価格、出品日時、状態、元商品Linkを表示する。
+Seller商品Cardには画像、Title、販売形式Badge、形式に応じた価格Label、出品日時、状態、
+元商品Linkを表示する。
 
 ### 6.3 取得上限の表記
 
@@ -446,8 +486,8 @@ Request:
 }
 ```
 
-Responseは取得した全`items`と`CollectionMeta`を返す。価格Filter、Sort、Filter後件数は
-Frontendが計算する。外部取得が
+Responseは取得した全`items`と`CollectionMeta`を返す。価格・掲載日・販売形式Filter、Sort、
+Filter後件数はFrontendが計算する。外部取得が
 部分失敗した場合はHTTP 200で取得済み結果を返すが、`partial=true`と`errors`を必須にする。
 
 ### `GET /api/sellers/{sellerId}/analysis`
@@ -480,6 +520,7 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 | Loading | Spinnerと「最大取得範囲を確認中」の文言。途中件数は表示しない |
 | 成功 | Metadata、Filter、Gridを表示 |
 | 0件 | 条件変更を促し、空Gridを表示 |
+| Filter後0件 | 取得総数を残し、「取得範囲内では一致なし」と表示 |
 | 部分成功 | 取得済み結果と警告、停止理由、再実行Button |
 | 入力Error | 対象Fieldの近くに修正方法を表示 |
 | 外部Error | Error分類に応じた説明と手動再実行Button |
@@ -503,6 +544,7 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 ### Backend / Domain
 
 - [ ] KeywordのValidation Test
+- [ ] `SaleFormat`とAuction価格LabelのDomain / Schema Test
 - [ ] 検索・Seller収集の全停止理由のUnit Test
 - [ ] Seller Knowledgeの正規化、Keyword、境界、Score、信頼度のUnit Test
 - [ ] 0件、29件、30件、99件、100件の境界Test
@@ -511,9 +553,11 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 
 ### Frontend
 
-- [ ] 価格範囲のValidation Test
+- [ ] 価格・掲載日期間のValidation Test
 - [ ] 入力、Loading、0件、成功、部分成功、Error表示のComponent Test
-- [ ] 価格Filterと4種類のSortのTest
+- [ ] 価格・掲載日・販売形式Filterと4種類のSortのTest
+- [ ] Asia/Tokyoの日付境界と開始日・終了日の片側指定Test
+- [ ] 通常出品・Auction・不明のBadgeと価格LabelのTest
 - [ ] 画像PlaceholderのTest
 - [ ] Sellerの状態別Tabと取得範囲表示のTest
 - [ ] Seller KnowledgeのScoreと注意書き表示のTest
@@ -525,17 +569,20 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 
 1. `ポケカ 引退品`を検索する
 2. 取得範囲と古い順の注意書きを確認する
-3. 価格FilterとSortを変更する
-4. 商品CardからSeller画面を開く
-5. 販売中・売却済みの件数と打ち切り理由を確認する
-6. Seller Knowledgeと標本信頼度を確認する
-7. 元Mercari商品Linkが正しいHTTPS URLであることを確認する
+3. 掲載開始日だけ、終了日だけ、期間指定でFilterする
+4. 通常出品・Auctionを切り替え、Badgeと価格Labelを確認する
+5. 価格FilterとSortを変更する
+6. 商品CardからSeller画面を開く
+7. 販売中・売却済みの件数と打ち切り理由を確認する
+8. Seller Knowledgeと標本信頼度を確認する
+9. 元Mercari商品Linkが正しいHTTPS URLであることを確認する
 
 ### MVP完了条件
 
 - [ ] E2E受入Flowがすべて成功する
 - [ ] 商品検索とSeller分析で取得範囲・停止理由を常に確認できる
-- [ ] Mercari全体の古い順・Seller全商品であると誤認させる表示がない
+- [ ] Mercari全体の古い順・指定期間の全件・Seller全商品であると誤認させる表示がない
+- [ ] Auctionを通常出品または確定価格と誤認させる表示がない
 - [ ] Seller Knowledgeがこの文書の同じ入力から決定的に同じ値を返す
 - [ ] 外部取得失敗を成功または0件として隠さない
 - [ ] 主要操作がKeyboardとMobile Layoutで利用できる

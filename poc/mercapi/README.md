@@ -13,6 +13,11 @@ Seller商品一覧の追加検証では、Mercari Webが`max_pager_id`と`meta.h
 30件上限はMercari API自体の終端ではなく、固定版`mercapi`の公開メソッドと応答モデルの実装不足です。
 ただし、現状の公開APIのままでは利用できないため、Wrapper拡張またはAdapter側の補完が必要です。
 
+通常出品とAuctionの判定、価格の意味、終了予定時刻、Seller一覧への影響は既存PoCの対象外だった。
+Phase 0-F実装前に
+[Auction情報の追加検証計画](../../docs/phase-0/phase-0-f-auction-validation.md)を実行し、
+結果を`auction-result.md`へ記録する。
+
 ## セットアップ
 
 リポジトリルートで実行します。`mercapi`は検証したGitコミットに固定しています。追加検証では
