@@ -218,9 +218,8 @@ Fixtureは、**観測したResponseの構造だけを写した、手書き・最
 - Git管理対象とする
 - 1 Fixture = 1検証観点
 - **L1〜L3だけで使う。** L4はFixtureを使わず実応答を扱う
-- 模擬データだが**想像で作らない。** 実際に観測した構造に基づく（[§5.4](#54-出所の記録)）
-- 実サービスで再現できない異常系（`has_next=true`で末尾`pager_id`が欠落、空Response +
-  `has_next=true`、429など）は、**観測済みの正常Fixtureから派生**させて作る。ゼロから創作しない
+- 模擬データだが**想像で作らない。** 実際に観測した構造に基づく（[§5.5](#55-出所の記録)）
+- 実サービスで再現できない異常系の扱いは[§5.4](#54-異常系fixtureの作り方)に従う
 
 Fixtureを使う理由は、**実サービスでは狙って起こせない状況を再現できる**ことにある。
 
@@ -279,24 +278,121 @@ Fixtureを使う理由は、**実サービスでは狙って起こせない状�
 - 30件Page相当が必要な場合だけ、生成Helperで機械的に増やす
 - Fixtureへ検証と無関係なNestを残さない
 
-### 5.4 出所の記録
+### 5.4 異常系Fixtureの作り方
+
+`has_next=true`なのに空、末尾`pager_id`の欠落、429などは実サービスで狙って起こせない。
+ここで「想像で作らない」という原則と衝突して見えるが、**想像を2種類に分ければ矛盾しない。**
+
+#### 想像には2種類ある
+
+| 種類 | 内容 | 可否 |
+|---|---|:---:|
+| **構造（形）の想像** | Field名、階層、型を推測する | **禁止** |
+| **状態（値・組み合わせ）の想像** | 観測した構造の中で値を変える・Fieldを消す | **必須** |
+
+異常系で入るのは後者だけとする。観測済みの正常Fixtureを起点に、**新しいField名を発明せず**
+値とFieldの有無だけを変える。
+
+```jsonc
+// 観測済み（正常）
+{ "data": [ { "id": "m000000000001", "pager_id": 9 } ], "meta": { "has_next": true } }
+
+// 派生① 末尾pager_id欠落 → pager_id を消しただけ
+{ "data": [ { "id": "m000000000001" } ],                "meta": { "has_next": true } }
+
+// 派生② 空Response + has_next=true → data を空にしただけ
+{ "data": [],                                           "meta": { "has_next": true } }
+
+// 派生③ 終端 → has_next を false にしただけ
+{ "data": [ { "id": "m000000000001", "pager_id": 9 } ], "meta": { "has_next": false } }
+```
+
+次は禁止する。Mercariが実際にどう返すか観測しておらず、存在しない形をTestすることになる。
+
+```jsonc
+// NG: Error Responseの形を推測した
+{ "error": { "code": "RATE_LIMITED", "retryAfter": 60 } }
+
+// NG: 値域を観測していない
+{ "auction": { "status": "ENDED" } }
+```
+
+#### 異常系の大半はFixtureではない
+
+[§9のError分類](../phase-0/phase-0-f-adapter-spec.md#9-errorと再試行)の多くは、Response Bodyの
+問題ではなく**通信そのものの失敗**である。Fake Fork Clientに例外を投げさせるだけで再現でき、
+Mercariの応答形を知る必要がない。
+
+| Error Code | 再現方法 | 応答形の観測 |
+|---|---|:---:|
+| `rate_limited_429` / `forbidden_403` / `unauthorized_401` | Fake Fork Clientに例外を投げさせる | **不要** |
+| `timeout` / `network_error` | 同上 | **不要** |
+| `upstream_5xx` | 同上 | **不要** |
+| `parse_error` | 派生Fixtureを読ませる | 構造のみ（観測済み） |
+
+```python
+# 429のTest。Fixtureを1件も使わない
+adapter = MercariAdapter(client=FakeForkClient(raises=HTTPStatusError(429)))
+
+result = await adapter.search_items_page("ポケカ 引退品")
+
+assert result.code == "rate_limited_429"
+assert result.retry_count == 0  # 429は自動再試行しない
+```
+
+Fixtureが要るのは、**正常な形をしているのに内容が矛盾している**場合だけに絞られる。
+
+#### 何を確認しているのか
+
+異常系Testは「Mercariがこう壊れるはずだ」という**予測ではない。**
+
+```text
+NG  「Mercariはこう壊れる」を予測するTest      ← 予測が外れたら無意味になる
+OK  「この入力が来たらParse Errorにする」の確認 ← 自分たちの仕様の確認
+```
+
+[Adapter仕様 §5](../phase-0/phase-0-f-adapter-spec.md#5-forkへ追加するpublic-api)の
+「`has_next=true`なのに商品が空、または末尾`pager_id`がない場合はParse Errorにする」は
+**Card Digger側の決定**であり、Mercariの挙動予測ではない。その決定が実装されているかを確認する。
+
+したがって、その応答が実際には一度も来なくてもTestは無駄にならない。**来たときに黙って通さない**
+ことを保証している。
+
+### 5.5 出所の記録
 
 `tests/fixtures/README.md`へ次を表で残す。**実値は書かない。**
 
 | 記録項目 | 例 |
 |---|---|
 | Fixture名 | `seller_items/page_1_has_next.json` |
-| 取得元 | Seller商品一覧 / 検索 / 商品詳細 |
+| **区分** | `observed` / `derived` / `assumed` |
+| 取得元 | Seller商品一覧 / 検索 / 商品詳細 / Seller Profile |
+| 派生元 | `derived`のとき、起点にしたFixture名 |
 | 観測日 | `2026-08-31` |
 | 対象commit SHA | `20ba68fd...` |
 | 検証観点 | `has_next=true`で末尾`pager_id`をCursorへ引き継ぐ |
 
-### 5.5 禁止事項
+#### 区分
+
+構造をどこまで観測できているかを、Fixtureごとに必ず区別する。
+
+| 区分 | 意味 | 扱い |
+|---|---|---|
+| `observed` | 観測した構造を最小化・匿名化した | そのまま使う |
+| `derived` | 観測済み構造から値・Fieldの有無を変えた（[§5.4](#54-異常系fixtureの作り方)） | そのまま使う。派生元を必ず記録する |
+| `assumed` | **構造自体を観測できていない** | 合格の根拠にしない。観測候補として残す |
+
+`assumed`が必要になった場合、それは「Testが弱い」のではなく**まだ検証していない領域がある**という
+シグナルである。隠さず記録し、L4またはPoCでの観測対象として[TODO](../planning/todo.md)へ残す。
+
+### 5.6 禁止事項
 
 - 生Response JSONのCopy & Paste
 - 実Seller名、実商品Title、実画像URL、実商品IDの記載
 - Cookie、DPoP、Token、Request Headerの記載
 - Fixtureへの個人情報の混入
+- **観測していないField名・階層・型を推測してFixtureを作ること**（[§5.4](#54-異常系fixtureの作り方)）
+- `assumed`区分のFixtureを合格の根拠に使うこと
 
 ---
 
@@ -513,7 +609,10 @@ L4はTest Runnerで実行するTestではなく、**実測して記録する作�
 - [ ] §5.2の匿名化規則をすべて適用した
 - [ ] Cookie、DPoP、Token、Headerを含めていない
 - [ ] 1 Fixture = 1検証観点にした
-- [ ] `tests/fixtures/README.md`へ出所と検証観点を追記した
+- [ ] 新しいField名・階層・型を発明していない
+- [ ] 異常系は、そもそもFixtureが必要かを確認した（例外を投げるだけで足りないか）
+- [ ] `observed` / `derived` / `assumed`の区分を決めた
+- [ ] `tests/fixtures/README.md`へ区分・派生元・出所・検証観点を追記した
 
 ### L4を実行するとき
 
