@@ -135,7 +135,7 @@ Phase 0-F / Phase 1では、次の制約を仕様とUIへ明示する。
 ### Phase 0-Fで必須
 
 - 管理下の`mercapi` Forkへ`SellerItemsPage`と状態別ページングを実装する
-- 固定Response Fixtureで次を自動テストする
+- 固定Response Fixtureで次を自動テストする（実施方法は[Test運用規約](../development/test-policy.md)）
   - 状態別Request
   - 2ページ以上のCursor引き継ぎ
   - `has_next=false`による終端

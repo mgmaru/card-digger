@@ -7,6 +7,7 @@
 - 対象: 固定commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`の`kynacio/mercapi`
 - 関連仕様: [Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)
 - Product要件: [MVP実装仕様](../product/mvp-spec.md)
+- Test実施方法: [Test運用規約](../development/test-policy.md)
 
 ## 1. 目的
 
@@ -166,6 +167,8 @@ Auction商品を出品している最大3 Sellerで、販売中商品の1ペー�
 
 ## 8. 結果の記録
 
+### 8.1 結果文書
+
 実行後は`poc/mercapi/auction-result.md`へ次を記録する。
 
 - 実行日時、環境、固定commit SHA
@@ -179,3 +182,32 @@ Auction商品を出品している最大3 Sellerで、販売中商品の1ペー�
 - 追加検証または再検証条件
 
 結果文書が完成するまで、Auction対応をPhase 0-F完了扱いにしない。
+
+### 8.2 Fixture用の構造サンプル
+
+[合格基準 §6.1](#61-auctionをmvpへ含められる条件)は「固定Fixtureで判定と価格のUnit Testを
+作成できる」ことを条件にしている。検証後にField形状を再確認するためのライブRequestを
+追加で発生させないため、**この検証と同じ実行内で**Fixtureの起点を出力する。
+
+```text
+検証実行
+   │
+   ├─→ auction-result.md        判定・比率・合否（Git管理）
+   │
+   └─→ artifacts/               Git管理外
+         構造サンプル（Field名・型・存在有無・マスク済み値）
+                │
+                └─→ 手作業で匿名化・最小化 ─→ tests/fixtures/
+```
+
+構造サンプルへ出力する内容は次に限定する。
+
+| 出力する | 出力しない |
+|---|---|
+| Field名とJSONの型 | 実商品ID、実Seller ID、Seller名 |
+| 存在 / `null` / 欠落の別 | 実商品Title、実画像URL |
+| 値の形式（桁数、Timezone表記など） | Cookie、DPoP、Header、Token |
+| 通常出品・Auction・未知形状の各1件以上 | 生ResponseそのままのDump |
+
+匿名化規則と保存先の境界は[Test運用規約 §5](../development/test-policy.md#5-fixture規約)・
+[§6](../development/test-policy.md#6-生responseの取り扱い境界)に従う。

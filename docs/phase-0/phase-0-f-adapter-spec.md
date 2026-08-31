@@ -9,6 +9,7 @@
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
 - Product側の挙動: [MVP実装仕様](../product/mvp-spec.md)
 - Repository運用: [mercapi Fork運用手順](../development/mercapi-fork-operations.md)
+- Test実施方法: [Test運用規約](../development/test-policy.md)
 - 追加検証: [Auction情報の追加検証計画](phase-0-f-auction-validation.md)
 
 この文書はPhase 0-Fの正本とする。実装中に判断が分かれた場合は、コードだけで挙動を決めず、
@@ -45,7 +46,9 @@ Phase 0-Fでは画面を作らない。PythonのDomain型、Interface、Adapter�
 | 古い順 | Server側の順序を信用せず、取得範囲内だけをApplication側でSortする |
 | 商品詳細 | Adapterに用意するが、MVP検索一覧では自動取得しない |
 | Playwright | 自動Fallbackに使わず、仕様調査・障害診断用PoCに限定する |
-| 永続化 | Phase 0-Fでは行わない。Cookie、Token、生Response、画像本体を保存しない |
+| 永続化 | Phase 0-Fでは行わない。実行時にCookie、Token、生Response、画像本体を保存しない |
+| Test Fixture | 生Responseではなく、匿名化・最小化した構造標本をGit管理する |
+| テスト可能性 | 時計、待機、Fork ClientをAdapter / Use caseの内部で生成せず注入する |
 
 AuctionのDomain境界はこの文書で先に確保するが、Raw Fieldから`SaleFormat`と`price_yen`への
 Mappingは[Auction追加検証](phase-0-f-auction-validation.md)の結果を正本とする。結果文書が完成するまで、
@@ -362,6 +365,16 @@ Proxy切替、複数Accountによる回避は行わない。
 
 ## 10. Test方針
 
+この節は**何をテストするか**を定義する。Framework、配置、Fixtureの作り方、実行時期、完了判定は
+[Test運用規約](../development/test-policy.md)を正本とする。
+
+| 層 | 節 | 外部通信 | 実行 |
+|---|---|:---:|---|
+| L1 ForkのUnit Test | 10.1 | なし | 変更ごと |
+| L2 AdapterのUnit Test | 10.2 | なし | 変更ごと |
+| L3 Contract Test | 10.2 | なし | 変更ごと |
+| L4 ライブ受入検証 | 10.3 | あり | 手動・低頻度。自動Test Suiteへ入れない |
+
 ### 10.1 ForkのUnit Test
 
 - `status=on_sale`、`status=sold_out`を個別送信する
@@ -412,8 +425,10 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 - [ ] Domain型と`MarketplacePort`が定義されている
 - [ ] Mercari AdapterとMock Adapterが実装されている
 - [ ] 収集Policy、重複排除、停止理由、安全停止が実装されている
-- [ ] ForkとAdapterの全自動Testが成功している
-- [ ] ライブ受入検証が合格し、結果文書が追加されている
+- [ ] ForkとAdapterの全自動Test（L1〜L3）が成功している
+- [ ] Fixtureが[Test運用規約 §5](../development/test-policy.md#5-fixture規約)の匿名化規則を満たしている
+- [ ] 時計、待機、Fork Clientが注入可能になっている
+- [ ] ライブ受入検証（L4）が合格し、結果文書が追加されている
 - [ ] Application / Domain層に`mercapi`型とPrivate Memberが漏れていない
 - [ ] [MVP実装仕様](../product/mvp-spec.md)から利用できる状態になっている
 

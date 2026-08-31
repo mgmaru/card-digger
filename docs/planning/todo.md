@@ -418,6 +418,8 @@ flowchart LR
 - [x] Auction対応を追加PoCの合格後に有効化するGateを定義する
 - [x] Error分類、1回だけの限定再試行、3回連続時の安全停止を決定する
 - [x] Phase 1のMVP範囲、Seller Knowledge、完了条件を決定する
+- [x] [Test運用規約とFixtureの匿名化規則を確定する](../development/test-policy.md)
+- [x] 時計・待機・Fork Clientを注入可能にする設計制約を確定する
 
 ## 0-F-1. Auction情報を追加検証する
 
@@ -432,6 +434,7 @@ flowchart LR
 - [ ] `with_auction`がSeller商品の件数・状態・Cursorへ与える影響を確認する
 - [ ] 未知形状を`fixed_price`へ誤変換せず`unknown`にできるか確認する
 - [ ] `poc/mercapi/auction-result.md`へ実測結果を記録する
+- [ ] Fixtureの起点となる匿名化済み構造サンプルを`artifacts/`へ出力する
 - [ ] 合否と採用MappingをMVP仕様・Adapter仕様へ反映する
 
 ## 0-F-2. 管理下Forkを準備する
@@ -468,18 +471,24 @@ flowchart LR
 - [ ] 共通Error Codeと限定再試行を実装する
 - [ ] 検索・Seller商品の収集Policy、重複排除、停止理由を実装する
 - [ ] Mock Adapterを用意する
+- [ ] 時計・待機・Fork Clientを注入で受け取る
 - [ ] Domain / Application層へFork固有型を漏らさない
 - [ ] ForkのPrivate Memberを参照しない
 
 ## 0-F-5. Test・ライブ受入検証
 
-- [ ] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す
+実施方法・Fixture規約・実行時期は[Test運用規約](../development/test-policy.md)を正本とする。
+L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
+
+- [ ] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す（L1）
 - [ ] Adapterの正規化、Error、再試行、安全停止、収集上限をUnit Testする
 - [ ] `MarketplacePort`のContract TestをMercari / Mock Adapterの両方へ適用する
 - [ ] 検索を5回実行し、成功率と必須Field取得率を確認する
 - [ ] 通常出品・Auction・未知形状の販売形式と価格LabelをFixture Testする
 - [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
-- [ ] ライブ受入検証結果をMarkdownへ記録する
+- [ ] Fixtureが[匿名化規則](../development/test-policy.md#5-fixture規約)を満たすことを確認する
+- [ ] `tests/fixtures/README.md`へFixtureの出所と検証観点を記録する
+- [ ] ライブ受入検証（L4）結果をMarkdownへ記録する
 - [ ] [Adapter仕様のPhase 0-F完了条件](../phase-0/phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
 
 ---
@@ -787,6 +796,8 @@ Marketplace
 # 非機能TODO
 
 ## テスト
+
+実施方法は[Test運用規約](../development/test-policy.md)を正本とする。
 
 - [ ] DomainロジックのUnit Test
 - [ ] Seller KnowledgeのUnit Test

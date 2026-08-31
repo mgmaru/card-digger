@@ -11,6 +11,7 @@
 5. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
 6. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
 7. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+8. [Test運用規約](development/test-policy.md)
 
 ## ディレクトリ
 
@@ -23,7 +24,8 @@ docs/
 ├── planning/
 │   └── todo.md
 ├── development/
-│   └── mercapi-fork-operations.md
+│   ├── mercapi-fork-operations.md
+│   └── test-policy.md
 └── phase-0/
     ├── poc-validation.md
     ├── phase-0-e-selection.md
@@ -50,6 +52,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 
 - [mercapi-fork-operations.md](development/mercapi-fork-operations.md):
   Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
+- [test-policy.md](development/test-policy.md):
+  Test層、Framework、配置、Fixtureの匿名化規則、実行時期、完了判定
 
 ### `phase-0/`
 
@@ -70,3 +74,4 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
 - `docs/`直下には、このIndex以外の文書を増やさない
 - 同じ決定を複数文書へ複製せず、正本へのLinkを置く
+- 「何をテストするか」は各仕様書、「どうテストするか」は`development/test-policy.md`

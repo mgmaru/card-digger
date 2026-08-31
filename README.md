@@ -15,6 +15,7 @@ Phase 0-FとMVPの実装仕様を確定し、現在はAuction情報の追加検�
 - [Phase 0-E Mercari取得方式の選定結果](docs/phase-0/phase-0-e-selection.md)
 - [Phase 0-F Mercari Adapter実装仕様](docs/phase-0/phase-0-f-adapter-spec.md)
 - [Phase 0-F Auction情報の追加検証計画](docs/phase-0/phase-0-f-auction-validation.md)
+- [Test運用規約](docs/development/test-policy.md)
 
 ## リポジトリ構成
 
@@ -25,6 +26,7 @@ card-digger/
 │   ├── README.md
 │   ├── product/       # コンセプト・MVP仕様
 │   ├── planning/      # ロードマップ・TODO
+│   ├── development/   # Fork運用・Test運用規約
 │   └── phase-0/       # PoC条件・選定・Adapter仕様
 ├── poc/
 │   ├── common/        # 共通条件・結果テンプレート

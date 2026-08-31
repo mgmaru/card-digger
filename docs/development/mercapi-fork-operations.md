@@ -6,6 +6,7 @@
 - ステータス: **Fork作成・更新・依存更新の運用基準として採用**
 - 対象Repository: `kynacio/mercapi`、`mgmaru/mercapi`、`mgmaru/card-digger`
 - 技術仕様: [Phase 0-F Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
+- Test実施方法: [Test運用規約](test-policy.md)
 
 この文書は、管理下の`mercapi` Forkを安全に作成・更新し、Card Diggerから再現可能な形で
 利用するための手順を定義する。Forkへ追加する機能やAdapterのContractは技術仕様を正本とし、
@@ -140,6 +141,9 @@ upstream  https://github.com/kynacio/mercapi.git
 ForkへCard Digger固有の収集上限、画面文言、Seller Knowledgeを実装しない。追加範囲は
 [Adapter仕様の責務分離](../phase-0/phase-0-f-adapter-spec.md#3-責務の境界)に従う。
 
+手順1のFixtureは生Responseではなく、[Test運用規約 §5](test-policy.md#5-fixture規約)の
+匿名化・最小化規則に従った構造標本とする。
+
 ## 5. Card DiggerからForkを利用する
 
 Application Packageを作成した時点で、採用した依存管理ツールの設定ファイルへForkの完全な
@@ -191,10 +195,11 @@ git switch -c chore/sync-upstream-YYYYMMDD main
 
 - Mergeまたは必要なcommitだけのCherry-pickを行う
 - Conflictは独自拡張の意図を確認して解消する
-- Forkの全Unit Testを実行する
+- Forkの全Unit Test（L1）を実行する
 - Sellerページングの固定Fixture Testを実行する
-- Card DiggerのAdapter Unit / Contract Testを実行する
-- 必要な場合だけ、低頻度のライブ受入検証を行う
+- Card DiggerのAdapter Unit / Contract Test（L2 / L3）を実行する
+- 必要な場合だけ、低頻度のライブ受入検証（L4）を行う
+- 層の定義と実行時期は[Test運用規約 §3](test-policy.md#3-test層)・[§9](test-policy.md#9-ライブ受入検証l4の実施規約)に従う
 - 合格後にForkの`main`へ反映する
 
 この時点ではCard Diggerの依存SHAを変更しない。Forkの更新とCard Diggerへの採用は別の変更として

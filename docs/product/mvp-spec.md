@@ -7,6 +7,7 @@
 - ステータス: **Phase 1の実装基準として採用**
 - 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
 - Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)
+- Test実施方法: [Test運用規約](../development/test-policy.md)
 - 対象: Search MVP、Seller画面、Seller Knowledge Indicator
 
 この文書はMVPに含める機能、含めない機能、画面挙動、計算方法、完了条件の正本とする。
@@ -540,6 +541,10 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 - Error Logには操作種別、Error Code、HTTP Status、Field名を残し、個人情報を避ける
 
 ## 11. Testと完了条件
+
+この節は**何をテストするか**を定義する。Framework、配置、Fixture、実行時期、完了判定は
+[Test運用規約](../development/test-policy.md)を正本とする。Phase 1のTestはすべて
+Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 
 ### Backend / Domain
 
