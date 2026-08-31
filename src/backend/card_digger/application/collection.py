@@ -39,6 +39,10 @@ CONSECUTIVE_REFUSALS_BEFORE_STOP = 3
 #: Minimum gap between the start of one outside request and the next.
 MIN_REQUEST_INTERVAL_SECONDS = 2.0
 
+#: Further attempts allowed after a transient failure. Live acceptance
+#: verification sets this to zero, because its conditions forbid retrying.
+DEFAULT_MAX_RETRIES = 1
+
 
 @dataclass(frozen=True)
 class CollectionLimits:
@@ -75,14 +79,23 @@ class RequestGate:
         sleeper: Sleeper,
         *,
         min_interval_seconds: float = MIN_REQUEST_INTERVAL_SECONDS,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> None:
+        if max_retries < 0:
+            raise ValueError("max_retries cannot be negative")
         self._clock = clock
         self._sleeper = sleeper
         self._min_interval = min_interval_seconds
+        self._max_retries = max_retries
         self._last_started_at: datetime | None = None
         self.retry_count = 0
         self.consecutive_refusals = 0
         self.stopped = False
+
+    @property
+    def max_retries(self) -> int:
+        """Further attempts allowed after a transient failure."""
+        return self._max_retries
 
     async def run(self, operation: Operation, call: Callable[[], Awaitable]):
         """Make one request, with at most one further attempt."""
@@ -92,7 +105,7 @@ class RequestGate:
         try:
             result = await self._attempt(call)
         except MarketplaceError as error:
-            if not error.retryable:
+            if not error.retryable or self._max_retries < 1:
                 self._record_refusal(error)
                 raise
             # One more attempt, no further. The pacing below keeps it at least

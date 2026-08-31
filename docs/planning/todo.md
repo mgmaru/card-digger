@@ -838,18 +838,61 @@ L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 > [0-F-4](#0-f-4-domainとadapterを実装する)で`MarketplacePort`を定義した直後に書き始める
 > （[Test運用規約 §8](../development/test-policy.md#8-contract-testの適用方法)）。
 
-- [ ] 0-F-1の構造サンプルからFixtureを起こす（観測なしで作らない）
-- [ ] 実サービスで再現できない異常系Fixtureを、正常Fixtureから派生させて用意する
-- [ ] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す（L1）
-- [ ] Adapterの正規化、Error、再試行、安全停止、収集上限をUnit Testする
-- [ ] `MarketplacePort`のContract TestをMercari / Mock Adapterの両方へ適用する
+### L1〜L3（自動Test Suite）
+
+**0-F-3と0-F-4で完了済み。**
+
+- [x] 0-F-1の構造サンプルからFixtureを起こす（観測なしで作らない）
+- [x] 実サービスで再現できない異常系Fixtureを、正常Fixtureから派生させて用意する
+- [x] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す（L1）
+- [x] Adapterの正規化、Error、再試行、安全停止、収集上限をUnit Testする
+- [x] `MarketplacePort`のContract TestをMercari / Mock Adapterの両方へ適用する
+- [x] 通常出品・Auction・未知形状の販売形式と価格LabelをFixture Testする
+- [x] Fixtureが[匿名化規則](../development/test-policy.md#5-fixture規約)を満たすことを確認する
+- [x] `tests/fixtures/README.md`へFixtureの出所と検証観点を記録する
+
+### L4（ライブ受入検証）
+
+条件・手順・合格基準は[ライブ受入検証実施計画](../phase-0/phase-0-f-live-acceptance.md)を正本とする。
+
+- [x] L4 Runnerと手順書を用意する
+- [x] `RequestGate`へ自動再試行を止める設定を追加する（L4は`max_retries=0`）
+- [x] Runnerが`--confirm`なしで通信しないことをTestで固定する
 - [ ] 検索を5回実行し、成功率と必須Field取得率を確認する
-- [ ] 通常出品・Auction・未知形状の販売形式と価格LabelをFixture Testする
+- [ ] 商品詳細20件のコンディション・いいねの取得率を確認する
+- [ ] Seller Profile 最大10人の名前取得率を確認する
 - [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
-- [ ] Fixtureが[匿名化規則](../development/test-policy.md#5-fixture規約)を満たすことを確認する
-- [ ] `tests/fixtures/README.md`へFixtureの出所と検証観点を記録する
-- [ ] ライブ受入検証（L4）結果をMarkdownへ記録する
+- [ ] 販売形式の判定が検索・商品詳細・Seller一覧で一致することを確認する
+- [ ] Auction価格が商品ページの取得時点価格と一致することを確認する（**PoC側で実施**）
+- [ ] 401 / 403 / 429 / Challengeを回避せず記録する
+- [ ] ライブ受入検証（L4）結果を`docs/phase-0/phase-0-f-live-acceptance-result.md`へ記録する
 - [ ] [Adapter仕様のPhase 0-F完了条件](../phase-0/phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
+
+### 準備完了（2026-08-31）
+
+| 項目 | 内容 |
+|---|---|
+| Runner | `src/backend/scripts/live_acceptance.py` |
+| 実行 | `uv run python scripts/live_acceptance.py --plan` / `--confirm` |
+| Request予算 | 最大180 Request、間隔2秒として最短6分（`--plan`で確認できる） |
+| 実施条件 | 同時実行数1、間隔2秒以上、**自動再試行なし**、3回連続の安全Errorで停止 |
+| 出力 | 標準出力のMarkdown（結果文書へ貼る）と`artifacts/live-acceptance.json`（Git管理外） |
+| Test | 214 passed / 0 failed（190 → 214。Runnerの純粋関数24件を追加） |
+
+**Runnerは`--confirm`が無い限り1件も通信しない。** CIは`tests/`だけを実行するため、
+`scripts/`はどのJobからも呼ばれない。
+
+#### 2つのStepに分ける
+
+| Step | 対象 | 場所 | 理由 |
+|---|---|---|---|
+| 1 | 検索・商品詳細・Seller Profile・Seller商品一覧 | `src/backend` | Adapterと収集Policyの実測 |
+| 2 | Auction価格 vs **商品ページ**の現在価格 | `poc/mercapi` | Browserが要るため。`src/backend`にPlaywrightを持ち込まない |
+
+#### 未実施の理由
+
+L4は実Mercariへ接続する手動作業であり、実行そのものは人が判断して開始する。
+Runnerと手順は用意したが、**まだ1件も通信していない。**
 
 ---
 
