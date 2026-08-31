@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": 100000001,
+    "name": "seller-sample-1",
+    "num_ratings": 128,
+    "num_sell_items": 342,
+    "star_rating_score": 5,
+    "photo_url": "https://example.test/profile-1.webp",
+    "photo_thumbnail_url": "https://example.test/profile-thumb-1.webp",
+    "created": 1600000000
+  }
+}

@@ -76,12 +76,16 @@ src/
 │   │   │   ├── ports.py
 │   │   │   └── errors.py
 │   │   ├── application/
+│   │   │   ├── collection.py          # 収集Policyの共通部分
 │   │   │   ├── collect_search.py
 │   │   │   ├── analyze_seller.py
-│   │   │   └── seller_knowledge.py
+│   │   │   └── seller_knowledge.py    # Phase 1
 │   │   ├── adapters/
-│   │   │   └── mercari.py
-│   │   └── api/
+│   │   │   ├── mercari.py
+│   │   │   ├── mock.py
+│   │   │   ├── error_mapping.py
+│   │   │   └── clock.py
+│   │   └── api/                       # Phase 1
 │   │       ├── main.py
 │   │       └── schemas.py
 │   ├── tests/
@@ -98,6 +102,12 @@ src/
 ```
 
 `src/backend`直下には`pyproject.toml`、`uv.lock`、`.python-version`を置く。
+
+`application/collection.py`はRequest間隔・1回だけの再試行・安全停止・Page収集の共通部分で、
+`collect_search.py`と`analyze_seller.py`の両方が使う。`adapters/`の`mock.py`、
+`error_mapping.py`、`clock.py`は
+[Test運用規約 §7](../development/test-policy.md#7-テスト可能性のための設計制約)の設計制約
+（Fork Client・時計・待機の注入、例外変換の純粋関数化）を満たすために0-F-4で追加した。
 
 Python依存は`uv`が生成する`uv.lock`、Frontend依存は`package-lock.json`で固定する。Mercari Adapterの
  import方向は`adapters → domain`だけとし、`domain`から`adapters`やFastAPIを参照しない。

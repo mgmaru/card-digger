@@ -57,7 +57,7 @@ CIの並列実行や再実行はこの条件を守れない。
 |---|---|---|
 | `docs` | 相対Link、見出しAnchor、code fenceの検査（`tools/check_docs_links.py`） | 導入済み |
 | `poc` | `poc/mercapi`のUnit Test | 導入済み |
-| `backend` | `uv run pytest`によるL2 / L3 | **0-F-4で追加** |
+| `backend` | `uv run pytest`によるL2 / L3（`src/backend`） | 導入済み |
 
 ### 3.2 `mgmaru/mercapi`
 
@@ -119,8 +119,7 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 
 ## 6. Branch保護
 
-**0-F-4でApplication Packageを作成した時点**で`card-digger`の`main`へ設定する。
-それまではCIによる可視化だけを行う。
+`card-digger`の`main`へ設定する（**0-F-4で設定済み**）。
 
 | 設定 | 値 | 理由 |
 |---|---|---|

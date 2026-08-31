@@ -234,7 +234,12 @@ return Extractors.get_with(key, lambda x: datetime.fromtimestamp(float(x)))
 
 戻り値は**Timezone情報を持たないnaive datetime**で、実行環境のLocal Timezoneに依存する。
 [Adapter仕様 §6](../../docs/phase-0/phase-0-f-adapter-spec.md#6-domain型)は
-Timezone付き`datetime`を要求するため、**Adapterで必ずUTCとして解釈し直す。**
+Timezone付き`datetime`を要求するため、**AdapterでTimezoneを付け直す。**
+
+> **訂正（0-F-4）。** この節は当初「UTCとして解釈し直す」と記載していたが、
+> naive値は実行環境のLocal Timezoneの時刻であり、UTCとして解釈するとLocal Offset分ずれる。
+> 正しい扱いは[Adapter仕様 §6.2](../../docs/phase-0/phase-0-f-adapter-spec.md#62-naive-datetimeの解釈)。
+> 本検証のRFC 3339変換は`astimezone()`によるLocal解釈で実施しており、**実測値に影響はない。**
 
 ---
 
@@ -297,6 +302,10 @@ Auction判定が構造的に不可能**である。Endpoint自体は`with_auctio
 `_report_incorrect_optional`でLogを出して**`auction_info = None`にする**。
 
 その結果、**Auction商品が通常出品として通過する**。
+
+> **0-F-4で対応済み。** Card Digger側では区別できないため、Forkの`AuctionInfo`の全Fieldを
+> optionalにし、未知形状を全None instanceとして保存するようにした。詳細は
+> [Adapter仕様 §5.1](../../docs/phase-0/phase-0-f-adapter-spec.md#51-0-f-4で追加したfork側の修正)。
 [Adapter仕様の「未知形状を`fixed_price`へ寄せない」](../../docs/phase-0/phase-0-f-adapter-spec.md#6-domain型)に反するため、
 **Adapterは`mercapi`モデルではなく判定ルールで形式を決め、未知形状は`unknown`にする。**
 
@@ -362,7 +371,7 @@ poc/mercapi/artifacts/structure-samples/
 | 反映先 | 内容 |
 |---|---|
 | Adapter仕様 §6 | `price_yen` = `highest_bid`（取得時点の現在価格）。`initial_price`は使わない |
-| Adapter仕様 §6 | 日時はnaiveのためUTCとして解釈し直す |
+| Adapter仕様 §6.2 | 日時はnaiveのためLocal Timezoneとして解釈しUTCへ変換する |
 | Adapter仕様 §5 | Forkへ`with_auction`送信と`auction_info`保持を追加する |
 | Adapter仕様 §7 | Seller商品も`with_auction=true`で取得する |
 | Adapter仕様 §10.2 | 3経路のField形状差をAdapterで吸収する |

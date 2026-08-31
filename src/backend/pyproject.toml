@@ -1,0 +1,33 @@
+[project]
+name = "card-digger-backend"
+version = "0.1.0"
+description = "Card Digger backend: domain model, Mercari adapter and collection policies"
+requires-python = ">=3.11"
+dependencies = [
+  "mercapi @ git+https://github.com/mgmaru/mercapi.git@b3bdec98d7ed56d0e3f1270f9852a2a170c5896c",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<0.25",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# The marketplace client is pinned to a commit of the managed fork, which is a
+# direct reference by design: a moving branch or a version range would change
+# what runs without a review.
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["card_digger"]
+
+[tool.pytest.ini_options]
+# Live acceptance verification (L4) is a manual activity and never a test.
+# Only L2 and L3 live under tests/.
+testpaths = ["tests"]
+asyncio_mode = "auto"

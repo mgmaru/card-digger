@@ -1,0 +1,15 @@
+{
+  "meta": { "nextPageToken": "", "previousPageToken": "", "numFound": "1" },
+  "items": [
+    {
+      "id": "m000000000007",
+      "name": "sample-item-without-image",
+      "price": "1200",
+      "sellerId": "100000001",
+      "status": "ITEM_STATUS_ON_SALE",
+      "created": "1756600000",
+      "isNoPrice": false,
+      "auction": null
+    }
+  ]
+}

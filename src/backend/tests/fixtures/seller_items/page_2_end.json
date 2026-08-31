@@ -1,0 +1,25 @@
+{
+  "result": "OK",
+  "meta": {
+    "has_next": false
+  },
+  "data": [
+    {
+      "id": "m000000000003",
+      "seller": {
+        "id": 100000001,
+        "name": "seller-sample-1"
+      },
+      "status": "on_sale",
+      "name": "sample-item-3",
+      "price": 500,
+      "thumbnails": [
+        "https://example.test/image-3.webp"
+      ],
+      "num_likes": 1,
+      "created": 1756400000,
+      "updated": 1756400000,
+      "pager_id": 7
+    }
+  ]
+}
