@@ -1,0 +1,19 @@
+{
+  "meta": { "nextPageToken": "", "previousPageToken": "", "numFound": "1" },
+  "items": [
+    {
+      "id": "m000000000005",
+      "name": "sample-unknown-shape-item",
+      "price": "1200",
+      "sellerId": "100000001",
+      "status": "ITEM_STATUS_ON_SALE",
+      "created": "1756600000",
+      "updated": "1756600000",
+      "itemConditionId": "3",
+      "isNoPrice": false,
+      "photos": [{ "uri": "https://example.test/image-1.webp" }],
+      "thumbnails": ["https://example.test/thumb-1.webp"],
+      "auction": { "__unknown_field": "unrecognised" }
+    }
+  ]
+}

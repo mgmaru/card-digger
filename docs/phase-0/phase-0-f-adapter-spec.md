@@ -3,7 +3,7 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-08-31**（Auction追加検証の結果を反映）
+- 最終更新日: **2026-08-31**（Auction追加検証の結果と、0-F-4実装で判明した2件を反映）
 - ステータス: **実装基準として採用**
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
@@ -44,7 +44,7 @@ Phase 0-Fでは画面を作らない。PythonのDomain型、Interface、Adapter�
 | 販売形式 | `fixed_price` / `auction` / `unknown`をDomainで保持し、未知形状を通常出品へ寄せない |
 | Auction | 追加検証に**合格**。検索・Seller一覧の両方で有効化する |
 | Auction価格 | `highest_bid`（取得時点の現在価格）を`price_yen`にする。`initial_price`は使わない |
-| Auction日時 | `mercapi`はnaive `datetime`を返すため、AdapterでUTCとして解釈し直す |
+| 日時 | `mercapi`はnaive `datetime`を返すため、AdapterでLocal Timezoneとして解釈しUTCへ変換する |
 | 古い順 | Server側の順序を信用せず、取得範囲内だけをApplication側でSortする |
 | 商品詳細 | Adapterに用意するが、MVP検索一覧では自動取得しない |
 | Playwright | 自動Fallbackに使わず、仕様調査・障害診断用PoCに限定する |
@@ -122,7 +122,7 @@ upstreamからForkへの取込と、ForkからCard Diggerへの依存更新を�
 
 名称は上流のCoding Styleに合わせて調整できるが、次の情報と挙動は変更しない。
 
-実装済みのPublic APIは次のとおり（Fork `beab279`時点）。
+実装済みのPublic APIは次のとおり（Fork `b3bdec9`時点）。
 
 ```python
 @dataclass
@@ -174,6 +174,39 @@ Sellerが存在しない場合（HTTP 404）は`None`を返す。
 - `meta.has_next`が欠落している場合もParse Errorにする
 - `exclude_archived_item`は送らない。PoCのBrowser観測では送られていたが、Public APIの
   Parameterには含めない。件数差が問題になればライブ受入検証で検出する
+
+### 5.1 0-F-4で追加したFork側の修正
+
+Adapterを実装する過程で、**この仕様をForkのPublic APIだけでは満たせない箇所**が2つ見つかった。
+どちらもCard Digger側では回避できないため、Forkを修正してから依存SHAを固定した。
+
+| # | 症状 | 修正 |
+|---|---|---|
+| 1 | 商品詳細の未知形状Auctionが通常出品として通過する | `AuctionInfo`の全Fieldをoptionalにした |
+| 2 | HTTP 401 / 403 / 429 / 5xxがParse Errorとして届く | 404以外のError StatusでRaiseするようにした |
+
+#### 1. 未知形状のAuctionが通常出品になる
+
+`Item.auction_info`はoptionalとして定義されているため、`AuctionInfo`の必須Field
+（`state`など）が欠けると`map_to_class`はParse Errorを投げず、Logだけ出して
+`auction_info = None`にする。これは`auction_info`が最初から無い通常出品と**区別できない**。
+
+§6.1の「Objectだが既知キーを1つも含まない → UNKNOWN」を、Card Digger側では実装できない。
+そこで0-F-3で`SellerItemAuctionInfo`へ既に採用していた「全Fieldをoptionalにし、未知形状を
+全None instanceとして保存する」方式へ`AuctionInfo`も揃えた。
+
+#### 2. Error StatusがParse Errorになる
+
+Forkは404だけを判定した後、Response Bodyをそのままmapperへ渡していた。401 / 403 / 429 / 5xxは
+想定外のBodyとしてParse Errorになり、**Statusも理由も失われる**。
+
+§9のError分類はRate Limitを他と区別することが前提であり、
+`unauthorized_401` / `forbidden_403` / `rate_limited_429`が実通信から到達不能では
+3回連続の安全停止が機能しない。404以外のError StatusでRaiseするよう修正した。
+404の意味は変えない（商品・Sellerなしは`None`のまま）。
+
+PoCはこの2点を`api._client`へのEvent Hook追加で回避していたが、
+§3.2「ForkのPublic APIだけを利用する」に反するためAdapterでは採用しない。
 
 ## 6. Domain型
 
@@ -288,9 +321,37 @@ price_yen = 検索 price = auction.highestBid = auction_info.highest_bid
 #### 日時
 
 - `expected_end_time`、`start_time`はepoch秒。`bidDeadline` / `bid_deadline`はISO 8601文字列
-- `mercapi`は`datetime.fromtimestamp()`でnaive `datetime`を返すため、**UTCとして解釈し直す**
+- `mercapi`は`datetime.fromtimestamp()`でnaive `datetime`を返す。詳細は§6.2
 - 未入札（`state=STATE_NO_BID`、`total_bids=0`）の終了予定時刻は確定値ではない。確定値として扱わない
 - 欠落時に架空の終了時刻を生成せず、延長を推測しない
+
+### 6.2 naive `datetime`の解釈
+
+`mercapi`の`Extractors.get_datetime`は`datetime.fromtimestamp(float(x))`を使う。
+
+```python
+# 返り値はTimezone情報を持たない
+datetime.fromtimestamp(1756600000)
+```
+
+**この値はUTCではなく、実行環境のLocal Timezoneで表した時刻である。**
+UTCとして解釈し直すとLocal Offset分ずれる。開発機（`Asia/Tokyo`）では9時間ずれ、
+出品日時の表示と365日基準の判定が両方とも誤る。
+
+したがってAdapterは、Pythonにおけるnaive値の意味どおり**Local Timezoneとして解釈**し、
+UTCへ変換する。
+
+```python
+value.astimezone(timezone.utc)
+```
+
+`astimezone()`はnaive値を実行環境のLocal Timezoneとみなすため、TZ設定にかかわらず
+元の瞬間を復元できる。`TZ=UTC`の環境では「UTCとして解釈し直す」と同じ結果になる。
+
+> 2026-08-31以前のこの文書は「UTCとして解釈し直す」と記載していた。0-F-4の実装時に
+> `TZ=UTC`以外の環境で成立しないことが判明したため訂正した。Phase 0-BのPoC
+> （[`normalize_search_item`](../../poc/mercapi/result.md)）は当初からLocal解釈で実装されており、
+> 実測結果はこの訂正の影響を受けない。
 
 ## 7. Marketplace Interface
 
@@ -458,7 +519,7 @@ Proxy切替、複数Accountによる回避は行わない。
 - 検索の`auction.id`が空文字でもAUCTIONと判定する
 - 検索・商品詳細・Seller商品一覧の3形状を同じ`SaleFormat`へ正規化する
 - 文字列の`highestBid`を整数の`price_yen`へ変換する
-- naive `datetime`をUTCとして解釈し、Timezone付きで返す
+- naive `datetime`から元の瞬間を復元し、Timezone付きで返す（Process Timezoneに依存しない）
 - Auctionの取得時点価格を正規化し、開始価格や確定価格へ読み替えない
 - 検索とSeller商品で同じ販売形式Mappingを使用する
 - 必須Field欠落でParse Errorになる
@@ -486,19 +547,19 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 
 ## 11. Phase 0-F完了条件
 
-- [ ] 管理下のForkが作成され、ライセンスと著作権表示が維持されている
-- [ ] ForkのSellerページングPublic APIとUnit Testが完成している
-- [ ] Card DiggerがForkのTest済みcommit SHAへ固定されている
+- [x] 管理下のForkが作成され、ライセンスと著作権表示が維持されている
+- [x] ForkのSellerページングPublic APIとUnit Testが完成している
+- [x] Card DiggerがForkのTest済みcommit SHAへ固定されている
 - [x] Auction追加検証の結果文書が完成し、合否とMappingが仕様へ反映されている
-- [ ] Domain型と`MarketplacePort`が定義されている
-- [ ] Mercari AdapterとMock Adapterが実装されている
-- [ ] 収集Policy、重複排除、停止理由、安全停止が実装されている
-- [ ] ForkとAdapterの全自動Test（L1〜L3）が成功している
-- [ ] Fixtureが[Test運用規約 §5](../development/test-policy.md#5-fixture規約)の匿名化規則を満たしている
-- [ ] 時計、待機、Fork Clientが注入可能になっている
+- [x] Domain型と`MarketplacePort`が定義されている
+- [x] Mercari AdapterとMock Adapterが実装されている
+- [x] 収集Policy、重複排除、停止理由、安全停止が実装されている
+- [x] ForkとAdapterの全自動Test（L1〜L3）が成功している
+- [x] Fixtureが[Test運用規約 §5](../development/test-policy.md#5-fixture規約)の匿名化規則を満たしている
+- [x] 時計、待機、Fork Clientが注入可能になっている
 - [ ] ライブ受入検証（L4）が合格し、結果文書が追加されている
-- [ ] Application / Domain層に`mercapi`型とPrivate Memberが漏れていない
-- [ ] [MVP実装仕様](../product/mvp-spec.md)から利用できる状態になっている
+- [x] Application / Domain層に`mercapi`型とPrivate Memberが漏れていない
+- [x] [MVP実装仕様](../product/mvp-spec.md)から利用できる状態になっている
 
 ## 12. Phase 0-Fで実装しないもの
 

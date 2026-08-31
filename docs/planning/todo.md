@@ -585,7 +585,7 @@ Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへ
 > [Test運用規約 §4.4](../development/test-policy.md#44-forkのtestに関する例外)。
 
 - [x] Forkの開発環境を構築し、既存Testの基準線を記録する
-- [ ] 追加Testが基準線を悪化させないことを確認する
+- [x] 追加Testが基準線を悪化させないことを確認する
 - [x] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
 - [x] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
 - [x] Seller商品Modelへ`pager_id`を追加する
@@ -597,7 +597,7 @@ Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへ
 - [x] 構造サンプルからJSON Fixtureを起こす（`observed` / `derived`の区分を記録する）
 - [x] `httpx.MockTransport`でForkのUnit Testを追加する
 - [x] 既存Testの結果が基準線から悪化しないことを確認する
-- [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する（**0-F-4でApplication Package作成時に実施**）
+- [x] ForkのTest済みcommit SHAへCard Diggerの依存を固定する（`b3bdec9`。0-F-4で実施）
 
 ### 実施結果（2026-08-31）
 
@@ -606,7 +606,7 @@ Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへ
 | Branch | `feat/seller-items-pagination`（`main`=`717d25b`から作成） |
 | feature commit | `74df1d3` |
 | `main`反映 | `d9dced921989d29e939451fc044b45e756251b06`（`--no-ff` merge） |
-| 現在のFork `main` | **[0-F-3b](#0-f-3b-ciを導入する)以降さらに進んでいる。固定するSHAはそちらを参照** |
+| 現在のFork `main` | **[0-F-4](#0-f-4-domainとadapterを実装する)以降さらに進んでいる。固定したSHAはそちらを参照** |
 | Test | **27 passed → 51 passed / 0 failed**（追加24件） |
 | 差分 | 14ファイル、663挿入 / 6削除。削除はimport行の置換のみ |
 | Fixture | `tests/fixtures/seller_items/` に7件。`observed` 2 / `derived` 5 / `assumed` **0** |
@@ -637,6 +637,10 @@ async def items_page(profile_id, statuses, *, limit=30, max_pager_id=None, with_
 `auction_info`が「空Object」と「未知キーだけのObject」は、どちらもモデル上は全Field `None`の
 インスタンスになる。Adapterは**この状態を`FIXED_PRICE`ではなく`UNKNOWN`へ寄せる**こと。
 実測では空Objectを0件しか観測しておらず、安全側に倒す。
+
+> **0-F-4で対応済み。** 3経路とも「Fieldが`None` → `FIXED_PRICE`」「既知キーを1つ以上持つ →
+> `AUCTION`」「全Fieldが`None`のインスタンス → `UNKNOWN`」で判定する。
+> 商品詳細だけは同じ判定ができなかったため、Fork側も修正した（[0-F-4](#0-f-4-domainとadapterを実装する)）。
 
 #### black
 
@@ -677,8 +681,8 @@ uv pip install --python .venv/bin/python -e . \
 - [x] Forkの`pytest`へ`--record-mode=none`を明示する
 - [x] Forkの未使用workflow（PyPI公開・Docs公開）を無効化する
 - [x] CIとMerge基準を文書化する
-- [ ] `backend` JobをCIへ追加する（**0-F-4でApplication Package作成後**）
-- [ ] `card-digger`の`main`へBranch保護を設定する（**0-F-4以降**）
+- [x] `backend` JobをCIへ追加する（0-F-4で実施）
+- [x] `card-digger`の`main`へBranch保護を設定する（0-F-4で実施）
 
 ### 実施結果（2026-08-31）
 
@@ -707,7 +711,7 @@ uv pip install --python .venv/bin/python -e . \
 | PR経由にする対象 | `src/` `poc/` `tools/` `.github/` |
 | 直接pushを許容する対象 | `docs/` `README.md` |
 | 承認者数 | **要求しない**。1人開発では自己承認ができず全変更が止まる |
-| Branch保護 | **0-F-4以降**に設定する |
+| Branch保護 | 0-F-4で設定した |
 
 ## 0-F-4. DomainとAdapterを実装する
 
@@ -725,24 +729,105 @@ uv pip install --python .venv/bin/python -e . \
 > あわせて[CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)の`backend` Jobと
 > [§6](../development/ci-policy.md#6-branch保護)のBranch保護を設定する。
 
-- [ ] `uv`でPython 3.11以上のApplication Packageを`src/backend`へ作成する
-- [ ] Forkの完全なcommit SHAを`pyproject.toml`へ記載し`uv.lock`を生成する
-- [ ] `ListingStatus`、`SaleFormat`、`ItemCondition`、`MarketplaceItem`、`Seller`を定義する
-- [ ] `PageInfo`、`SearchPage`、`SellerItemsPage`を定義する
-- [ ] `MarketplacePort`を定義する
-- [ ] Mercari Adapterの検索・詳細・Profile・Seller商品Pageを実装する
-- [ ] URL、価格、日時、状態、販売形式を正規化する
-- [ ] Auctionの価格を`highest_bid`（取得時点の現在価格）へ正規化する
-- [ ] 検索・商品詳細・Seller商品一覧の3形状を同じ`SaleFormat`へ正規化する
-- [ ] naive `datetime`をUTCとして解釈し直す
-- [ ] 未知の販売形式を`SaleFormat.UNKNOWN`として保持する
-- [ ] 必須Field欠落とCursor不整合をParse Errorにする
-- [ ] 共通Error Codeと限定再試行を実装する
-- [ ] 検索・Seller商品の収集Policy、重複排除、停止理由を実装する
-- [ ] Mock Adapterを用意する
-- [ ] 時計・待機・Fork Clientを注入で受け取る
-- [ ] Domain / Application層へFork固有型を漏らさない
-- [ ] ForkのPrivate Memberを参照しない
+- [x] `uv`でPython 3.11以上のApplication Packageを`src/backend`へ作成する
+- [x] Forkの完全なcommit SHAを`pyproject.toml`へ記載し`uv.lock`を生成する
+- [x] `ListingStatus`、`SaleFormat`、`ItemCondition`、`MarketplaceItem`、`Seller`を定義する
+- [x] `PageInfo`、`SearchPage`、`SellerItemsPage`を定義する
+- [x] `MarketplacePort`を定義する
+- [x] Mercari Adapterの検索・詳細・Profile・Seller商品Pageを実装する
+- [x] URL、価格、日時、状態、販売形式を正規化する
+- [x] Auctionの価格を`highest_bid`（取得時点の現在価格）へ正規化する
+- [x] 検索・商品詳細・Seller商品一覧の3形状を同じ`SaleFormat`へ正規化する
+- [x] naive `datetime`から元の瞬間を復元する（**仕様の記述を訂正した。後述**）
+- [x] 未知の販売形式を`SaleFormat.UNKNOWN`として保持する
+- [x] 必須Field欠落とCursor不整合をParse Errorにする
+- [x] 共通Error Codeと限定再試行を実装する
+- [x] 検索・Seller商品の収集Policy、重複排除、停止理由を実装する
+- [x] Mock Adapterを用意する
+- [x] 時計・待機・Fork Clientを注入で受け取る
+- [x] Domain / Application層へFork固有型を漏らさない
+- [x] ForkのPrivate Memberを参照しない
+
+### 実施結果（2026-08-31）
+
+| 項目 | 内容 |
+|---|---|
+| Branch | `feat/domain-and-adapter` |
+| Package | `src/backend`（`uv` / Python 3.11 / `pyproject.toml` + `uv.lock`） |
+| 固定したFork SHA | **`b3bdec98d7ed56d0e3f1270f9852a2a170c5896c`** |
+| Test | **186 passed / 0 failed**（L2 Unit 156 / L3 Contract 30） |
+| Fixture | 20件。`observed` 6 / `derived` 14 / `assumed` **0** |
+| CI | `backend` Jobを追加（`docs` / `poc` / `backend`の3 Job） |
+| Branch保護 | `card-digger`の`main`へ設定 |
+
+#### 構成
+
+```text
+card_digger/
+├── domain/       models.py / ports.py / errors.py
+├── application/  collection.py / collect_search.py / analyze_seller.py
+└── adapters/     mercari.py / mock.py / error_mapping.py / clock.py
+```
+
+`domain`と`application`が`mercapi`をimportしないこと、Adapterがforkの
+Private Memberを触らないことは`tests/unit/test_layering.py`が**静的に検査**する。
+
+#### 仕様から変更した点
+
+| 項目 | 仕様の記載 | 実装 | 理由 |
+|---|---|---|---|
+| naive日時 | UTCとして解釈し直す | **Local Timezoneとして解釈しUTCへ変換** | 後述。仕様側を訂正した |
+| 収集Policyの置き場 | 記載なし | `application/collection.py`を追加 | 検索とSeller収集が同じ間隔・再試行・安全停止を使う |
+| Adapterの再試行 | 記載なし | **Adapterは持たない** | 待機と時計は収集Policy側にあり、`RequestGate`が一元管理する |
+| Request Timeout | 「規定時間超過」 | `httpx`の既定値 | Forkに設定用のPublic APIが無く、根拠のない値を新設しない |
+
+いずれも[Adapter仕様](../phase-0/phase-0-f-adapter-spec.md)と
+[MVP仕様 §2.1](../product/mvp-spec.md#21-repository構成)へ反映済み。
+
+### 実装中に判明した2件
+
+**どちらも「仕様どおりに実装すると壊れる」箇所で、着手前に判断を仰いでから対応した。**
+
+#### 1. naive `datetime`をUTCとして解釈すると9時間ずれる
+
+`mercapi`の`datetime.fromtimestamp()`が返すnaive値は**実行環境のLocal Timezone**の時刻であり、
+UTCとして解釈し直すとLocal Offset分ずれる。開発機（`Asia/Tokyo`）では出品日時の表示と
+365日基準の判定が両方とも9時間ずれる。
+
+`astimezone(timezone.utc)`でLocal解釈からUTCへ変換する方式へ変更し、
+[Adapter仕様 §6.2](../phase-0/phase-0-f-adapter-spec.md#62-naive-datetimeの解釈)を訂正した。
+Phase 0-BのPoCは当初からLocal解釈で実装されており、**実測結果は影響を受けない。**
+`TZ`を切り替えて同じ瞬間になることをTestで固定した。
+
+#### 2. ForkのPublic APIだけでは仕様を満たせない箇所が2つ
+
+| # | 症状 | Fork側の修正 | PR |
+|---|---|---|---|
+| 1 | 商品詳細の未知形状Auctionが通常出品として通過する | `AuctionInfo`の全Fieldをoptional化 | [#1](https://github.com/mgmaru/mercapi/pull/1) |
+| 2 | HTTP 401 / 403 / 429 / 5xxがParse Errorとして届く | 404以外のError StatusでRaise | [#2](https://github.com/mgmaru/mercapi/pull/2) |
+
+2はRate Limitを他のErrorと区別できず、**3回連続の安全停止が実通信から到達不能**になるため
+放置できない。PoCは`api._client`へのEvent Hookで回避していたが、Private Memberの参照にあたる。
+
+詳細は[Adapter仕様 §5.1](../phase-0/phase-0-f-adapter-spec.md#51-0-f-4で追加したfork側の修正)。
+
+#### Forkの基準線
+
+| 時点 | commit | 結果 |
+|---|---|---|
+| [0-F-3b](#0-f-3b-ciを導入する)まで | `beab279` | 51 passed / 0 failed |
+| `AuctionInfo`のoptional化 | `5db3ae5` | 57 passed / 0 failed |
+| **Error StatusでRaise（固定対象）** | **`b3bdec9`** | **94 passed / 0 failed** |
+
+基準線51件を維持したまま43件を追加した。**悪化なし。**
+
+#### 残る既知の制約
+
+- **未観測の形状は`assumed` Fixtureにしていない。** 終了済みAuction（`finish_time`あり）と、
+  実際に現れた未知形状は標本が無いため、未観測のまま残す
+- **`challenge`は分類先として定義しているが、実通信からの検出手段が無い。**
+  CAPTCHA / Challengeの応答形を観測できていないため、推測で判定しない。
+  安全停止の対象Codeには含めており、観測できた時点で分類を追加する
 
 ## 0-F-5. Test・ライブ受入検証
 

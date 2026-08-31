@@ -3,9 +3,10 @@
 大量出品・引退品の中から、確認する価値が高いトレーディングカード商品を効率よく絞り込むための、マーケットプレイス検索・出品者分析ツールです。
 
 Phase 0-A〜0-Eの技術検証を完了し、Mercari取得には **`kynacio/mercapi`方式**を選定しました。
-Phase 0-FとMVPの実装仕様を確定し、Auction情報の追加検証も**合格**しました。現在は管理下の
-`mercapi` Forkを準備する段階です。Seller商品の状態別ページングと`with_auction`は、
-検証済みコミットを基準にしたForkへ追加します。
+Phase 0-FとMVPの実装仕様を確定し、Auction情報の追加検証も**合格**しました。管理下の
+`mercapi` ForkへSeller商品の状態別ページングと`with_auction`を追加し、Domain型・
+`MarketplacePort`・Mercari Adapter・収集Policyを`src/backend`へ実装しました。
+残るのはライブ受入検証（L4）です。
 
 ## ドキュメント
 
@@ -36,7 +37,8 @@ card-digger/
 │   ├── mercari/       # marvinody/mercari の検証
 │   ├── mercapi/       # kynacio/mercapi の検証
 │   └── playwright/    # ブラウザ経由方式の検証
-└── src/               # 採用方式決定後のアプリケーション実装
+└── src/
+    └── backend/       # Domain、Use case、Mercari Adapter
 ```
 
 各PoCは依存関係や実行手順が異なるため、検証に着手する段階でそれぞれのディレクトリ内に環境を構築します。
@@ -48,16 +50,24 @@ git clone https://github.com/mgmaru/card-digger.git
 cd card-digger
 ```
 
-Phase 0-F実装開始前の時点では、リポジトリ共通の依存パッケージや必須環境変数はありません。
-実装時はBackend / Frontendの依存を固定し、秘密情報が必要になった場合は`.env`を直接共有せず、
-値を含まない`.env.example`を追加します。
+リポジトリ共通の依存パッケージや必須環境変数はありません。依存はBackend / Frontendそれぞれの
+ディレクトリで固定します。Backendは[`src/backend/README.md`](src/backend/README.md)を参照してください。
+
+```bash
+cd src/backend
+uv sync --extra dev
+uv run pytest tests
+```
+
+秘密情報が必要になった場合は`.env`を直接共有せず、値を含まない`.env.example`を追加します。
 
 ## 開発方針
 
 1. 3つの取得方式を同じ条件で検証した
 2. 必要な商品・Seller情報を取得できる方式として`kynacio/mercapi`を選定した
 3. 選定方式をMercari Adapterの内側に閉じ込める仕様を確定した
-4. 検索・画像一覧・Seller分析を備えたMVPを実装する
+4. Domain型とAdapterを実装し、取得方式をAdapterの内側へ閉じ込めた
+5. 検索・画像一覧・Seller分析を備えたMVPを実装する
 
 検証条件と採用基準の詳細は[TODO](docs/planning/todo.md)を参照してください。
 

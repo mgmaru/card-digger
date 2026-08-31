@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "m000000000005",
+    "status": "on_sale",
+    "name": "sample-unknown-shape-item",
+    "price": 1200,
+    "created": 1756600000,
+    "num_likes": 0,
+    "photos": ["https://example.test/image-1.webp"],
+    "seller": { "id": 100000001, "name": "seller-sample-1" },
+    "auction_info": { "__unknown_field": "unrecognised" }
+  }
+}

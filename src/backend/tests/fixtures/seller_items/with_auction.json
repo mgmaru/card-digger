@@ -1,0 +1,37 @@
+{
+  "result": "OK",
+  "meta": { "has_next": false },
+  "data": [
+    {
+      "id": "m000000000001",
+      "seller": { "id": 100000001, "name": "seller-sample-1" },
+      "status": "on_sale",
+      "name": "sample-auction-item",
+      "price": 1200,
+      "thumbnails": ["https://example.test/image-1.webp"],
+      "num_likes": 0,
+      "created": 1756600000,
+      "updated": 1756600000,
+      "pager_id": 9,
+      "auction_info": {
+        "id": "100000001",
+        "bid_deadline": "2026-09-01T11:52:24Z",
+        "total_bid": 3,
+        "initial_price": 300,
+        "highest_bid": 1200
+      }
+    },
+    {
+      "id": "m000000000002",
+      "seller": { "id": 100000001, "name": "seller-sample-1" },
+      "status": "on_sale",
+      "name": "sample-fixed-price-item",
+      "price": 3400,
+      "thumbnails": ["https://example.test/image-2.webp"],
+      "num_likes": 0,
+      "created": 1756500000,
+      "updated": 1756500000,
+      "pager_id": 8
+    }
+  ]
+}
