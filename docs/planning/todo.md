@@ -586,18 +586,61 @@ Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへ
 
 - [x] Forkの開発環境を構築し、既存Testの基準線を記録する
 - [ ] 追加Testが基準線を悪化させないことを確認する
-- [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
-- [ ] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
-- [ ] Seller商品Modelへ`pager_id`を追加する
-- [ ] Seller商品Modelへ`auction_info`を追加する
-- [ ] Responseの`meta.has_next`を保持する
-- [ ] `has_next=true`時だけ末尾`pager_id`を次Cursorとして返す
-- [ ] 空Response、Cursor欠落、未知Statusを検証する
-- [ ] 既存`items(profile_id)`の後方互換を維持する
-- [ ] 構造サンプルからJSON Fixtureを起こす（`observed` / `derived`の区分を記録する）
-- [ ] `httpx.MockTransport`でForkのUnit Testを追加する
-- [ ] 既存Testの結果が基準線から悪化しないことを確認する
-- [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する
+- [x] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
+- [x] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
+- [x] Seller商品Modelへ`pager_id`を追加する
+- [x] Seller商品Modelへ`auction_info`を追加する
+- [x] Responseの`meta.has_next`を保持する
+- [x] `has_next=true`時だけ末尾`pager_id`を次Cursorとして返す
+- [x] 空Response、Cursor欠落、未知Statusを検証する
+- [x] 既存`items(profile_id)`の後方互換を維持する
+- [x] 構造サンプルからJSON Fixtureを起こす（`observed` / `derived`の区分を記録する）
+- [x] `httpx.MockTransport`でForkのUnit Testを追加する
+- [x] 既存Testの結果が基準線から悪化しないことを確認する
+- [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する（**0-F-4でApplication Package作成時に実施**）
+
+### 実施結果（2026-08-31）
+
+| 項目 | 内容 |
+|---|---|
+| Branch | `feat/seller-items-pagination`（`main`=`717d25b`から作成） |
+| feature commit | `74df1d3` |
+| `main`反映 | **`d9dced921989d29e939451fc044b45e756251b06`**（`--no-ff` merge） |
+| Test | **27 passed → 51 passed / 0 failed**（追加24件） |
+| 差分 | 14ファイル、663挿入 / 6削除。削除はimport行の置換のみ |
+| Fixture | `tests/fixtures/seller_items/` に7件。`observed` 2 / `derived` 5 / `assumed` **0** |
+| cassette | 新規記録・既存改変ともに**なし** |
+
+#### 追加したPublic API
+
+```python
+async def items_page(profile_id, statuses, *, limit=30, max_pager_id=None, with_auction=False)
+    -> SellerItemsPage | None
+```
+
+`SellerItemsPage(items, has_next, next_max_pager_id)`、`SellerItem.pager_id`、
+`SellerItem.auction_info`（`SellerItemAuctionInfo`）を追加した。`items()`は無変更。
+
+#### 仕様から変更した点
+
+| 項目 | 仕様の記載 | 実装 | 理由 |
+|---|---|---|---|
+| Cursorの型 | `str \| None` | **`int \| None`** | 実測で`pager_id`は10桁の整数。Domainの`str`変換はAdapterが行う |
+| 戻り値 | `SellerItemsPage` | `SellerItemsPage \| None` | HTTP 404のSellerでは`None`を返す既存`items()`の流儀へ合わせた |
+| `exclude_archived_item` | 記載なし | **送らない** | Public APIのParameterに含めない。件数差はライブ受入検証で検出する |
+
+いずれも[Adapter仕様 §5](../phase-0/phase-0-f-adapter-spec.md#5-forkへ追加するpublic-api)へ反映済み。
+
+#### 判断が必要な残件（0-F-4で扱う）
+
+`auction_info`が「空Object」と「未知キーだけのObject」は、どちらもモデル上は全Field `None`の
+インスタンスになる。Adapterは**この状態を`FIXED_PRICE`ではなく`UNKNOWN`へ寄せる**こと。
+実測では空Objectを0件しか観測しておらず、安全側に倒す。
+
+#### black
+
+追加・変更したファイルは`black 22.6.0`準拠。`mercapi/mapping/definitions.py`は
+**変更前から未整形**のため整形しない（差分が428行に膨らみ、レビュー不能になるため）。
 
 ### 既存Testの基準線（2026-08-31）
 
@@ -608,12 +651,13 @@ uv pip install --python .venv/bin/python -e . \
 .venv/bin/python -m pytest tests --record-mode=none -q
 ```
 
-| 時点 | 結果 |
-|---|---|
-| Fork直後（`20ba68f`） | 22 passed / 5 failed |
-| **[0-F-2b](#0-f-2b-upstream既存testの失敗を修正する)適用後（`717d25b`）** | **27 passed / 0 failed** |
+| 時点 | commit | 結果 |
+|---|---|---|
+| Fork直後 | `20ba68f` | 22 passed / 5 failed |
+| [0-F-2b](#0-f-2b-upstream既存testの失敗を修正する)適用後 | `717d25b` | 27 passed / 0 failed |
+| **Sellerページング追加後** | **`d9dced9`** | **51 passed / 0 failed** |
 
-**0-F-3の基準線は27 passed / 0 failed。** 追加変更後もこの状態を維持する。
+基準線27件は維持したまま24件を追加した。**悪化なし。**
 
 `--record-mode=none`を必ず付ける。付け忘れるとcassetteが無いRequestで実通信が発生し得る。
 

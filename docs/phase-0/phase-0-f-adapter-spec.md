@@ -122,30 +122,44 @@ upstreamからForkへの取込と、ForkからCard Diggerへの依存更新を�
 
 名称は上流のCoding Styleに合わせて調整できるが、次の情報と挙動は変更しない。
 
+実装済みのPublic APIは次のとおり（Fork `d9dced9`）。
+
 ```python
-@dataclass(frozen=True)
+@dataclass
 class SellerItemsPage:
-    items: tuple[SellerItem, ...]
+    items: list[SellerItem]
     has_next: bool
-    next_max_pager_id: str | None
+    next_max_pager_id: int | None = None
+
+@dataclass
+class SellerItemAuctionInfo:
+    id_: str | None = None
+    bid_deadline: str | None = None
+    total_bid: int | None = None
+    initial_price: int | None = None
+    highest_bid: int | None = None
 
 async def items_page(
     profile_id: str,
-    statuses: tuple[str, ...],
+    statuses: Sequence[str],
     *,
     limit: int = 30,
-    max_pager_id: str | None = None,
+    max_pager_id: int | None = None,
     with_auction: bool = False,
-) -> SellerItemsPage:
+) -> SellerItemsPage | None:
     ...
 ```
+
+`pager_id`は実測で**10桁の整数**だったため、Cursorは`int`で扱う。Domainの
+`PageInfo.next_cursor`は`str | None`のままとし、**Adapterが文字列へ変換する**。
+Sellerが存在しない場合（HTTP 404）は`None`を返す。
 
 ### Parameter規則
 
 - `profile_id`: 空文字を拒否する
 - `statuses`: `on_sale`、`trading`、`sold_out`だけを許可し、1件以上を必須にする
 - `limit`: `1..30`。MVPでは30固定で使う
-- `max_pager_id`: 1ページ目は`None`、2ページ目以降は直前Responseの値を使う
+- `max_pager_id`: 1ページ目は`None`、2ページ目以降は直前Responseの値を使う。型は`int`
 - `with_auction`: `true`のときだけResponseに`auction_info`が付く。件数・順序・Cursor・状態Filterは変わらない
 - `SellerItem`は`auction_info`を保持する。省略時と非Auction商品ではキーごと欠落する
 
@@ -157,6 +171,9 @@ async def items_page(
 - `has_next=true`なのに商品が空、または末尾`pager_id`がない場合はParse Errorにする
 - Cursorを推測・生成しない
 - Unknown Fieldは無視できるが、必須Field欠落はErrorにする
+- `meta.has_next`が欠落している場合もParse Errorにする
+- `exclude_archived_item`は送らない。PoCのBrowser観測では送られていたが、Public APIの
+  Parameterには含めない。件数差が問題になればライブ受入検証で検出する
 
 ## 6. Domain型
 
