@@ -206,6 +206,10 @@ Fixtureの作り方、`observed` / `derived` / `assumed`の区分、匿名化規
 8. Test済みcommitの完全なSHAを記録する
 9. 必要なら`kynacio/mercapi`へPull Requestを作成する
 
+upstreamは**Issueを無効化**しているため、報告手段はPull Requestだけである。還元はMITライセンス上の
+義務ではなく任意とし、出すかどうかは変更ごとに判断する。判断の記録は
+[TODO](../planning/todo.md)へ残す。
+
 **基準線がすべてGreenとは限らない。** upstream由来の既知の失敗は、原因を記録したうえで
 「悪化させない」ことを合格条件とし、作業Branchの目的外の修正を混ぜない。
 

@@ -529,7 +529,7 @@ Response Bodyを変えずに妥当と判断できる根拠は次のとおり。
 - [x] 全Testが成功することを確認する
 - [x] Forkへcommitし、`main`へ反映する
 - [x] 修正後の基準線と commit SHA を記録する
-- [ ] upstreamへの報告（Issue / PR）の要否を判断する（**保留**。対外的なやり取りのため別途判断）
+- [x] upstreamへの報告（Issue / PR）の要否を判断する（**報告しないと決定**。理由は後述）
 
 ### 実施結果（2026-08-31）
 
@@ -544,6 +544,30 @@ Response Bodyを変えずに妥当と判断できる根拠は次のとおり。
 | Push | `origin`の`fix/item-cassette-include-auction`と`main`へ反映済み |
 
 `main`で再実行しても27 passedを確認した。**0-F-3の新しい基準線は「27 passed / 0 failed」**とする。
+
+### upstreamへ報告しない判断（2026-08-31）
+
+**`kynacio/mercapi`へIssue・Pull Requestを出さない。**
+
+| 根拠 | 実測・内容 |
+|---|---|
+| Issueが使えない | upstreamは**Issueを無効化**している。外部からの報告窓口が閉じられており、意図的な意思表示と読める |
+| upstreamが停滞 | 最終push `2026-02-10`（判断時点で約6.5ヶ月前）。Star 0の個人プロジェクト |
+| ライセンス上の義務は充足 | MITの義務は著作権表示とLICENSE本文の維持だけで、貢献の還元は義務ではない。Forkでは両方を維持している |
+| 実害がない | `mgmaru/mercapi`は修正済みで、Card Diggerはそこを参照する |
+| 衝突リスクが軽微 | 将来upstreamが同じ箇所を別方法で直した場合でも、衝突は**5行**にとどまる |
+
+Forkして自分用に修正すること自体はOSSの慣習上まったく問題なく、還元は礼儀であって義務ではない。
+慣習的に問題視されるのは、改変版をオリジナルとして再配布する場合や帰属表示を削る場合であり、
+本Forkはどちらにも該当しない。
+
+#### 再検討する契機
+
+- upstreamが再び活発に更新されはじめたとき
+- 同じ箇所でupstream取込時に衝突が発生したとき
+- Sellerページングなど、本体に還元する価値の高い変更を出す判断をしたとき
+
+Sellerページングを還元する場合も、関心事が異なるためcassette修正とは**別のPull Request**にする。
 
 Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへの採用は
 [別の判断](../development/mercapi-fork-operations.md#22-forkからcard-digger)として扱う。
