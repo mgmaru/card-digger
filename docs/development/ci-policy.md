@@ -127,6 +127,13 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 | Require approvals | **無効** | 1人開発では自己承認ができず、全変更が止まる |
 | Require linear history | 有効 | 履歴を追いやすくする |
 | Allow force push | **無効** | 参照中のcommitを到達不能にしない |
+| Include administrators | **無効** | §4の「`docs/`は直接pushを許容する」を成立させる |
+| Allow deletions | **無効** | `main`を消せないようにする |
+
+必須Statusは`Docs links`、`PoC unit tests`、`Backend unit and contract tests`の3つとする。
+
+Linear historyを要求するため、Pull RequestはSquashまたはRebaseでMergeする。
+Merge commitは`main`へ作らない。
 
 Forkの`main`にも同じ考え方を適用する。ただし
 [Fork運用手順 §8](mercapi-fork-operations.md#8-問題発生時の戻し方)のとおり、
