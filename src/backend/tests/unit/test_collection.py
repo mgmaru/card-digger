@@ -550,3 +550,49 @@ def _fails_then_succeeds(exc):
         return "ok"
 
     return call
+
+
+class TestRetriesTurnedOff:
+    """Live acceptance verification runs with no retry at all.
+
+    Its conditions say so: a retry is a second request the protocol did not
+    account for, and the point of the exercise is to measure what one pass over
+    the real service actually returns.
+    """
+
+    async def test_a_transient_failure_is_not_attempted_again(self, clock, sleeper):
+        gate = RequestGate(clock, sleeper, max_retries=0)
+        calls = []
+
+        async def always_fails():
+            calls.append(1)
+            raise error(ErrorCode.TIMEOUT)
+
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, always_fails)
+
+        assert len(calls) == 1
+        assert gate.retry_count == 0
+
+    async def test_requests_are_still_spaced_apart(self, clock, sleeper):
+        gate = RequestGate(clock, sleeper, max_retries=0)
+
+        await gate.run(Operation.SEARCH, _returns("ok"))
+        await gate.run(Operation.SEARCH, _returns("ok"))
+
+        assert sleeper.slept == [2.0]
+
+    async def test_the_safety_stop_still_applies(self, clock, sleeper):
+        gate = RequestGate(clock, sleeper, max_retries=0)
+
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            with pytest.raises(MarketplaceError):
+                await gate.run(
+                    Operation.SEARCH, _raises(error(ErrorCode.RATE_LIMITED_429))
+                )
+
+        assert gate.stopped is True
+
+    def test_a_negative_count_is_refused(self, clock, sleeper):
+        with pytest.raises(ValueError):
+            RequestGate(clock, sleeper, max_retries=-1)

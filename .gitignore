@@ -31,6 +31,10 @@ blob-report/
 # PoC raw responses may contain session or seller data
 poc/**/artifacts/
 
+# Live acceptance verification output. Aggregates only, but it is a run record
+# rather than source, and it may carry item ids for follow up.
+src/backend/artifacts/
+
 # Logs and temporary files
 *.log
 tmp/
