@@ -200,7 +200,24 @@ Auction商品を出品している最大3 Sellerで、販売中商品の1ペー�
                 └─→ 手作業で匿名化・最小化 ─→ tests/fixtures/
 ```
 
-構造サンプルへ出力する内容は次に限定する。
+#### 出力する経路
+
+Phase 0-A〜0-Cの`artifacts/`は残っておらず、`result.md`にField名はあるが型・`null`・欠落・
+Object全体の形は残っていない。**Phase 0-Fで必要になるFixtureの根拠は、この実行だけが持つ。**
+そのため、Auction判定に直接必要な経路だけでなく、次の4経路すべてを出力する。
+
+| 経路 | 用途 | Auction判定に必要か |
+|---|---|:---:|
+| 検索結果 | 販売形式判定、`SearchPage`の正規化 | 必要 |
+| 商品詳細 | 価格・終了予定時刻の照合、`get_item` | 必要 |
+| Seller商品一覧 | `pager_id` / `meta.has_next`、ForkのUnit Test | 必要 |
+| Seller Profile | `Seller`型の正規化 | 不要 |
+
+Seller Profileは本検証の判定には使わないが、**後日ライブ実行を追加しないため**、§3.2で選んだ
+Seller（最大3人）について同じ実行内で取得する。Request数は最大3件増える。同時実行数1、
+開始間隔2秒以上の条件は変更しない。
+
+#### 出力する内容
 
 | 出力する | 出力しない |
 |---|---|
@@ -208,6 +225,7 @@ Auction商品を出品している最大3 Sellerで、販売中商品の1ペー�
 | 存在 / `null` / 欠落の別 | 実商品Title、実画像URL |
 | 値の形式（桁数、Timezone表記など） | Cookie、DPoP、Header、Token |
 | 通常出品・Auction・未知形状の各1件以上 | 生ResponseそのままのDump |
+| `meta`と末尾商品の`pager_id` | 画像Body |
 
 匿名化規則と保存先の境界は[Test運用規約 §5](../development/test-policy.md#5-fixture規約)・
 [§6](../development/test-policy.md#6-生responseの取り扱い境界)に従う。

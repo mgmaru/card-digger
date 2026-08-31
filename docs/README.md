@@ -53,7 +53,7 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [mercapi-fork-operations.md](development/mercapi-fork-operations.md):
   Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
 - [test-policy.md](development/test-policy.md):
-  Test層、Framework、配置、Fixtureの匿名化規則、実行時期、完了判定
+  用語、Testの目的と役割、Test層、Framework、配置、Fixtureの匿名化規則、実行時期、完了判定
 
 ### `phase-0/`
 

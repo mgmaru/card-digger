@@ -15,6 +15,49 @@
 
 ---
 
+## 用語
+
+| 用語 | 意味 | この文書での使い方 |
+|---|---|---|
+| Test Suite | 1つのコマンドでまとめて実行するTestの集合 | 「自動Test Suite」＝`pytest tests`で走るL1〜L3。L4は入れない |
+| Fixture | Testが使う**固定された入力データ** | Mercari応答を模したJSON File。規約は[§5](#5-fixture規約) |
+| Unit Test | **1つの実装**が単体で正しく動くかを確認するTest | L1・L2 |
+| Contract Test | **Interfaceの約束**を、その全実装へ同じTestで確認するTest | L3。`MarketplacePort`の全実装へ適用する |
+| Mock Adapter | 外部通信せず固定データを返す`MarketplacePort`実装 | 開発とPhase 1のE2E受入Flowで使う |
+| Fake Fork Client | `mercapi` Forkの代わりにFixtureを返す差し替え部品 | L2・L3で`MercariAdapter`へ注入する |
+| ライブ受入検証 | 実Mercariへ接続して**実測値を記録する手動作業** | L4。Green / RedではなくMarkdownの結果文書を作る |
+| 注入 | 依存物を内部で生成せず外から渡す設計 | 時計・待機・Fork Client。制約は[§7](#7-テスト可能性のための設計制約) |
+
+### Unit TestとContract Testの違い
+
+どちらも外部通信しない。違いは「何を保証するか」にある。
+
+```text
+Unit Test      「MercariAdapterは この入力を こう変換する」    ← 実装ごとに書く
+Contract Test  「MarketplacePortの実装は 必ずこの約束を守る」  ← 1つ書いて、全実装へ流す
+```
+
+| 観点 | Unit Test | Contract Test |
+|---|---|---|
+| 対象 | **1つの実装** | **Interfaceの全実装** |
+| 保証する内容 | その実装が仕様どおり動く | すべての実装が**同じ約束**を守る |
+| 失敗が意味すること | その実装のBug | 実装間の**ズレ**。差し替えると壊れる |
+| Testの書き方 | 実装ごとに書く | 1つ書いて全実装へ流す |
+| Card Diggerでの例 | `MercariAdapter`がAuction価格を取得時点価格へ正規化する | `search_items_page`が必ず必須Fieldを満たすItemを返す |
+| 対応する層 | L1・L2 | L3 |
+
+Card Diggerには`MarketplacePort`の実装が2つできる。
+
+| 実装 | 用途 |
+|---|---|
+| `MercariAdapter` | 本番。Fork経由でMercariから取得する |
+| `Mock Adapter` | 開発と[MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)のE2E受入Flow |
+
+MVPのE2EはMock Adapterで動く。両者の挙動がズレると、**E2Eが緑なのに本番だけ壊れる**。
+これを防ぐのがContract Testであり、Unit Testでは代替できない。適用方法は[§8](#8-contract-testの適用方法)。
+
+---
+
 ## 1. この文書の位置づけ
 
 ```mermaid
@@ -34,9 +77,23 @@ flowchart LR
 
 ---
 
-## 2. Testを実施する理由
+## 2. Testの目的と役割
 
-Card Digger固有の理由に限定する。一般論としてのTestの利点は根拠にしない。
+### 2.1 Testが果たす3つの役割
+
+Testは「品質を上げるための追加作業」ではなく、**仕様と実装のズレを検出し続ける仕組み**として置く。
+
+| 役割 | 内容 | これがないとどうなるか |
+|---|---|---|
+| **仕様を実行可能にする** | 文書上の決定を、機械が毎回検証できる形へ固定する | 仕様は書かれているが、守られているか誰も確認できない |
+| **静かな失敗を検出する** | 例外を出さずに誤った値を返す状態を捕まえる | 画面は正常に見えたまま、利用者へ誤った情報を出す |
+| **変更を安全にする** | Fork更新・依存SHA更新・Refactorの可否を判断する根拠にする | 変更のたびに全機能を手で確認するか、確認せずに壊す |
+
+どの層がどのズレを検出するかは[§3 各層が答える問い](#各層が答える問い)にまとめる。
+
+### 2.2 Card Digger固有の理由
+
+一般論としてのTestの利点は根拠にしない。次の5点に限定する。
 
 | # | 理由 | 根拠 |
 |---|---|---|
@@ -46,7 +103,7 @@ Card Digger固有の理由に限定する。一般論としてのTestの利点�
 | 4 | Fork運用手順がTestをGateとして前提にしている | [Fork運用手順 §6.2](mercapi-fork-operations.md#62-取込後の検証) / [§7](mercapi-fork-operations.md#7-fork更新をcard-diggerへ反映する) |
 | 5 | 429・Timeout・安全停止・各上限は実サービスで再現できない | [Adapter仕様 §8](../phase-0/phase-0-f-adapter-spec.md#8-収集policy) / [§9](../phase-0/phase-0-f-adapter-spec.md#9-errorと再試行) |
 
-### 静かな失敗の例
+### 2.3 静かな失敗の例
 
 次はいずれも例外を出さず、画面上も正常に見える。Assertionでしか検出できない。
 
@@ -79,6 +136,25 @@ flowchart TD
 | L2 | Adapter Unit Test | 正規化、Error分類、収集Policy、停止理由 | なし | 変更ごと | `card-digger` |
 | L3 | Contract Test | `MarketplacePort`の全実装 | なし | 変更ごと | `card-digger` |
 | L4 | ライブ受入検証 | 実Mercari | **あり** | 手動・低頻度 | `card-digger` |
+
+### 各層が答える問い
+
+L1〜L3とL4は、**確認している対象が違う**。L4はL1〜L3を実Mercariへ向けて再実行する作業ではない。
+
+```text
+L1〜L3   コード  ←→  仕様        「書いたコードが仕様どおりか」
+L4       仕様    ←→  実Mercari   「仕様の前提が現実と合っているか」
+```
+
+| 層 | 答える問い | 壊れたときに分かること |
+|---|---|---|
+| L1 | ForkのPublic APIは仕様どおりか | Fork実装のBug |
+| L2 | Adapterは与えられたデータを正しく変換するか | Adapter実装のBug |
+| L3 | すべての`MarketplacePort`実装が同じ約束を守るか | Mock と本番実装のズレ |
+| L4 | **Mercariの実応答が仕様の前提どおりか** | **Mercari側の仕様変更** |
+
+Fixtureは固定されているため、Mercariが応答形式を変えてもL1〜L3は緑のままになる。
+これはBugではなくFixtureの性質であり、その盲点を埋める唯一の手段がL4である。
 
 - **L1〜L3だけを自動Test Suiteとする。**
 - **L4はTest Suiteに含めない。** CI、watch、Pre-commit、Pre-pushで実行しない。
@@ -141,6 +217,42 @@ Fixtureは、**観測したResponseの構造だけを写した、手書き・最
 - 生ResponseのDumpをそのまま置かない
 - Git管理対象とする
 - 1 Fixture = 1検証観点
+- **L1〜L3だけで使う。** L4はFixtureを使わず実応答を扱う
+- 模擬データだが**想像で作らない。** 実際に観測した構造に基づく（[§5.4](#54-出所の記録)）
+- 実サービスで再現できない異常系（`has_next=true`で末尾`pager_id`が欠落、空Response +
+  `has_next=true`、429など）は、**観測済みの正常Fixtureから派生**させて作る。ゼロから創作しない
+
+Fixtureを使う理由は、**実サービスでは狙って起こせない状況を再現できる**ことにある。
+
+| | 実Mercariへ通信するTest | Fixtureを読むTest |
+|---|---|---|
+| 結果 | 実行のたびに変わる | 常に同じ |
+| 速度 | 遅い（間隔2秒以上） | 一瞬 |
+| 異常系 | 429や壊れた応答を起こせない | 自由に用意できる |
+| 頻度制限 | 触れる | 無関係 |
+
+`tests/fixtures/seller_items/page_1_has_next.json`
+
+```json
+{
+  "data": [
+    {
+      "id": "m000000000001",
+      "name": "sample-auction-item",
+      "price": 1200,
+      "seller_id": "100000001",
+      "status": "on_sale",
+      "pager_id": 9,
+      "auction": { "id": "a000000001", "highestBid": 1200, "totalBid": 3 }
+    }
+  ],
+  "meta": { "has_next": true }
+}
+```
+
+> **`pytest`の`@pytest.fixture`とは別物。** `pytest`のFixtureはTestの準備処理を指す機能名であり、
+> この文書のFixtureは**固定入力データのFile**を指す。同じ単語で意味が異なるため、
+> 実装時は`load_fixture()`のような明示的な関数名でFileの読み込みと区別する。
 
 ### 5.2 匿名化規則
 
@@ -242,6 +354,73 @@ Contract Test群（定義は1つ）
    └─→ Mock Adapter
 ```
 
+### Test中の外部通信
+
+**Contract Test中の`MercariAdapter`は実Mercariへ通信しない。** Fork Clientの代わりに、Fixtureを
+返すFake Fork Clientを注入する。通信してしまえば、それはL3ではなくL4になる。
+
+```text
+本番実行
+  Use case → MarketplacePort → MercariAdapter → mercapi Fork → 実Mercari
+
+Contract Test（L3）
+  Test → MarketplacePort ─┬→ MercariAdapter → Fake Fork Client → Fixture
+                          └→ Mock Adapter   → 固定データ
+                             ※どちらも外部通信しない
+```
+
+| 場面 | `MercariAdapter` | `Mock Adapter` |
+|---|---|---|
+| 本番実行 | Fork経由で**実Mercariへ通信する** | 使わない |
+| L2 / L3 Test | Fake Fork ClientがFixtureを返す。**通信しない** | 固定データを返す。**通信しない** |
+| L4 | **実Mercariへ通信する** | 使わない |
+
+[§7の設計制約](#7-テスト可能性のための設計制約)でFork Clientを注入可能にしているのは、この差し替えを
+成立させるためである。
+
+### いつ書き、いつ実行するか
+
+Contract Testは`MercariAdapter`の完成後にだけ書くものではない。`MarketplacePort`を定義した直後に
+書き、実装が増えるたびに適用対象へ加える。
+
+| 順序 | 作業 | Contract Testの状態 |
+|---|---|---|
+| 1 | Domain型と`MarketplacePort`を定義する | 守るべき約束が決まる |
+| 2 | **Contract Testを書く** | まだ実行対象がない |
+| 3 | Mock Adapterを実装する | Mockに対して緑になる |
+| 4 | `MercariAdapter`を実装する | **両実装へ流して初めてズレを検出できる** |
+
+先にContract Testを書くことで、それが`MarketplacePort`の実行可能な仕様になり、Mock Adapterが
+「Testを通すためだけの簡易実装」になることを防ぐ。Mock Adapterは
+[MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)のE2E受入Flowで実際に使う部品である。
+
+### 書き方
+
+Test本体は1つだけ書き、対象実装を切り替えて同じTestを流す。
+
+```python
+# tests/contract/test_marketplace_port.py
+@pytest.fixture(params=["mercari", "mock"])
+def port(request) -> MarketplacePort:
+    if request.param == "mercari":
+        return MercariAdapter(client=FakeForkClient(load_fixture("search/page_1.json")))
+    return MockAdapter(items=mock_items())
+
+
+async def test_search_returns_items_with_required_fields(port):
+    page = await port.search_items_page("ポケカ 引退品")
+
+    assert page.items
+    for item in page.items:
+        assert item.id
+        assert item.price_yen >= 1
+        assert item.url.startswith("https://")
+        assert item.sale_format in SaleFormat
+```
+
+このTestは`MercariAdapter`と`Mock Adapter`の**両方**で実行される。
+片方だけが満たす挙動があれば、その時点で失敗する。
+
 ### 規則
 
 - 同一のTestを両実装へParametrizeして適用する
@@ -253,6 +432,21 @@ Contract Test群（定義は1つ）
 ---
 
 ## 9. ライブ受入検証（L4）の実施規約
+
+### L4の性格
+
+L4はTest Runnerで実行するTestではなく、**実測して記録する作業**である。
+性格はPhase 0-A〜0-CのPoC実測に近い。
+
+| | L1〜L3 | L4 |
+|---|---|---|
+| 実行方法 | `pytest tests` | 専用Scriptと手順書を手動実行 |
+| 入力 | 固定Fixture | 実Mercariの応答 |
+| 判定 | Assertionの成否 | 率（成功率80%以上、必須Field 100%など） |
+| 成果物 | Green / Red | **実測値を記録したMarkdown** |
+| 再現性 | 常に同じ | 実行時期で変わる |
+
+判定基準は[Adapter仕様 §10.3](../phase-0/phase-0-f-adapter-spec.md#103-ライブ受入検証)を正本とする。
 
 ### 実施条件
 

@@ -426,6 +426,11 @@ flowchart LR
 検証条件と合格基準は
 [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)を正本とする。
 
+> **この実行で取る構造サンプルが、後続のFixtureを作る唯一の根拠になる。**
+> Phase 0-A〜0-Cの`artifacts/`は残っておらず、`result.md`にField名はあるが型・`null`・欠落・
+> Object全体の形は残っていない。ここで取り損ねると、0-F-3以降で追加のライブ実行が必要になる。
+> Fixtureを観測なしで作らない（[Test運用規約 §5.1](../development/test-policy.md#51-定義)）。
+
 - [ ] 通常出品とAuctionを各10件以上取得する
 - [ ] 検索結果、商品詳細、商品ページの販売形式を照合する
 - [ ] `price`、開始価格、最高入札額、現在価格の対応を確認する
@@ -434,7 +439,11 @@ flowchart LR
 - [ ] `with_auction`がSeller商品の件数・状態・Cursorへ与える影響を確認する
 - [ ] 未知形状を`fixed_price`へ誤変換せず`unknown`にできるか確認する
 - [ ] `poc/mercapi/auction-result.md`へ実測結果を記録する
-- [ ] Fixtureの起点となる匿名化済み構造サンプルを`artifacts/`へ出力する
+- [ ] 検索結果の構造サンプルを出力する（通常出品・Auction・未知形状）
+- [ ] 商品詳細の構造サンプルを出力する（通常出品・Auction）
+- [ ] Seller商品一覧の構造サンプルを出力する（`data[]`・`pager_id`・`meta.has_next`）
+- [ ] Seller Profileの構造サンプルを出力する
+- [ ] 構造サンプルがマスク済みで、生Responseを含まないことを確認する
 - [ ] 合否と採用MappingをMVP仕様・Adapter仕様へ反映する
 
 ## 0-F-2. 管理下Forkを準備する
@@ -480,6 +489,12 @@ flowchart LR
 実施方法・Fixture規約・実行時期は[Test運用規約](../development/test-policy.md)を正本とする。
 L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 
+> Contract Testはこの節で初めて書くのではなく、
+> [0-F-4](#0-f-4-domainとadapterを実装する)で`MarketplacePort`を定義した直後に書き始める
+> （[Test運用規約 §8](../development/test-policy.md#8-contract-testの適用方法)）。
+
+- [ ] 0-F-1の構造サンプルからFixtureを起こす（観測なしで作らない）
+- [ ] 実サービスで再現できない異常系Fixtureを、正常Fixtureから派生させて用意する
 - [ ] Forkの正常系・終端・空Response・Cursor欠落Fixture Testを通す（L1）
 - [ ] Adapterの正規化、Error、再試行、安全停止、収集上限をUnit Testする
 - [ ] `MarketplacePort`のContract TestをMercari / Mock Adapterの両方へ適用する
