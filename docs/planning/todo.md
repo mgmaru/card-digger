@@ -855,7 +855,7 @@ L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 
 条件・手順・合格基準は[ライブ受入検証実施計画](../phase-0/phase-0-f-live-acceptance.md)を正本とする。
 
-- [x] L4 Runnerと手順書を用意する
+- [x] L4 Runner（人が手で起動する実行Script）と手順書を用意する
 - [x] `RequestGate`へ自動再試行を止める設定を追加する（L4は`max_retries=0`）
 - [x] Runnerが`--confirm`なしで通信しないことをTestで固定する
 - [ ] 検索を5回実行し、成功率と必須Field取得率を確認する

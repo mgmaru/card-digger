@@ -26,6 +26,7 @@
 | Mock Adapter | 外部通信せず固定データを返す`MarketplacePort`実装 | 開発とPhase 1のE2E受入Flowで使う |
 | Fake Fork Client | `mercapi` Forkの代わりにFixtureを返す差し替え部品 | L2・L3で`MercariAdapter`へ注入する |
 | ライブ受入検証 | 実Mercariへ接続して**実測値を記録する手動作業** | L4。Green / RedではなくMarkdownの結果文書を作る |
+| Runner | 人が手で起動する**実行Script** | Testと違い、実サービスへ接続して実測値を記録する。`poc/mercapi/run.py`、`src/backend/scripts/live_acceptance.py`など |
 | 注入 | 依存物を内部で生成せず外から渡す設計 | 時計・待機・Fork Client。制約は[§7](#7-テスト可能性のための設計制約) |
 
 ### Unit TestとContract Testの違い

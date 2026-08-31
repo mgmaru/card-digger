@@ -10,6 +10,20 @@
 - 検証条件: [Phase 0 共通検証プロトコル](poc-validation.md)
 - 結果の記録先: `docs/phase-0/phase-0-f-live-acceptance-result.md`（実施時に作成する）
 
+## 用語
+
+| 用語 | 意味 |
+|---|---|
+| **Runner** | 人が手で起動する実行用Script。自動Testと違い、実サービスへ接続して**実測値を記録する**ことが目的。Card Diggerでは`poc/mercapi/run.py`、`auction_probe.py`、本節の`live_acceptance.py`が該当する |
+| Fixture | Testが読む固定入力データ。実通信の代わりに使う（[Test運用規約 §5](../development/test-policy.md#5-fixture規約)） |
+| L1〜L3 | 外部通信しない自動Test Suite。Fixtureを入力にする |
+| L4 | この文書が扱うライブ受入検証。Runnerで実Mercariへ接続する |
+
+```text
+自動Test    CIが起動 → Fixtureを読む   → 緑 / 赤
+Runner      人が起動 → 実Mercariへ接続 → 実測値を書いたMarkdown
+```
+
 ## 1. 目的
 
 **L4はL1〜L3を実Mercariへ向けて再実行する作業ではない。** 確認している対象が違う。
@@ -71,9 +85,83 @@ cd poc/mercapi
 ```
 
 `src/backend`へPlaywrightを追加しない。本番で使わないBrowser依存をApplication Packageへ
-持ち込まないためであり、実行回数を分けられる利点もある。
+持ち込まないためである。
 
-## 4. 測定項目と合格基準
+**この照合を`MercariAdapter`経由で行わない理由は§4に記載する。** Browserが必要という技術的都合
+だけでなく、責務の分離にもとづく判断である。
+
+## 4. なぜStep 2をAdapter経由で行わないのか
+
+Step 2は`MercariAdapter`を通らず、`mercapi`の生の値と商品ページを直接比較する。
+「実装したBackendの出力をページと突き合わせた方が厳密ではないか」という疑問が生じるため、
+判断理由を残す。
+
+### 4.1 責務の違い
+
+| | `mercapi`（Fork） | `MercariAdapter` |
+|---|---|---|
+| 担うもの | HTTP、DPoP署名、JSON → Forkモデルへの解析 | 要求の組み立て、値の意味づけ、Error分類 |
+| 答える問い | **どうやって取得するか** | **何を要求し、その値が何を意味するか** |
+
+取得そのものは`mercapi`が担い、Adapterは1 Requestも送らない。
+Adapterが決めるのは`with_auction=true`のような**要求の内容**と、返ってきた値の**解釈**である。
+
+### 4.2 この照合が答える問い
+
+商品ページとの照合が確かめているのは次の1点に尽きる。
+
+> `highest_bid`は、買い手が画面で見る現在価格を意味するのか
+
+これは**Mercari側の事実**についての問いであり、Card Diggerのコードについての問いではない。
+[Test運用規約 §3](../development/test-policy.md#3-test層)のとおり、L4が答えるべきは
+「仕様の前提が現実と合っているか」であって「書いたコードが仕様どおりか」ではない。
+
+Adapterを通すと、1つの数字に2つの問いが乗る。
+
+```text
+不一致が出た → highest_bidの意味が変わったのか？
+             → AdapterのField選択が壊れたのか？
+             → 切り分けられない
+```
+
+生の値とページを比べれば、答えは前者だけに限定される。
+
+### 4.3 Adapterの検査は実測より固定Fixtureの方が強い
+
+「Adapterが誤って`initial_price`（開始価格）を使う」という失敗を、実測で捕まえられるかを考える。
+[0-F-1の実測](../../poc/mercapi/auction-result.md)ではAuction 10件の内訳が次のとおりだった。
+
+| 状態 | 件数 | `initial_price`と`highest_bid` |
+|---|---:|---|
+| 未入札（`STATE_NO_BID`） | **7** | **同じ値** |
+| 入札済み | 3 | 乖離する |
+
+**未入札では開始価格と現在価格が一致するため、バグがあっても7件は一致してしまう。**
+標本が未入札に寄れば、誤りがあるのに100%一致と出る。実測はこの検査に向いていない。
+
+Fixtureなら「開始価格300 / 現在価格1200」と必ず食い違う値を置けるため、誤りは確実に捕まる。
+したがって「AdapterがどのFieldを選ぶか」はL2のFixture Testが担当する。
+
+### 4.4 Adapterは実データでも検査されている
+
+Step 2でAdapterを通さないことは、「Adapterが実Mercariに対して未検証」を意味しない。
+**Step 1のRunnerは`MercariAdapter`を通して実Mercariから取得している。**
+
+| 検査 | 答える問い | 経路 | 入力 |
+|---|---|---|---|
+| L2 | Adapterは仕様どおり変換するか | Adapterのみ | Fixture |
+| **L4 Step 1** | 実データでもAdapterは成立するか | **Adapter → mercapi → 実Mercari** | 実応答 |
+| **L4 Step 2** | `highest_bid`は現在価格を意味するか | **mercapi → 実Mercari** + 商品ページ | 実応答 + 画面 |
+
+3つとも問いが1つずつで重なっていない。これが分離できている状態とする。
+
+### 4.5 この判断を見直す契機
+
+- Adapterが`price_yen`の決め方を変えたとき（Fixtureだけでなく実測でも確認する価値が出る）
+- `highest_bid`以外のFieldを画面表示へ使うようになったとき
+- Step 1とStep 2で同じ商品を追跡する必要が出たとき
+
+## 5. 測定項目と合格基準
 
 [Adapter仕様 §10.3](phase-0-f-adapter-spec.md#103-ライブ受入検証)を正本とする。
 
@@ -98,7 +186,7 @@ Adapterは必須Fieldが欠けた時点で操作を失敗させるため、**成
 それでも測るのは、この率が合格基準そのものであり、Adapterが将来黙って除外へ変わった場合に
 「測っていない」ではなく「100%を下回った」として現れるようにするためである。
 
-## 5. 記録する内容
+## 6. 記録する内容
 
 | 記録する | 記録しない |
 |---|---|
@@ -109,7 +197,7 @@ Adapterは必須Fieldが欠けた時点で操作を失敗させるため、**成
 
 不一致が出た商品のIDは、Git管理外の`artifacts/`にだけ残す。結果文書には件数だけを書く。
 
-## 6. 判定と不合格時の扱い
+## 7. 判定と不合格時の扱い
 
 - 基準を1つでも満たさない場合、**Phase 0-Fを完了扱いにしない**
 - Errorや安全停止を成功として隠さない。発生した事実と回数を記録する
@@ -120,7 +208,7 @@ Adapterは必須Fieldが欠けた時点で操作を失敗させるため、**成
 コードだけで判断せず[Adapter仕様](phase-0-f-adapter-spec.md)と[TODO](../planning/todo.md)を
 先に更新する。
 
-## 7. 実行前チェックリスト
+## 8. 実行前チェックリスト
 
 - [ ] `uv run pytest tests`がすべて成功している（L2 / L3）
 - [ ] Forkの`pytest`がすべて成功している（L1）
@@ -129,7 +217,7 @@ Adapterは必須Fieldが欠けた時点で操作を失敗させるため、**成
 - [ ] 3回連続の安全Errorで停止する準備をした（`max_retries=0`で実行される）
 - [ ] 結果文書へ個人情報と生Responseを書かない準備をした
 
-## 8. 実行しないこと
+## 9. 実行しないこと
 
 | 項目 | 理由 |
 |---|---|
