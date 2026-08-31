@@ -463,22 +463,41 @@ flowchart LR
 > `gh auth login`だけは実行者自身が行う。認証以外はCommandで進められる。
 > Clone先はCard Diggerと同じ親Directoryとし、Card Digger配下へ置かない。
 
-- [ ] `gh auth status`で認証とScopeを確認する
-- [ ] `kynacio/mercapi`のライセンスとFork・再配布条件を確認する
-- [ ] `gh repo fork kynacio/mercapi`で`mgmaru/mercapi`を作成する
-- [ ] Card Diggerと同じ親Directoryへ`gh repo clone`する
-- [ ] Fork元を`upstream` Remoteとして登録する
-- [ ] `feat/seller-items-pagination` Branchを作成する
-- [ ] 検証済みcommit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`を変更基点にする
-- [ ] `git log -1`が変更基点SHAと一致することを確認する
-- [ ] LICENSEと著作権表示が維持されていることを確認する
+- [x] `gh auth status`で認証とScopeを確認する
+- [x] `kynacio/mercapi`のライセンスとFork・再配布条件を確認する
+- [x] `gh repo fork kynacio/mercapi`で`mgmaru/mercapi`を作成する
+- [x] Card Diggerと同じ親Directoryへ`gh repo clone`する
+- [x] Fork元を`upstream` Remoteとして登録する
+- [x] `feat/seller-items-pagination` Branchを作成する
+- [x] 検証済みcommit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`を変更基点にする
+- [x] `git log -1`が変更基点SHAと一致することを確認する
+- [x] LICENSEと著作権表示が維持されていることを確認する
+
+**完了: 2026-08-31。** `mgmaru/mercapi`を作成し、`/Users/hiroaki/Developer/mercapi`へCloneした。
+
+| 項目 | 実測 |
+|---|---|
+| upstream License | **MIT**（Copyright (c) 2022 Take-kun）。Fork・改変・再配布・商用利用が可能 |
+| Fork | `mgmaru/mercapi`（public、`parent=kynacio/mercapi`、LICENSE維持） |
+| Remote | `origin`=Fork、`upstream`=本家。upstreamのpush URLは無効化済み |
+| Branch | `feat/seller-items-pagination` |
+| 基点SHA | `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`（upstream `main`の先頭と一致） |
+
+`gh repo clone`がForkに対して`upstream`を自動登録するため、`git remote add`は不要だった。
 
 ## 0-F-3. ForkへSellerページングを実装する
 
 > Fixtureは[0-F-1で観測した構造サンプル](../development/mercapi-fork-operations.md#35-fixtureの起点を引き継ぐ)
 > から起こす。ForkのためにMercariへ改めてアクセスしない。構造サンプルはGit管理外のため、
 > ForkのFixtureを作り終えるまで`poc/mercapi/artifacts/`を削除しない。
+>
+> **upstreamのTestは`vcrpy`で実通信をcassetteへ記録する方式で、`dpop` JWT・実商品ID・実Titleを
+> そのまま含む。**[Test運用規約 §5](../development/test-policy.md#5-fixture規約)と衝突するため、
+> 新しいcassetteを実通信から記録せず、通信の差し替えは**`httpx.MockTransport`**を使う。
+> 既存cassetteは削除も改変もしない。詳細は
+> [Test運用規約 §4.4](../development/test-policy.md#44-forkのtestに関する例外)。
 
+- [ ] Forkの開発環境を構築し、既存Testが成功する基準線を記録する
 - [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
 - [ ] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
 - [ ] Seller商品Modelへ`pager_id`を追加する
@@ -487,7 +506,9 @@ flowchart LR
 - [ ] `has_next=true`時だけ末尾`pager_id`を次Cursorとして返す
 - [ ] 空Response、Cursor欠落、未知Statusを検証する
 - [ ] 既存`items(profile_id)`の後方互換を維持する
-- [ ] 固定FixtureによるForkのUnit Testを追加する
+- [ ] 構造サンプルからJSON Fixtureを起こす（`observed` / `derived`の区分を記録する）
+- [ ] `httpx.MockTransport`でForkのUnit Testを追加する
+- [ ] 既存Testが引き続き成功することを確認する
 - [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する
 
 ## 0-F-4. DomainとAdapterを実装する

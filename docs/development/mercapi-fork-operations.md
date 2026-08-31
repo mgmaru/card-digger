@@ -114,9 +114,11 @@ gh api repos/kynacio/mercapi/license --jq '.license.spdx_id'
 ### 3.3 Forkを作成する
 
 ```bash
-gh repo fork kynacio/mercapi --org-level=false --clone=false --remote=false
-gh repo view mgmaru/mercapi --json name,owner,parent,isFork
+gh repo fork kynacio/mercapi --clone=false
+gh repo view mgmaru/mercapi --json name,owner,parent,isFork,licenseInfo,visibility
 ```
+
+`--remote`はRepository引数と併用できない。`--clone=false`だけを指定する。
 
 GitHubではFork名は初期状態でupstreamと同名になる。別名も指定できるが、本プロジェクトでは
 Repositoryの所有者を含む`mgmaru/mercapi`で区別する。
@@ -143,11 +145,18 @@ Card Diggerと**同じ親Directory**へ兄弟として配置する。Card Digger
 # card-digger の親Directoryで実行する
 gh repo clone mgmaru/mercapi
 cd mercapi
-git remote add upstream https://github.com/kynacio/mercapi.git
 git remote -v
-git fetch upstream
 git switch -c feat/seller-items-pagination 20ba68fd42677997c4c91b4e4eb17c1e7e387efa
 git log -1 --format=%H
+```
+
+`gh repo clone`はForkに対して**`upstream`を自動登録し、upstreamのfetchまで行う**。
+`git remote add upstream`は不要で、登録済みかを`git remote -v`で確認するだけでよい。
+
+`upstream`のpush URLは既定でupstream本体を指すため、誤Pushを防ぐために無効化する。
+
+```bash
+git remote set-url --push upstream DISABLED_no_push_to_upstream
 ```
 
 最後の`git log`が変更基点SHAと一致することを確認する。
@@ -198,6 +207,31 @@ Fixtureの作り方、`observed` / `derived` / `assumed`の区分、匿名化規
 
 ForkへCard Digger固有の収集上限、画面文言、Seller Knowledgeを実装しない。追加範囲は
 [Adapter仕様の責務分離](../phase-0/phase-0-f-adapter-spec.md#3-責務の境界)に従う。
+
+### 4.1 upstreamのTest構成と規約の衝突
+
+`kynacio/mercapi`のTestは`pytest` + `vcrpy` / `pytest-recording`で、`tests/cassettes/*.yml`へ
+**実通信をそのまま記録**する方式である。記録済みcassetteには次が含まれる。
+
+| 含まれるもの | 例 |
+|---|---|
+| Request Header | **`dpop`のJWTがそのまま** |
+| 実商品ID・実Title | `m62857872792`、実際の商品名 |
+| 実画像URL | `https://static.mercdn.net/...` |
+| Seller ID・Seller名 | Response内にそのまま |
+
+[Test運用規約 §5](test-policy.md#5-fixture規約)は生Response・Header・実IDの保存を禁止しており、
+**この方式をそのまま踏襲できない。** Forkは公開Repositoryであり、記録するとそのまま公開される。
+
+したがって、Forkへ追加するTestでは次を守る。
+
+- **新しいcassetteをMercariへの実通信から記録しない**
+- 追加分のFixtureは[0-F-1の構造サンプル](#35-fixtureの起点を引き継ぐ)から手で起こす
+- 既存cassetteは削除も改変もしない（upstreamの資産を壊さない）
+- 通信の差し替えは**`httpx.MockTransport`**を使う。`vcrpy`は新規に使わない
+
+Framework、Fixtureの置き場、MockTransportを選んだ理由は
+[Test運用規約 §4.4](test-policy.md#44-forkのtestに関する例外)を正本とする。
 
 手順1のFixtureは生Responseではなく、[Test運用規約 §5](test-policy.md#5-fixture規約)の
 匿名化・最小化規則に従った構造標本とする。

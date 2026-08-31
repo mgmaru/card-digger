@@ -170,7 +170,7 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 | 対象 | 採用 | 理由 |
 |---|---|---|
 | Backend / Adapter | `pytest` + `pytest-asyncio` | Adapterがasync。同一Contractを複数実装へ流すParametrizeを明確に書ける |
-| Fork | Fork Repositoryの既存Test構成に従う | 上流のCoding Styleを優先する |
+| Fork | `pytest` + `pytest-asyncio` + `httpx.MockTransport` | 上流のFrameworkへ合わせる。ただし新規cassetteは記録しない（[§4.4](#44-forkのtestに関する例外)） |
 | PoC (`poc/`) | 標準ライブラリ`unittest`を継続 | 既存資産があり、依存を増やさない |
 | Frontend | Phase 1のApplication基盤実装時に決定する | MVP着手時まで確定不要 |
 
@@ -205,6 +205,42 @@ pytest tests/contract     # L3のみ
 
 - L4はTestコマンドではなく、専用Scriptと手順書から手動実行する。
 - 実行手順は`src/backend/README.md`へ記載する。
+
+### 4.4 ForkのTestに関する例外
+
+upstream `kynacio/mercapi`のTestは`vcrpy` / `pytest-recording`で**実通信をcassetteへ記録**する。
+記録済みcassetteには`dpop` JWT、実商品ID、実Title、実画像URLが平文で含まれ、
+[§5](#5-fixture規約)の匿名化規則と[§6](#6-生responseの取り扱い境界)の保存境界に反する。
+Forkは公開Repositoryのため、記録すればそのまま公開される。
+
+そのためForkへ追加するTestは次とする。
+
+| 項目 | 決定 |
+|---|---|
+| Framework | upstream既存の`pytest` + `pytest-asyncio`をそのまま使う |
+| 通信の差し替え | **`httpx.MockTransport`**。`vcrpy`を新規に使わない |
+| Fixture | [§5](#5-fixture規約)に従うJSON |
+| 既存cassette | **削除も改変もしない** |
+| 新規cassette | **記録しない** |
+
+#### MockTransportを選ぶ理由
+
+`httpx.MockTransport`は、実際に通信するTransportを差し替えるhttpx標準の部品である。
+Fork本体のコードを変えずに、通信だけを止められる。
+
+```text
+Fork のコード → httpx.AsyncClient → Transport → api.mercari.jp
+                                    ↑ ここだけ差し替える
+```
+
+| 理由 | 内容 |
+|---|---|
+| Request検証 | [Adapter仕様 §10.1](../phase-0/phase-0-f-adapter-spec.md#101-forkのunit-test)の8項目中4項目が「何を送ったか」の検証で、`assert`で直接書ける |
+| 応答の返し分け | 1回のTestで1ページ目と2ページ目を返し分けられ、Cursor引き継ぎを検証できる |
+| 無通信の保証 | 通信する経路が存在しない。**設定ではなく構造で**L1の無通信を保証できる |
+
+`vcrpy`は「cassetteが無ければ録画する」モードを持ち、設定を誤るとTest実行が実通信になる。
+MockTransportにはその事故が構造的に起こらない。
 
 ---
 
