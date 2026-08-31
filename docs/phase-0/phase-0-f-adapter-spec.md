@@ -3,14 +3,14 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-08-31**
+- 最終更新日: **2026-08-31**（Auction追加検証の結果を反映）
 - ステータス: **実装基準として採用**
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
 - Product側の挙動: [MVP実装仕様](../product/mvp-spec.md)
 - Repository運用: [mercapi Fork運用手順](../development/mercapi-fork-operations.md)
 - Test実施方法: [Test運用規約](../development/test-policy.md)
-- 追加検証: [Auction情報の追加検証計画](phase-0-f-auction-validation.md)
+- 追加検証: [Auction情報の追加検証計画](phase-0-f-auction-validation.md) / [実測結果](../../poc/mercapi/auction-result.md)
 
 この文書はPhase 0-Fの正本とする。実装中に判断が分かれた場合は、コードだけで挙動を決めず、
 この文書とTODOを先に更新する。
@@ -42,7 +42,9 @@ Phase 0-Fでは画面を作らない。PythonのDomain型、Interface、Adapter�
 | Seller一覧 | `on_sale`と`sold_out`を別Request・別Cursorで取得する |
 | `trading` | Domain上は独立状態として保持する。MVPでは専用収集を行わない |
 | 販売形式 | `fixed_price` / `auction` / `unknown`をDomainで保持し、未知形状を通常出品へ寄せない |
-| Auction | 判定と価格Fieldの追加検証合格後に、検索・Seller一覧の両方で有効化する |
+| Auction | 追加検証に**合格**。検索・Seller一覧の両方で有効化する |
+| Auction価格 | `highest_bid`（取得時点の現在価格）を`price_yen`にする。`initial_price`は使わない |
+| Auction日時 | `mercapi`はnaive `datetime`を返すため、AdapterでUTCとして解釈し直す |
 | 古い順 | Server側の順序を信用せず、取得範囲内だけをApplication側でSortする |
 | 商品詳細 | Adapterに用意するが、MVP検索一覧では自動取得しない |
 | Playwright | 自動Fallbackに使わず、仕様調査・障害診断用PoCに限定する |
@@ -50,9 +52,9 @@ Phase 0-Fでは画面を作らない。PythonのDomain型、Interface、Adapter�
 | Test Fixture | 生Responseではなく、匿名化・最小化した構造標本をGit管理する |
 | テスト可能性 | 時計、待機、Fork ClientをAdapter / Use caseの内部で生成せず注入する |
 
-AuctionのDomain境界はこの文書で先に確保するが、Raw Fieldから`SaleFormat`と`price_yen`への
-Mappingは[Auction追加検証](phase-0-f-auction-validation.md)の結果を正本とする。結果文書が完成するまで、
-推測でMappingを実装せず、Phase 0-Fを完了扱いにしない。
+Raw Fieldから`SaleFormat`と`price_yen`へのMappingは
+[Auction追加検証の実測結果](../../poc/mercapi/auction-result.md)を根拠とし、§6.1に確定値を記載する。
+実測していない形（終了済みAuction、未知形状）は`unknown`として扱い、推測で実装しない。
 
 ## 3. 責務の境界
 
@@ -61,6 +63,8 @@ Mappingは[Auction追加検証](phase-0-f-auction-validation.md)の結果を正�
 Forkには、Mercariを利用する一般的なPython Clientとして成立する機能だけを追加する。
 
 - Seller商品一覧で状態を指定できる
+- Seller商品一覧で`with_auction`を指定できる
+- Seller商品の`auction_info`をResponseモデルへ保持する
 - `max_pager_id`をRequestへ渡せる
 - 各Seller商品の`pager_id`をResponseモデルへ保持する
 - `meta.has_next`をResponseモデルへ保持する
@@ -131,6 +135,7 @@ async def items_page(
     *,
     limit: int = 30,
     max_pager_id: str | None = None,
+    with_auction: bool = False,
 ) -> SellerItemsPage:
     ...
 ```
@@ -141,6 +146,8 @@ async def items_page(
 - `statuses`: `on_sale`、`trading`、`sold_out`だけを許可し、1件以上を必須にする
 - `limit`: `1..30`。MVPでは30固定で使う
 - `max_pager_id`: 1ページ目は`None`、2ページ目以降は直前Responseの値を使う
+- `with_auction`: `true`のときだけResponseに`auction_info`が付く。件数・順序・Cursor・状態Filterは変わらない
+- `SellerItem`は`auction_info`を保持する。省略時と非Auction商品ではキーごと欠落する
 
 ### Response規則
 
@@ -225,9 +232,48 @@ class SellerItemsPage:
 失敗させる。`SaleFormat.UNKNOWN`は未知形状を表す有効値であり、`FIXED_PRICE`へ変換しない。
 `item_condition`、`like_count`、評価、評価件数、販売件数だけはNullableとする。
 
-`price_yen`は、通常出品では販売価格、Auctionでは追加検証で特定した取得時点の現在価格とする。
-Auctionの開始価格や確定落札額で代用しない。検証で現在価格を安定して取得できない場合は、
-[追加検証計画の縮小方針](phase-0-f-auction-validation.md#62-合格しない場合)に従う。
+`price_yen`は、通常出品では販売価格、Auctionでは取得時点の現在価格とする。
+Auctionの開始価格や確定落札額で代用しない。
+
+### 6.1 Auction Fieldの正規化
+
+[実測結果](../../poc/mercapi/auction-result.md)で確定した内容とする。**3経路でField名も型も異なる。**
+
+| 経路 | Field名 | キー | 値の型 |
+|---|---|---|---|
+| 検索 | `auction` | `id` / `bidDeadline` / `totalBid` / `highestBid` / `initialPrice` | **すべて文字列** |
+| 商品詳細 | `auction_info` | `id` / `start_time` / `total_bids` / `initial_price` / `highest_bid` / `state` / `auction_type` / `expected_end_time` | 数値・文字列 |
+| Seller商品一覧 | `auction_info` | `id` / `bid_deadline` / `total_bid` / `initial_price` / `highest_bid` | 数値・文字列 |
+
+#### `SaleFormat`の判定
+
+```text
+1. Fieldが 欠落 / null / 空Object     → FIXED_PRICE
+2. Objectで既知キーを1つ以上含む      → AUCTION
+3. Objectだが既知キーを1つも含まない  → UNKNOWN
+4. Object以外の型                     → UNKNOWN
+```
+
+- **検索の`auction.id`は空文字のため、判定に使わない**
+- `mercapi`の`Item.auction_info`が`None`かどうかを判定根拠にしない。
+  必須Fieldが欠けると例外ではなく`None`になり、Auctionが通常出品として通過する
+- 通常出品は検索で`auction: null`、詳細とSeller一覧ではキーごと欠落する
+
+#### 価格
+
+```text
+price_yen = 検索 price = auction.highestBid = auction_info.highest_bid
+```
+
+- `initial_price`（開始価格）は`price_yen`へ使わない。入札済み商品で現在価格と乖離する
+- 検索の`auction.*`は文字列のため整数へ変換する
+
+#### 日時
+
+- `expected_end_time`、`start_time`はepoch秒。`bidDeadline` / `bid_deadline`はISO 8601文字列
+- `mercapi`は`datetime.fromtimestamp()`でnaive `datetime`を返すため、**UTCとして解釈し直す**
+- 未入札（`state=STATE_NO_BID`、`total_bids=0`）の終了予定時刻は確定値ではない。確定値として扱わない
+- 欠落時に架空の終了時刻を生成せず、延長を推測しない
 
 ## 7. Marketplace Interface
 
@@ -259,12 +305,13 @@ class MarketplacePort(Protocol):
 
 - `search_items_page`はMVPでは`on_sale`、カテゴリ・価格指定なし、
   `SORT_CREATED_TIME / ORDER_ASC`固定で要求する
-- Auction追加検証に合格した場合は`withAuction=true`で通常出品とAuctionを取得し、
+- 検索は`withAuction=true`で通常出品とAuctionをまとめて取得し、
   販売形式Filterのための追加Requestは行わない
 - `SORT_CREATED_TIME / ORDER_ASC`は検証条件を維持するため送るだけで、順序保証には使わない
 - AdapterはServer側の古い順を保証しない
 - `get_item`は画面から明示的に必要になった場合だけ呼ぶ
 - Seller商品は`on_sale`と`sold_out`を一つずつ指定する
+- Seller商品は`with_auction=true`で取得する。省略すると`auction_info`が返らず判定できない
 - `UNKNOWN`はRequest Parameterとして使用できない
 - Applicationへ`mercapi` Object、生Response、DPoP、Header、Cookieを返さない
 
@@ -391,6 +438,10 @@ Proxy切替、複数Accountによる回避は行わない。
 - `mercapi`型がDomain型へ正規化される
 - `trading`を`unknown`や`sold_out`へ変換しない
 - 通常出品、Auction、未知形状をそれぞれ`SaleFormat`へ変換する
+- 検索の`auction.id`が空文字でもAUCTIONと判定する
+- 検索・商品詳細・Seller商品一覧の3形状を同じ`SaleFormat`へ正規化する
+- 文字列の`highestBid`を整数の`price_yen`へ変換する
+- naive `datetime`をUTCとして解釈し、Timezone付きで返す
 - Auctionの取得時点価格を正規化し、開始価格や確定価格へ読み替えない
 - 検索とSeller商品で同じ販売形式Mappingを使用する
 - 必須Field欠落でParse Errorになる
@@ -421,7 +472,7 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 - [ ] 管理下のForkが作成され、ライセンスと著作権表示が維持されている
 - [ ] ForkのSellerページングPublic APIとUnit Testが完成している
 - [ ] Card DiggerがForkのTest済みcommit SHAへ固定されている
-- [ ] Auction追加検証の結果文書が完成し、合否とMappingが仕様へ反映されている
+- [x] Auction追加検証の結果文書が完成し、合否とMappingが仕様へ反映されている
 - [ ] Domain型と`MarketplacePort`が定義されている
 - [ ] Mercari AdapterとMock Adapterが実装されている
 - [ ] 収集Policy、重複排除、停止理由、安全停止が実装されている

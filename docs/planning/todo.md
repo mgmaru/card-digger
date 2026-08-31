@@ -431,20 +431,29 @@ flowchart LR
 > Object全体の形は残っていない。ここで取り損ねると、0-F-3以降で追加のライブ実行が必要になる。
 > Fixtureを観測なしで作らない（[Test運用規約 §5.1](../development/test-policy.md#51-定義)）。
 
-- [ ] 通常出品とAuctionを各10件以上取得する
-- [ ] 検索結果、商品詳細、商品ページの販売形式を照合する
-- [ ] `price`、開始価格、最高入札額、現在価格の対応を確認する
-- [ ] 入札件数、終了予定時刻、Timezone、欠落条件を確認する
-- [ ] 検索とSeller商品一覧で同じ販売形式判定を適用できるか確認する
-- [ ] `with_auction`がSeller商品の件数・状態・Cursorへ与える影響を確認する
-- [ ] 未知形状を`fixed_price`へ誤変換せず`unknown`にできるか確認する
-- [ ] `poc/mercapi/auction-result.md`へ実測結果を記録する
-- [ ] 検索結果の構造サンプルを出力する（通常出品・Auction・未知形状）
-- [ ] 商品詳細の構造サンプルを出力する（通常出品・Auction）
-- [ ] Seller商品一覧の構造サンプルを出力する（`data[]`・`pager_id`・`meta.has_next`）
-- [ ] Seller Profileの構造サンプルを出力する
-- [ ] 構造サンプルがマスク済みで、生Responseを含まないことを確認する
-- [ ] 合否と採用MappingをMVP仕様・Adapter仕様へ反映する
+- [x] 通常出品とAuctionを各10件以上取得する
+- [x] 検索結果、商品詳細、商品ページの販売形式を照合する
+- [x] `price`、開始価格、最高入札額、現在価格の対応を確認する
+- [x] 入札件数、終了予定時刻、Timezone、欠落条件を確認する
+- [x] 検索とSeller商品一覧で同じ販売形式判定を適用できるか確認する
+- [x] `with_auction`がSeller商品の件数・状態・Cursorへ与える影響を確認する
+- [x] 未知形状を`fixed_price`へ誤変換せず`unknown`にできるか確認する
+- [x] `poc/mercapi/auction-result.md`へ実測結果を記録する
+- [x] 検索結果の構造サンプルを出力する（通常出品103件・Auction 16件。未知形状は0件で未観測）
+- [x] 商品詳細の構造サンプルを出力する（通常出品・Auction）
+- [x] Seller商品一覧の構造サンプルを出力する（`data[]`・`pager_id`・`meta.has_next`）
+- [x] Seller Profileの構造サンプルを出力する
+- [x] 構造サンプルがマスク済みで、生Responseを含まないことを確認する
+- [x] 合否と採用MappingをMVP仕様・Adapter仕様へ反映する
+
+**判定: 合格。** 販売形式の判定は商品ページを正として20 / 20一致し、Auction価格
+（`highest_bid`）も商品ページの現在価格と10 / 10一致した。API Request 30件はすべてHTTP 200で、
+401 / 403 / 429は0件だった。詳細は[検証結果](../../poc/mercapi/auction-result.md)。
+
+制約として次の2点が判明したため、Forkの追加範囲へ反映した。
+
+- Seller商品一覧は`with_auction=true`を送らないと`auction_info`を返さない
+- 検索・商品詳細・Seller商品一覧でAuction Fieldの形が3種類異なる
 
 ## 0-F-2. 管理下Forkを準備する
 
@@ -457,8 +466,9 @@ flowchart LR
 ## 0-F-3. ForkへSellerページングを実装する
 
 - [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
-- [ ] Public APIで`status`、`limit`、`max_pager_id`を指定可能にする
+- [ ] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
 - [ ] Seller商品Modelへ`pager_id`を追加する
+- [ ] Seller商品Modelへ`auction_info`を追加する
 - [ ] Responseの`meta.has_next`を保持する
 - [ ] `has_next=true`時だけ末尾`pager_id`を次Cursorとして返す
 - [ ] 空Response、Cursor欠落、未知Statusを検証する
@@ -474,7 +484,9 @@ flowchart LR
 - [ ] `MarketplacePort`を定義する
 - [ ] Mercari Adapterの検索・詳細・Profile・Seller商品Pageを実装する
 - [ ] URL、価格、日時、状態、販売形式を正規化する
-- [ ] Auctionの価格を追加検証で確定した取得時点価格へ正規化する
+- [ ] Auctionの価格を`highest_bid`（取得時点の現在価格）へ正規化する
+- [ ] 検索・商品詳細・Seller商品一覧の3形状を同じ`SaleFormat`へ正規化する
+- [ ] naive `datetime`をUTCとして解釈し直す
 - [ ] 未知の販売形式を`SaleFormat.UNKNOWN`として保持する
 - [ ] 必須Field欠落とCursor不整合をParse Errorにする
 - [ ] 共通Error Codeと限定再試行を実装する

@@ -3,7 +3,8 @@
 ## 文書ステータス
 
 - 作成日: **2026-08-31**
-- ステータス: **実行前。Auction対応をMVPへ実装する前の必須Gate**
+- ステータス: **実行済み（2026-08-31）。判定は合格**
+- 実測結果: [poc/mercapi/auction-result.md](../../poc/mercapi/auction-result.md)
 - 対象: 固定commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`の`kynacio/mercapi`
 - 関連仕様: [Mercari Adapter実装仕様](phase-0-f-adapter-spec.md)
 - Product要件: [MVP実装仕様](../product/mvp-spec.md)

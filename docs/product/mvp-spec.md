@@ -6,7 +6,7 @@
 - 最終更新日: **2026-08-31**
 - ステータス: **Phase 1の実装基準として採用**
 - 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
-- Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)
+- Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)。**[実測結果](../../poc/mercapi/auction-result.md)で合格**
 - Test実施方法: [Test運用規約](../development/test-policy.md)
 - 対象: Search MVP、Seller画面、Seller Knowledge Indicator
 
@@ -110,7 +110,7 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 - 最低価格・最高価格Filter
 - 掲載開始日・終了日Filter（Asia/Tokyoの日単位）
 - 販売形式（通常出品・オークション・不明）の保持とBadge表示
-- 販売形式Filter（Auction追加検証の合格後に有効化）
+- 販売形式Filter（Auction追加検証に合格したため有効）
 - 取得範囲内の古い順・新しい順
 - 価格の安い順・高い順
 - 画像中心のResponsive Grid
@@ -182,8 +182,8 @@ Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定�
 掲載開始日だけなら指定日以降、掲載終了日だけなら指定日以前、両方なら指定期間内を表す。
 時刻指定はMVPへ含めず、日付境界を必ずAsia/Tokyoで計算する。
 
-販売形式Filterは[Auction追加検証](../phase-0/phase-0-f-auction-validation.md)の合格後に有効化する。
-不合格時の縮小方針は同文書の判定に従い、未知形式を通常出品として扱わない。
+販売形式Filterは[Auction追加検証](../../poc/mercapi/auction-result.md)に合格したため有効とする。
+未知形式は`unknown`のまま保持し、通常出品として扱わない。
 
 ### 5.2 検索開始
 
@@ -293,6 +293,7 @@ Mercari全体の最古順・指定期間の全件ではありません
 - Title。2〜3行で省略し、完全なTitleはAccessible NameまたはTooltipで確認可能にする
 - 販売形式Badge（`通常出品`、`オークション`、`形式不明`）
 - 通常出品は「価格」、Auctionは「現在価格（取得時点）」、不明は「価格（取得時点）」
+- Auctionの価格は`highest_bid`（取得時点の現在価格）。開始価格や確定落札額ではない
 - 出品日時（Asia/Tokyo）
 - 検索実行時点からの経過日数
 - 「Mercariで商品を見る」外部Link
