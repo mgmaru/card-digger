@@ -78,7 +78,24 @@ Card Diggerの依存SHAを変更するまではabc123...を使用し続ける。
 
 ## 3. 初回Forkの作成
 
-### 3.1 作成前の確認
+### 3.1 前提
+
+`gh` CLIで作成する。実行前に認証済みであることを確認する。
+
+```bash
+gh auth status
+```
+
+| 前提 | 確認方法 |
+|---|---|
+| `gh`が導入済み | `gh --version` |
+| `mgmaru`として認証済み | `gh auth status` |
+| `repo` scopeを持つ | `gh auth status`のScopes表示 |
+
+**認証は人の操作が必要**であり、この文書の手順では代行しない。未認証なら`gh auth login`を
+実行者自身が行う。
+
+### 3.2 作成前の確認
 
 - `kynacio/mercapi`のライセンスを確認する
 - Fork、変更、再配布、商用利用に必要な条件を確認する
@@ -87,7 +104,24 @@ Card Diggerの依存SHAを変更するまではabc123...を使用し続ける。
 - 変更基点を検証済みcommit
   `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`に固定する
 
-### 3.2 GitHub上でForkする
+```bash
+gh repo view kynacio/mercapi --json licenseInfo,isArchived,defaultBranchRef,pushedAt
+gh api repos/kynacio/mercapi/license --jq '.license.spdx_id'
+```
+
+ライセンスが取得できない、または再配布条件を満たせない場合はForkを作成せず、判断を記録して止める。
+
+### 3.3 Forkを作成する
+
+```bash
+gh repo fork kynacio/mercapi --org-level=false --clone=false --remote=false
+gh repo view mgmaru/mercapi --json name,owner,parent,isFork
+```
+
+GitHubではFork名は初期状態でupstreamと同名になる。別名も指定できるが、本プロジェクトでは
+Repositoryの所有者を含む`mgmaru/mercapi`で区別する。
+
+`gh`が使えない場合はWeb UIでも作成できる。
 
 1. <https://github.com/kynacio/mercapi>を開く
 2. `Fork`を選ぶ
@@ -95,27 +129,28 @@ Card Diggerの依存SHAを変更するまではabc123...を使用し続ける。
 4. Repository名を`mercapi`にする
 5. Forkを作成する
 
-GitHubではFork名は初期状態でupstreamと同名になる。別名も指定できるが、本プロジェクトでは
-Repositoryの所有者を含む`mgmaru/mercapi`で区別する。
+### 3.4 Card Diggerとは別DirectoryへCloneする
 
-### 3.3 Card Diggerとは別DirectoryへCloneする
-
-ローカルでは、例えば次のように兄弟Directoryとして配置する。
+Card Diggerと**同じ親Directory**へ兄弟として配置する。Card Digger配下へ置かない。
 
 ```text
-workspace/
-├── card-digger/
-└── mercapi/
+<親Directory>/
+├── card-digger/   ← このRepository
+└── mercapi/       ← Fork
 ```
 
 ```bash
-git clone https://github.com/mgmaru/mercapi.git
+# card-digger の親Directoryで実行する
+gh repo clone mgmaru/mercapi
 cd mercapi
 git remote add upstream https://github.com/kynacio/mercapi.git
 git remote -v
 git fetch upstream
 git switch -c feat/seller-items-pagination 20ba68fd42677997c4c91b4e4eb17c1e7e387efa
+git log -1 --format=%H
 ```
+
+最後の`git log`が変更基点SHAと一致することを確認する。
 
 Remoteは次の関係になっていることを確認する。
 
@@ -126,6 +161,29 @@ upstream  https://github.com/kynacio/mercapi.git
 
 `origin`は自分のForkへのFetch / Push、`upstream`は本家からのFetchに使う。通常の作業で
 `upstream`へPushしない。
+
+### 3.5 Fixtureの起点を引き継ぐ
+
+ForkのUnit Testで使うFixtureは、Card Digger側で観測済みの構造サンプルから起こす。
+**Forkのために改めてMercariへアクセスしない。**
+
+```text
+card-digger/poc/mercapi/artifacts/structure-samples/
+├── seller_items/with_auction.json      ← ForkのSeller一覧Fixtureの起点
+├── seller_items/without_auction.json   ← with_auction省略時の起点
+├── search/*.json
+├── item/*.json
+└── profile/profile.json
+```
+
+| 注意 | 内容 |
+|---|---|
+| Git管理外 | `poc/**/artifacts/`は`.gitignore`対象。**ForkのFixtureを作り終えるまで削除しない** |
+| 匿名化済み | 実ID・実Title・実URLを含まない。値ではなく形だけを持つ |
+| 観測日 | 2026-08-31。[Auction検証結果](../../poc/mercapi/auction-result.md)と対応する |
+
+Fixtureの作り方、`observed` / `derived` / `assumed`の区分、匿名化規則は
+[Test運用規約 §5](test-policy.md#5-fixture規約)を正本とする。
 
 ## 4. Forkへ機能を追加する
 
@@ -253,11 +311,15 @@ Fork側ではRevertまたは修正commitを作る
 
 ### 初回作成
 
+- [ ] `gh auth status`で認証とScopeを確認した
 - [ ] ライセンスと再配布条件を確認した
 - [ ] `mgmaru/mercapi`をForkした
+- [ ] Card Diggerと同じ親DirectoryへCloneした
 - [ ] `origin`と`upstream`を正しく登録した
 - [ ] 検証済みupstream SHAから作業Branchを作った
+- [ ] `git log -1`が変更基点SHAと一致した
 - [ ] LICENSEと著作権表示を維持した
+- [ ] Fixtureの起点となる構造サンプルの所在を確認した
 
 ### upstreamからの更新取込
 

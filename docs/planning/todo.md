@@ -457,13 +457,27 @@ flowchart LR
 
 ## 0-F-2. 管理下Forkを準備する
 
+手順の正本は[mercapi Fork運用手順 §3](../development/mercapi-fork-operations.md#3-初回forkの作成)とする。
+**`gh` CLIで実施する。**
+
+> `gh auth login`だけは実行者自身が行う。認証以外はCommandで進められる。
+> Clone先はCard Diggerと同じ親Directoryとし、Card Digger配下へ置かない。
+
+- [ ] `gh auth status`で認証とScopeを確認する
 - [ ] `kynacio/mercapi`のライセンスとFork・再配布条件を確認する
-- [ ] GitHub上に`mgmaru/mercapi` Forkを作成する
+- [ ] `gh repo fork kynacio/mercapi`で`mgmaru/mercapi`を作成する
+- [ ] Card Diggerと同じ親Directoryへ`gh repo clone`する
 - [ ] Fork元を`upstream` Remoteとして登録する
 - [ ] `feat/seller-items-pagination` Branchを作成する
 - [ ] 検証済みcommit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`を変更基点にする
+- [ ] `git log -1`が変更基点SHAと一致することを確認する
+- [ ] LICENSEと著作権表示が維持されていることを確認する
 
 ## 0-F-3. ForkへSellerページングを実装する
+
+> Fixtureは[0-F-1で観測した構造サンプル](../development/mercapi-fork-operations.md#35-fixtureの起点を引き継ぐ)
+> から起こす。ForkのためにMercariへ改めてアクセスしない。構造サンプルはGit管理外のため、
+> ForkのFixtureを作り終えるまで`poc/mercapi/artifacts/`を削除しない。
 
 - [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
 - [ ] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
