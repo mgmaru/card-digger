@@ -497,7 +497,8 @@ flowchart LR
 > 既存cassetteは削除も改変もしない。詳細は
 > [Test運用規約 §4.4](../development/test-policy.md#44-forkのtestに関する例外)。
 
-- [ ] Forkの開発環境を構築し、既存Testが成功する基準線を記録する
+- [x] Forkの開発環境を構築し、既存Testの基準線を記録する
+- [ ] 追加Testが基準線を悪化させないことを確認する
 - [ ] `SellerItemsPage`に`items`、`has_next`、`next_max_pager_id`を定義する
 - [ ] Public APIで`status`、`limit`、`max_pager_id`、`with_auction`を指定可能にする
 - [ ] Seller商品Modelへ`pager_id`を追加する
@@ -508,8 +509,29 @@ flowchart LR
 - [ ] 既存`items(profile_id)`の後方互換を維持する
 - [ ] 構造サンプルからJSON Fixtureを起こす（`observed` / `derived`の区分を記録する）
 - [ ] `httpx.MockTransport`でForkのUnit Testを追加する
-- [ ] 既存Testが引き続き成功することを確認する
+- [ ] 既存Testの結果が基準線から悪化しないことを確認する
 - [ ] ForkのTest済みcommit SHAへCard Diggerの依存を固定する
+
+### 既存Testの基準線（2026-08-31）
+
+```bash
+uv venv --python 3.11 .venv
+uv pip install --python .venv/bin/python -e . \
+  "vcrpy>=4.2,<5" "pytest>=7.1.2,<8" "pytest-asyncio>=0.19,<0.20" "pytest-recording>=0.12.1,<0.13"
+.venv/bin/python -m pytest tests --record-mode=none -q
+```
+
+**22 passed / 5 failed。** upstream由来の既知の失敗であり、Card Diggerの変更が原因ではない。
+
+| 項目 | 内容 |
+|---|---|
+| 失敗Test | `test_item`、`test_item_with_comments`、`test_item_not_found`、`test_items_fetch_full_item_from_seller_item`、`test_search_fetch_full_item_from_result` |
+| 共通点 | すべて`Mercapi.item()`を経由する |
+| 原因 | 固定commit`20ba68f`が`items/get`へ`include_auction=true`を追加したが、cassetteのURIは`?id=...`のまま。VCRのquery matcherが失敗する |
+| 対処 | **この作業Branchでは直さない。** 修正にはcassetteの改変か再録画が必要で、[Test運用規約 §4.4](../development/test-policy.md#44-forkのtestに関する例外)およびSellerページングという本Branchの目的から外れる |
+| 扱い | 基準線として記録し、追加変更後もこの5件だけが失敗する状態を維持する |
+
+`--record-mode=none`を必ず付ける。付け忘れるとcassetteが無いRequestで実通信が発生し得る。
 
 ## 0-F-4. DomainとAdapterを実装する
 

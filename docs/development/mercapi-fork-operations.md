@@ -196,14 +196,18 @@ Fixtureの作り方、`observed` / `derived` / `assumed`の区分、匿名化規
 
 ## 4. Forkへ機能を追加する
 
-1. `feat/seller-items-pagination`で固定Response Fixtureと失敗するTestを追加する
-2. Seller商品の状態別FilterとCursorページングをPublic APIへ実装する
-3. 既存Testと追加Testをすべて実行する
-4. License、公開API、後方互換への影響を確認する
-5. Branchを`origin`へPushする
-6. `mgmaru/mercapi`内で変更内容をレビューして`main`へ反映する
-7. Test済みcommitの完全なSHAを記録する
-8. 必要なら`kynacio/mercapi`へPull Requestを作成する
+1. 変更前に既存Testを実行し、**成否の基準線**を記録する
+2. `feat/seller-items-pagination`で固定Response Fixtureと失敗するTestを追加する
+3. Seller商品の状態別FilterとCursorページングをPublic APIへ実装する
+4. 既存Testと追加Testをすべて実行し、**基準線から悪化していないこと**を確認する
+5. License、公開API、後方互換への影響を確認する
+6. Branchを`origin`へPushする
+7. `mgmaru/mercapi`内で変更内容をレビューして`main`へ反映する
+8. Test済みcommitの完全なSHAを記録する
+9. 必要なら`kynacio/mercapi`へPull Requestを作成する
+
+**基準線がすべてGreenとは限らない。** upstream由来の既知の失敗は、原因を記録したうえで
+「悪化させない」ことを合格条件とし、作業Branchの目的外の修正を混ぜない。
 
 ForkへCard Digger固有の収集上限、画面文言、Seller Knowledgeを実装しない。追加範囲は
 [Adapter仕様の責務分離](../phase-0/phase-0-f-adapter-spec.md#3-責務の境界)に従う。
