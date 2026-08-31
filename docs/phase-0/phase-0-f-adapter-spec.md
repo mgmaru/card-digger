@@ -122,7 +122,7 @@ upstreamからForkへの取込と、ForkからCard Diggerへの依存更新を�
 
 名称は上流のCoding Styleに合わせて調整できるが、次の情報と挙動は変更しない。
 
-実装済みのPublic APIは次のとおり（Fork `d9dced9`）。
+実装済みのPublic APIは次のとおり（Fork `beab279`時点）。
 
 ```python
 @dataclass

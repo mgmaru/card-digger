@@ -605,7 +605,8 @@ Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへ
 |---|---|
 | Branch | `feat/seller-items-pagination`（`main`=`717d25b`から作成） |
 | feature commit | `74df1d3` |
-| `main`反映 | **`d9dced921989d29e939451fc044b45e756251b06`**（`--no-ff` merge） |
+| `main`反映 | `d9dced921989d29e939451fc044b45e756251b06`（`--no-ff` merge） |
+| 現在のFork `main` | **[0-F-3b](#0-f-3b-ciを導入する)以降さらに進んでいる。固定するSHAはそちらを参照** |
 | Test | **27 passed → 51 passed / 0 failed**（追加24件） |
 | 差分 | 14ファイル、663挿入 / 6削除。削除はimport行の置換のみ |
 | Fixture | `tests/fixtures/seller_items/` に7件。`observed` 2 / `derived` 5 / `assumed` **0** |
@@ -655,7 +656,8 @@ uv pip install --python .venv/bin/python -e . \
 |---|---|---|
 | Fork直後 | `20ba68f` | 22 passed / 5 failed |
 | [0-F-2b](#0-f-2b-upstream既存testの失敗を修正する)適用後 | `717d25b` | 27 passed / 0 failed |
-| **Sellerページング追加後** | **`d9dced9`** | **51 passed / 0 failed** |
+| Sellerページング追加後 | `d9dced9` | 51 passed / 0 failed |
+| **CI対応後（整形・record-mode明示）** | **`beab279`** | **51 passed / 0 failed** |
 
 基準線27件は維持したまま24件を追加した。**悪化なし。**
 
@@ -709,10 +711,19 @@ uv pip install --python .venv/bin/python -e . \
 
 ## 0-F-4. DomainとAdapterを実装する
 
-> 依存管理Toolは**`uv`**で確定（2026-08-31）。`pyproject.toml`と`uv.lock`の両方をコミットし、
-> Forkは完全な40文字commit SHA **`d9dced921989d29e939451fc044b45e756251b06`** で固定する。
+> 依存管理Toolは**`uv`**で確定（2026-08-31）。`pyproject.toml`と`uv.lock`の両方をコミットする。
+>
+> 固定するForkのcommit SHAは **`beab279af0395ea8b7e649b1e4bee2bb57000b59`**（2026-08-31時点の`main`）。
+> Forkはこの後も更新されうるため、固定前に必ず現在の先頭を確認する。
+>
+> ```bash
+> git -C <mercapiのClone先> fetch origin && git -C <mercapiのClone先> rev-parse origin/main
+> ```
+>
 > 着手前に[Test運用規約 §7](../development/test-policy.md#7-テスト可能性のための設計制約)の
 > 設計制約（時計・待機・Fork Clientの注入）を満たす構成にする。
+> あわせて[CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)の`backend` Jobと
+> [§6](../development/ci-policy.md#6-branch保護)のBranch保護を設定する。
 
 - [ ] `uv`でPython 3.11以上のApplication Packageを`src/backend`へ作成する
 - [ ] Forkの完全なcommit SHAを`pyproject.toml`へ記載し`uv.lock`を生成する
