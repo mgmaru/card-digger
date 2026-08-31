@@ -661,6 +661,52 @@ uv pip install --python .venv/bin/python -e . \
 
 `--record-mode=none`を必ず付ける。付け忘れるとcassetteが無いRequestで実通信が発生し得る。
 
+## 0-F-3b. CIを導入する
+
+本格的な実装に入る前に、Testが自動で走る状態を作る。方針は
+[CIとMerge基準](../development/ci-policy.md)を正本とする。
+
+> **CIからL4（ライブ受入検証）を実行しない。** PoCのRunnerをどのJobからも呼ばない。
+
+- [x] `card-digger`へ`.github/workflows/ci.yml`を追加する（`docs` / `poc`の2 Job）
+- [x] 文書Link検査を`tools/check_docs_links.py`としてScript化する
+- [x] ForkのActionsを有効化する
+- [x] Forkの`black --check`が通るよう整形する
+- [x] Forkの`pytest`へ`--record-mode=none`を明示する
+- [x] Forkの未使用workflow（PyPI公開・Docs公開）を無効化する
+- [x] CIとMerge基準を文書化する
+- [ ] `backend` JobをCIへ追加する（**0-F-4でApplication Package作成後**）
+- [ ] `card-digger`の`main`へBranch保護を設定する（**0-F-4以降**）
+
+### 実施結果（2026-08-31）
+
+| 対象 | 内容 |
+|---|---|
+| `card-digger` CI | `docs`（Link検査27ファイル）と`poc`（Unit Test 35件）の2 Job |
+| Fork CI | upstream由来の`check.yaml`を利用。**新規作成せず** |
+| Fork CI結果 | **全6 Job成功**（Lint + Python 3.9 / 3.10 / 3.11 / 3.12 / 3.13） |
+| Fork整形 | `chore/format-with-black`。**AST一致を確認**した整形のみの変更 |
+| Fork `main` | **`beab279af0395ea8b7e649b1e4bee2bb57000b59`** |
+
+#### 判明した事実
+
+| 項目 | 内容 |
+|---|---|
+| ForkのCI | upstream由来で4本存在したが、**実行履歴は0件**だった |
+| 原因 | GitHubはForkのActionsを既定で無効にする。API経由で有効化した |
+| upstreamのlint | `definitions.py`と`models/shop/data.py`が`black 22.6.0`未準拠で、**upstream自身のCIも赤だった** |
+| 共通する背景 | 0-F-2bの5件失敗と同様、CIが監視されていなかった |
+| 公開workflow | `Publish to PyPI`等は手動トリガのみで誤爆リスクは低いが、使わないため無効化した |
+
+#### 運用の決定
+
+| 項目 | 決定 |
+|---|---|
+| PR経由にする対象 | `src/` `poc/` `tools/` `.github/` |
+| 直接pushを許容する対象 | `docs/` `README.md` |
+| 承認者数 | **要求しない**。1人開発では自己承認ができず全変更が止まる |
+| Branch保護 | **0-F-4以降**に設定する |
+
 ## 0-F-4. DomainとAdapterを実装する
 
 > 依存管理Toolは**`uv`**で確定（2026-08-31）。`pyproject.toml`と`uv.lock`の両方をコミットし、

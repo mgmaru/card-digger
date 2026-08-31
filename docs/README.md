@@ -12,6 +12,7 @@
 6. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
 7. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
 8. [Test運用規約](development/test-policy.md)
+9. [CIとMerge基準](development/ci-policy.md)
 
 ## ディレクトリ
 
@@ -24,6 +25,7 @@ docs/
 ├── planning/
 │   └── todo.md
 ├── development/
+│   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
 │   └── test-policy.md
 └── phase-0/
@@ -54,6 +56,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
 - [test-policy.md](development/test-policy.md):
   用語、Testの目的と役割、Test層、Framework、配置、Fixtureの匿名化規則、実行時期、完了判定
+- [ci-policy.md](development/ci-policy.md):
+  CIで実行する範囲、PR運用、Merge基準、Branch保護
 
 ### `phase-0/`
 
@@ -75,3 +79,4 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - `docs/`直下には、このIndex以外の文書を増やさない
 - 同じ決定を複数文書へ複製せず、正本へのLinkを置く
 - 「何をテストするか」は各仕様書、「どうテストするか」は`development/test-policy.md`
+- 「いつ自動実行し、何を満たしたらMergeするか」は`development/ci-policy.md`

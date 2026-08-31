@@ -1,0 +1,148 @@
+# CIとMerge基準
+
+## 文書ステータス
+
+- 決定日: **2026-08-31**
+- ステータス: **Card DiggerとForkの両Repositoryへ適用**
+- 対象: 自動実行するTestの範囲、PR運用、Merge基準、Branch保護
+- Test層の定義: [Test運用規約](test-policy.md)
+- Fork運用: [mercapi Fork運用手順](mercapi-fork-operations.md)
+
+「**何をテストするか**」は各仕様書、「**どうテストするか**」は[Test運用規約](test-policy.md)、
+「**いつ自動で走らせ、何を満たしたらMergeするか**」をこの文書の正本とする。
+
+---
+
+## 1. 目的
+
+Testは書かれているだけでは機能しない。**実行されて初めて壊れを検知できる。**
+
+| 課題 | CIが解決すること |
+|---|---|
+| 実行が人の記憶に依存する | pushとPRのたびに自動実行する |
+| 依存更新のGateが形骸化する | [Fork運用手順 §6.2](mercapi-fork-operations.md#62-取込後の検証)のGateを機械が判定する |
+| 赤の常態化に気付かない | 失敗が即座に見える |
+| Documentの相互Linkが静かに壊れる | 見出し変更によるLink切れを検知する |
+
+---
+
+## 2. CIで実行する範囲
+
+```text
+L1  ForkのUnit Test        ─┐
+L2  AdapterのUnit Test      ├─ CIで実行する（外部通信なし）
+L3  Contract Test          ─┘
+L4  ライブ受入検証           ─── CIで実行しない（実Mercariへ通信する）
+```
+
+### 絶対規則
+
+> **CIからL4を実行しない。**
+> PoCのRunner（`run.py`、`auction_probe.py`、`seller_paging_probe.py`、
+> `seller_status_paging_probe.py`）をCIのどのJobからも呼ばない。
+> CIは`test*.py`の探索だけを行う。
+
+理由は[Test運用規約 §9](test-policy.md#9-ライブ受入検証l4の実施規約)のアクセス頻度条件であり、
+CIの並列実行や再実行はこの条件を守れない。
+
+---
+
+## 3. Repositoryごとの構成
+
+### 3.1 `card-digger`
+
+`.github/workflows/ci.yml`。契機は`main`へのpushとPull Request。
+
+| Job | 内容 | 導入時期 |
+|---|---|---|
+| `docs` | 相対Link、見出しAnchor、code fenceの検査（`tools/check_docs_links.py`） | 導入済み |
+| `poc` | `poc/mercapi`のUnit Test | 導入済み |
+| `backend` | `uv run pytest`によるL2 / L3 | **0-F-4で追加** |
+
+### 3.2 `mgmaru/mercapi`
+
+upstream由来の`.github/workflows/check.yaml`をそのまま使う。**新規に作らない。**
+
+| Job | 内容 |
+|---|---|
+| `Linting` | `black --check mercapi/ tests/` |
+| `Unit test` | Python 3.9 / 3.10 / 3.11 / 3.12 / 3.13で`pytest --record-mode=none` |
+
+- Forkは既定でActionsが無効のため、一度だけ有効化が必要
+- `--record-mode=none`は既定値だが、**設定変更で実通信へ化けないよう明示**する
+- 使用しないworkflow（`Publish to PyPI`、`Publish to TestPyPI`、`Build and publish docs`）は
+  誤実行を避けるため無効化する
+
+---
+
+## 4. PR運用
+
+1人開発のため、**GitHubは自分のPull Requestを自分で承認できない。**
+したがって承認者数を要求せず、機械が判定できる基準だけをGateにする。
+
+| 変更対象 | 運用 |
+|---|---|
+| `src/`、`poc/`、`tools/`、`.github/` | **Pull Requestを経由する** |
+| `docs/`、`README.md` | `main`への直接pushを許容する |
+| Fork（`mgmaru/mercapi`） | 目的ごとにBranchを分け、`--no-ff`で`main`へMergeする |
+
+Branchは目的ごとに分ける。実装と無関係な修正を同じBranchへ混ぜない。
+
+| 接頭辞 | 用途 |
+|---|---|
+| `feat/` | 機能追加 |
+| `fix/` | 不具合修正 |
+| `chore/` | 整形、CI設定、依存更新 |
+| `docs/` | 文書のみの変更 |
+
+---
+
+## 5. Merge基準
+
+次をすべて満たしたときにMergeする。
+
+- [ ] CIのすべてのJobが成功している
+- [ ] Testの結果が基準線から**悪化していない**
+- [ ] 変更がBranchの目的の範囲に収まっている
+- [ ] 仕様を変えた場合、対応する文書を同じ変更で更新している
+- [ ] 実測値・commit SHA・判断理由を記録すべき変更では、記録が済んでいる
+
+### 基準線の考え方
+
+「全Green」を常に前提にしない。upstream由来の既知の失敗のように、
+**こちらの責任ではない赤**が存在しうる。その場合は原因と件数を記録し、
+「悪化させない」ことを基準にする。
+
+現在の基準線は[TODO](../planning/todo.md)へ記録する。
+
+---
+
+## 6. Branch保護
+
+**0-F-4でApplication Packageを作成した時点**で`card-digger`の`main`へ設定する。
+それまではCIによる可視化だけを行う。
+
+| 設定 | 値 | 理由 |
+|---|---|---|
+| Require status checks | **有効** | CIの成功をMergeの必須条件にする |
+| Require approvals | **無効** | 1人開発では自己承認ができず、全変更が止まる |
+| Require linear history | 有効 | 履歴を追いやすくする |
+| Allow force push | **無効** | 参照中のcommitを到達不能にしない |
+
+Forkの`main`にも同じ考え方を適用する。ただし
+[Fork運用手順 §8](mercapi-fork-operations.md#8-問題発生時の戻し方)のとおり、
+Card Diggerが参照中のcommitを到達不能にしないことを最優先とする。
+
+---
+
+## 7. やらないこと
+
+| 項目 | 理由 |
+|---|---|
+| **L4のCI実行** | アクセス頻度条件を守れない |
+| Coverage率のGate | [Test運用規約 §11](test-policy.md#11-やらないこと)で除外済み |
+| 定期実行（cron） | 外部通信や無人実行を常態化させない |
+| Deploy / Release Pipeline | 公開Serviceではなく、単一利用者のLocal実行を前提とする |
+| PRの承認必須化 | 1人開発では機能しない |
+| CIからの自動Merge | 判断を機械へ委ねない |
+| Secretsを要するJob | 現時点で必要な秘密情報がない |

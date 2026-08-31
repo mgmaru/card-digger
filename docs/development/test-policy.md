@@ -158,6 +158,7 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 
 - **L1〜L3だけを自動Test Suiteとする。**
 - **L4はTest Suiteに含めない。** CI、watch、Pre-commit、Pre-pushで実行しない。
+- CIで実行するJobの構成とMerge基準は[CIとMerge基準](ci-policy.md)を正本とする。
 - Phase 1のBackend API Test・Frontend Component Test・E2E受入FlowはL3と同じ扱いとし、
   Mock Adapterと固定Fixtureだけを使う。
 

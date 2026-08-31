@@ -17,6 +17,7 @@ Phase 0-FとMVPの実装仕様を確定し、Auction情報の追加検証も**�
 - [Phase 0-F Mercari Adapter実装仕様](docs/phase-0/phase-0-f-adapter-spec.md)
 - [Phase 0-F Auction情報の追加検証計画](docs/phase-0/phase-0-f-auction-validation.md) / [実測結果](poc/mercapi/auction-result.md)
 - [Test運用規約](docs/development/test-policy.md)
+- [CIとMerge基準](docs/development/ci-policy.md)
 
 ## リポジトリ構成
 
@@ -27,8 +28,9 @@ card-digger/
 │   ├── README.md
 │   ├── product/       # コンセプト・MVP仕様
 │   ├── planning/      # ロードマップ・TODO
-│   ├── development/   # Fork運用・Test運用規約
+│   ├── development/   # Fork運用・Test運用規約・CI
 │   └── phase-0/       # PoC条件・選定・Adapter仕様
+├── tools/             # 文書Link検査などの補助Script
 ├── poc/
 │   ├── common/        # 共通条件・結果テンプレート
 │   ├── mercari/       # marvinody/mercari の検証
