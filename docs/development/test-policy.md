@@ -174,8 +174,8 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 | PoC (`poc/`) | 標準ライブラリ`unittest`を継続 | 既存資産があり、依存を増やさない |
 | Frontend | Phase 1のApplication基盤実装時に決定する | MVP着手時まで確定不要 |
 
-> Python依存管理Toolは[MVP仕様 §2.1](../product/mvp-spec.md#21-repository構成)のとおりApplication基盤実装時に決定する。
-> 本文のコマンドはTool固有の前置き（`uv run`、`poetry run`、`.venv/bin/`など）を省略して記載する。
+> Python依存管理Toolは**`uv`**とする（[MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)）。
+> 本文のコマンドは`uv run`を前置きして実行する。
 
 ### 4.2 配置
 
@@ -198,9 +198,9 @@ src/backend/
 
 ```bash
 # Application Package Root（src/backend）で実行する
-pytest tests              # L2 + L3
-pytest tests/unit         # L2のみ
-pytest tests/contract     # L3のみ
+uv run pytest tests              # L2 + L3
+uv run pytest tests/unit         # L2のみ
+uv run pytest tests/contract     # L3のみ
 ```
 
 - L4はTestコマンドではなく、専用Scriptと手順書から手動実行する。

@@ -47,6 +47,7 @@ Phase 1の基準構成は次とする。Package Versionは実装開始時に互�
 | Domain / Use case | Python。Web Frameworkに依存させない |
 | Mercari取得 | `MarketplacePort`を実装するPython Mercari Adapter |
 | 外部Client | 管理下の`mercapi` Forkをcommit SHA固定 |
+| Python依存管理 | **`uv`**。`pyproject.toml`と`uv.lock`の両方をコミットする |
 | Database | MVPでは使用しない |
 | Authentication | MVPでは実装しない。単一利用者のLocal実行を前提とする |
 | Network公開 | Backend / Frontendとも既定ではLoopback InterfaceだけへBindする |
@@ -96,8 +97,23 @@ src/
     └── package-lock.json
 ```
 
-Python依存は`pyproject.toml`、Frontend依存は`package-lock.json`で固定する。Mercari Adapterの
+`src/backend`直下には`pyproject.toml`、`uv.lock`、`.python-version`を置く。
+
+Python依存は`uv`が生成する`uv.lock`、Frontend依存は`package-lock.json`で固定する。Mercari Adapterの
  import方向は`adapters → domain`だけとし、`domain`から`adapters`やFastAPIを参照しない。
+
+Forkは移動しうるBranchやTagではなく、完全な40文字のcommit SHAで指定する。
+
+```toml
+[project]
+requires-python = ">=3.11"
+dependencies = [
+  "mercapi @ git+https://github.com/mgmaru/mercapi.git@FULL_40_CHARACTER_COMMIT_SHA",
+]
+```
+
+指定形式はPEP 508の直接参照とし、`[tool.uv.sources]`のようなTool固有の書式へ依存させない。
+手順は[mercapi Fork運用手順 §5](../development/mercapi-fork-operations.md#5-card-diggerからforkを利用する)を正本とする。
 
 ## 3. MVPに含める機能
 

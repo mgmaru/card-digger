@@ -247,8 +247,8 @@ Framework、Fixtureの置き場、MockTransportを選んだ理由は
 
 ## 5. Card DiggerからForkを利用する
 
-Application Packageを作成した時点で、採用した依存管理ツールの設定ファイルへForkの完全な
-commit SHAを記載し、生成されるLockfileもコミットする。
+Application Packageを作成した時点で、`pyproject.toml`へForkの完全なcommit SHAを記載し、
+`uv`が生成する`uv.lock`もコミットする。
 
 ```text
 mercapi @ git+https://github.com/mgmaru/mercapi.git@FULL_40_CHARACTER_COMMIT_SHA
@@ -266,8 +266,17 @@ mercapi @ git+https://github.com/mgmaru/mercapi.git@FULL_40_CHARACTER_COMMIT_SHA
 - Mercari AdapterのUnit TestとContract Testが成功する
 - ライブ受入検証の結果と実行日を記録している
 
-> Python Applicationの依存管理ツールはApplication基盤の実装時に決定する。この文書では、
-> 使用ツールにかかわらず「完全なFork commit SHA」と「Lockfile」の両方を固定することを必須とする。
+```bash
+# src/backend で実行する
+uv add "mercapi @ git+https://github.com/mgmaru/mercapi.git@FULL_40_CHARACTER_COMMIT_SHA"
+uv lock
+uv sync
+```
+
+依存SHAを更新するときも同じ形式で書き換え、`uv.lock`を再生成してからTestを実行する。
+
+> 依存管理Toolは`uv`とする（[MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)）。
+> Toolにかかわらず「完全なFork commit SHA」と「Lockfile」の両方を固定することを必須とする。
 
 ## 6. upstream更新をForkへ取り込む
 

@@ -663,7 +663,13 @@ uv pip install --python .venv/bin/python -e . \
 
 ## 0-F-4. DomainとAdapterを実装する
 
-- [ ] Python 3.11以上のApplication Packageを`src/`へ作成する
+> 依存管理Toolは**`uv`**で確定（2026-08-31）。`pyproject.toml`と`uv.lock`の両方をコミットし、
+> Forkは完全な40文字commit SHA **`d9dced921989d29e939451fc044b45e756251b06`** で固定する。
+> 着手前に[Test運用規約 §7](../development/test-policy.md#7-テスト可能性のための設計制約)の
+> 設計制約（時計・待機・Fork Clientの注入）を満たす構成にする。
+
+- [ ] `uv`でPython 3.11以上のApplication Packageを`src/backend`へ作成する
+- [ ] Forkの完全なcommit SHAを`pyproject.toml`へ記載し`uv.lock`を生成する
 - [ ] `ListingStatus`、`SaleFormat`、`ItemCondition`、`MarketplaceItem`、`Seller`を定義する
 - [ ] `PageInfo`、`SearchPage`、`SellerItemsPage`を定義する
 - [ ] `MarketplacePort`を定義する
