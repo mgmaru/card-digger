@@ -231,7 +231,8 @@ ForkへCard Digger固有の収集上限、画面文言、Seller Knowledgeを実�
 
 - **新しいcassetteをMercariへの実通信から記録しない**
 - 追加分のFixtureは[0-F-1の構造サンプル](#35-fixtureの起点を引き継ぐ)から手で起こす
-- 既存cassetteは削除も改変もしない（upstreamの資産を壊さない）
+- 既存cassetteのResponse Bodyは改変しない
+- 既存cassetteのRequest URIは、コード変更へ追随する目的に限り根拠付きで更新できる
 - 通信の差し替えは**`httpx.MockTransport`**を使う。`vcrpy`は新規に使わない
 
 Framework、Fixtureの置き場、MockTransportを選んだ理由は

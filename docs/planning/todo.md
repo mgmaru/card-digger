@@ -485,6 +485,69 @@ flowchart LR
 
 `gh repo clone`がForkに対して`upstream`を自動登録するため、`git remote add`は不要だった。
 
+## 0-F-2b. upstream既存Testの失敗を修正する
+
+Fork直後の基準線が **22 passed / 5 failed** だった。壊れたまま依存し続けないため、
+Sellerページングへ着手する前に修正する。
+
+> **`feat/seller-items-pagination`へ混ぜない。** `fix/item-cassette-include-auction`を
+> `main`から分けて作業し、修正だけを独立してレビュー・切戻しできる状態にする。
+
+### 原因
+
+| 項目 | 内容 |
+|---|---|
+| 失敗Test | `test_item` / `test_item_with_comments` / `test_item_not_found` / `test_items_fetch_full_item_from_seller_item` / `test_search_fetch_full_item_from_result` |
+| 共通点 | すべて`Mercapi.item()`を経由する |
+| 原因 | 固定commit`20ba68f`が`items/get`へ`include_auction=true`を追加したが、cassetteのURIは`?id=...`のまま。VCRのquery matcherが不一致になる |
+
+### 採用する修正方法
+
+**cassetteのRequest URIだけを更新する。Response Bodyは触らない。**
+
+| 案 | 判断 |
+|---|---|
+| **URIへ`include_auction=true`を追加** | **採用** |
+| VCRのmatcherを緩める | 不採用。全Testの検証力が落ちる |
+| 実通信で再録画 | 不採用。`dpop`と実IDが公開Repositoryへ入る |
+| 修正しない | 不採用。`get_item`はAdapterが使う経路であり、赤の常態化を招く |
+
+Response Bodyを変えずに妥当と判断できる根拠は次のとおり。
+
+| 根拠 | 実測 |
+|---|---|
+| [0-F-1の実測](../../poc/mercapi/auction-result.md) | 通常出品の商品詳細は`auction_info`がキーごと欠落（10 / 10） |
+| 対象5 cassette | `auction_info`の出現が**0件**。すべて通常出品 |
+
+したがって`include_auction=true`で取得しても、記録済みBodyはそのまま妥当な応答である。
+
+### TODO
+
+- [x] `main`から`fix/item-cassette-include-auction`を作成する
+- [x] 5 cassetteの`uri`へ`include_auction=true`を追加する
+- [x] Response Bodyを変更していないことをdiffで確認する
+- [x] 全Testが成功することを確認する
+- [x] Forkへcommitし、`main`へ反映する
+- [x] 修正後の基準線と commit SHA を記録する
+- [ ] upstreamへの報告（Issue / PR）の要否を判断する（**保留**。対外的なやり取りのため別途判断）
+
+### 実施結果（2026-08-31）
+
+| 項目 | 内容 |
+|---|---|
+| Branch | `fix/item-cassette-include-auction`（`main`から作成） |
+| 変更 | 5ファイル各1行。`uri:`へ`include_auction=true`を追加 |
+| Response Body | **無変更**（`git diff --numstat`で各1挿入1削除、uri行以外の変更0行） |
+| Test | **22 passed / 5 failed → 27 passed / 0 failed** |
+| fix commit | `7fd4c50f0c006438c9b4919276561f3fa5aa8fc0` |
+| `main`反映 | `717d25b8b235ca297e0c40f8f36636ef5508b620`（`--no-ff` merge） |
+| Push | `origin`の`fix/item-cassette-include-auction`と`main`へ反映済み |
+
+`main`で再実行しても27 passedを確認した。**0-F-3の新しい基準線は「27 passed / 0 failed」**とする。
+
+Card Diggerの依存SHAはまだ変更しない。Forkの更新とCard Diggerへの採用は
+[別の判断](../development/mercapi-fork-operations.md#22-forkからcard-digger)として扱う。
+
 ## 0-F-3. ForkへSellerページングを実装する
 
 > Fixtureは[0-F-1で観測した構造サンプル](../development/mercapi-fork-operations.md#35-fixtureの起点を引き継ぐ)
@@ -521,15 +584,12 @@ uv pip install --python .venv/bin/python -e . \
 .venv/bin/python -m pytest tests --record-mode=none -q
 ```
 
-**22 passed / 5 failed。** upstream由来の既知の失敗であり、Card Diggerの変更が原因ではない。
-
-| 項目 | 内容 |
+| 時点 | 結果 |
 |---|---|
-| 失敗Test | `test_item`、`test_item_with_comments`、`test_item_not_found`、`test_items_fetch_full_item_from_seller_item`、`test_search_fetch_full_item_from_result` |
-| 共通点 | すべて`Mercapi.item()`を経由する |
-| 原因 | 固定commit`20ba68f`が`items/get`へ`include_auction=true`を追加したが、cassetteのURIは`?id=...`のまま。VCRのquery matcherが失敗する |
-| 対処 | **この作業Branchでは直さない。** 修正にはcassetteの改変か再録画が必要で、[Test運用規約 §4.4](../development/test-policy.md#44-forkのtestに関する例外)およびSellerページングという本Branchの目的から外れる |
-| 扱い | 基準線として記録し、追加変更後もこの5件だけが失敗する状態を維持する |
+| Fork直後（`20ba68f`） | 22 passed / 5 failed |
+| **[0-F-2b](#0-f-2b-upstream既存testの失敗を修正する)適用後（`717d25b`）** | **27 passed / 0 failed** |
+
+**0-F-3の基準線は27 passed / 0 failed。** 追加変更後もこの状態を維持する。
 
 `--record-mode=none`を必ず付ける。付け忘れるとcassetteが無いRequestで実通信が発生し得る。
 

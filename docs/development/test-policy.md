@@ -220,8 +220,16 @@ Forkは公開Repositoryのため、記録すればそのまま公開される。
 | Framework | upstream既存の`pytest` + `pytest-asyncio`をそのまま使う |
 | 通信の差し替え | **`httpx.MockTransport`**。`vcrpy`を新規に使わない |
 | Fixture | [§5](#5-fixture規約)に従うJSON |
-| 既存cassette | **削除も改変もしない** |
-| 新規cassette | **記録しない** |
+| 新規cassette | **実通信から記録しない** |
+| 既存cassetteのResponse Body | **改変しない** |
+| 既存cassetteのRequest URI | コード変更へ追随する目的に限り、**根拠を記録して更新できる** |
+
+既存cassetteを一律に凍結しない。Request URIだけは、Fork側のコードが送るRequestが変わったときに
+追随させる必要がある。更新する場合は次を満たす。
+
+- Response Bodyを1バイトも変更しない
+- 更新後のBodyが、新しいRequestに対する応答として妥当であることを**実測で示す**
+- 何を根拠に妥当と判断したかを[TODO](../planning/todo.md)へ記録する
 
 #### MockTransportを選ぶ理由
 
