@@ -178,6 +178,20 @@ class TestSampling:
 
         assert len(sample) == 3
 
+    def test_counts_the_listing_states_that_came_back(self):
+        """The item detail is fetched by id, so trading can arrive there."""
+        from card_digger.domain.models import ListingStatus
+
+        items = (
+            *make_items(2, start=1, status=ListingStatus.ON_SALE),
+            *make_items(1, start=3, status=ListingStatus.TRADING),
+        )
+
+        assert live_acceptance._count_statuses(items) == {
+            "on_sale": 2,
+            "trading": 1,
+        }
+
     def test_counts_what_the_sample_was_made_of(self):
         items = (
             *make_items(2, start=1, sale_format=SaleFormat.FIXED_PRICE),
@@ -262,6 +276,26 @@ class TestReport:
 
         assert "**rate_limited_429**" in report
         assert "取得なし" in report
+
+
+class TestListingStatesAreReported:
+    def test_a_state_that_was_not_asked_for_is_visible(self):
+        """Trading reaching the runner is a fact, not an assumption."""
+        report = live_acceptance.render_markdown(
+            live_acceptance.Findings(
+                items={"listingStatuses": {"on_sale": 19, "trading": 1}},
+                sellers={"listingStatuses": {"on_sale": {"on_sale": 351}}},
+            )
+        )
+
+        assert "'trading': 1" in report
+        assert "Filterなし" in report
+
+    def test_an_unmeasured_breakdown_is_not_shown_as_empty(self):
+        report = live_acceptance.render_markdown(live_acceptance.Findings())
+
+        assert "## 出品状態の内訳" in report
+        assert "なし" in report
 
 
 class TestFinishedAuctions:

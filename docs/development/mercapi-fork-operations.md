@@ -224,7 +224,7 @@ ForkへCard Digger固有の収集上限、画面文言、Seller Knowledgeを実�
 | 含まれるもの | 例 |
 |---|---|
 | Request Header | **`dpop`のJWTがそのまま** |
-| 実商品ID・実Title | `m62857872792`、実際の商品名 |
+| 実商品ID・実Title | `m000000000001`形式の実ID、実際の商品名 |
 | 実画像URL | `https://static.mercdn.net/...` |
 | Seller ID・Seller名 | Response内にそのまま |
 

@@ -95,6 +95,20 @@ poc/mercapi/.venv/bin/python poc/mercapi/auction_probe.py
 構造サンプルはFixtureの起点として使い、規約は
 [Test運用規約](../../docs/development/test-policy.md)に従います。
 
+## 未解決2件の追加観測
+
+L4の2回の実行で残った問いを、1回の実行でまとめて観測します。Browserは使いません。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/open_questions_probe.py
+```
+
+1. `num_sell_items`は累計販売件数か、出品件数か
+2. `trading`（取引中）にAuction情報は付くか
+
+結果は[未解決2件の追加観測結果](open-questions-result.md)に記録しています。判定は
+**`num_sell_items`は累計販売件数ではない**、**`trading`にAuction情報は付かない**でした。
+
 ## テスト
 
 ```bash
@@ -110,6 +124,9 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `test_seller_paging_probe.py`: 対象選定、応答要約、Cursor引き継ぎの単体テスト
 - `auction_probe.py`: Auction判定、価格、終了予定時刻、`with_auction`影響の検証ランナー
 - `test_auction_probe.py`: 判定ルール、価格比較、構造サンプルのマスク、Cursorの単体テスト
+- `open_questions_probe.py`: `num_sell_items`の意味と`trading`のAuction情報を観測するランナー
+- `test_open_questions_probe.py`: 件数比較、Auction Field抽出、匿名化、安全停止の単体テスト
+- `open-questions-result.md`: 2026-09-01の追加観測結果
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証

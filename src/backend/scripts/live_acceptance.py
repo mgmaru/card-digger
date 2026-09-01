@@ -253,6 +253,7 @@ class LiveAcceptance:
         fields = Rate()
         first_success: list[MarketplaceItem] = []
         formats: Counter[str] = Counter()
+        statuses: Counter[str] = Counter()
 
         for index in range(self._search_trials):
             print(f"  search trial {index + 1}/{self._search_trials} ...", flush=True)
@@ -278,6 +279,7 @@ class LiveAcceptance:
             for item in result.items:
                 fields.record(required_fields_present(item))
                 formats[item.sale_format.value] += 1
+                statuses[item.listing_status.value] += 1
             trials.append({"trial": index + 1, **meta_as_dict(result.meta)})
             for error in result.meta.errors:
                 self._error_codes[error.code.value] += 1
@@ -289,6 +291,7 @@ class LiveAcceptance:
             "successRate": success.as_dict(),
             "requiredFieldRate": fields.as_dict(),
             "saleFormats": dict(formats),
+            "listingStatuses": dict(statuses),
         }
         return first_success
 
@@ -301,6 +304,7 @@ class LiveAcceptance:
         format_agrees = Rate()
         price_agrees = Rate()
 
+        detailed: list[MarketplaceItem] = []
         for index, listed in enumerate(sample, start=1):
             print(f"  item detail {index}/{len(sample)} ...", flush=True)
             try:
@@ -315,6 +319,7 @@ class LiveAcceptance:
                 continue
 
             success.record(True)
+            detailed.append(detail)
             condition.record(detail.item_condition is not None)
             likes.record(detail.like_count is not None)
             format_agrees.record(detail.sale_format is listed.sale_format)
@@ -344,6 +349,10 @@ class LiveAcceptance:
             # of 20/20 cannot be told apart from 20/20 auctions and no ordinary
             # listing at all.
             "sampleFormats": _count_formats(sample),
+            # The search asked for listings on sale. These were fetched by id,
+            # minutes later and with no filter, so a listing bought in between
+            # answers `trading` here.
+            "listingStatuses": _count_statuses(detailed),
             "successRate": success.as_dict(),
             "conditionRate": condition.as_dict(),
             "likeCountRate": likes.as_dict(),
@@ -366,6 +375,12 @@ class LiveAcceptance:
         # asks for listings on sale, so a sold out auction can be seen here and
         # nowhere else in this run.
         formats: dict[ListingStatus, Counter[str]] = {
+            ListingStatus.ON_SALE: Counter(),
+            ListingStatus.SOLD_OUT: Counter(),
+        }
+        # Each state is requested on its own, so anything else coming back means
+        # the filter stopped working.
+        statuses: dict[ListingStatus, Counter[str]] = {
             ListingStatus.ON_SALE: Counter(),
             ListingStatus.SOLD_OUT: Counter(),
         }
@@ -414,6 +429,7 @@ class LiveAcceptance:
                     self._error_codes[error.code.value] += 1
                 for item in collection.items:
                     formats[status][item.sale_format.value] += 1
+                    statuses[status][item.listing_status.value] += 1
                     if (
                         status is ListingStatus.SOLD_OUT
                         and item.sale_format
@@ -444,6 +460,9 @@ class LiveAcceptance:
             "saleFormatAgreementRate": format_agrees.as_dict(),
             "saleFormats": {
                 status.value: dict(counted) for status, counted in formats.items()
+            },
+            "listingStatuses": {
+                status.value: dict(counted) for status, counted in statuses.items()
             },
             "perSeller": reports,
         }
@@ -599,6 +618,22 @@ def _count_formats(items: Sequence[MarketplaceItem]) -> dict[str, int]:
     return dict(counted)
 
 
+def _count_statuses(items: Sequence[MarketplaceItem]) -> dict[str, int]:
+    """What listing states came back, whether or not they were asked for.
+
+    The search filters on sale and the seller pages ask for one state at a
+    time, so those two are expected to answer with what was requested and
+    nothing else. An item detail carries no filter at all: it is fetched by id,
+    and a listing bought between the search and the fetch comes back as
+    `trading`. Counting the states is how that shows up as a number rather than
+    as an assumption.
+    """
+    counted: Counter[str] = Counter()
+    for item in items:
+        counted[item.listing_status.value] += 1
+    return dict(counted)
+
+
 def _distinct_sellers(items: Sequence[MarketplaceItem], size: int) -> list[str]:
     seen: list[str] = []
     for item in items:
@@ -665,6 +700,18 @@ def render_markdown(findings: Findings) -> str:
         f"| Seller `sold_out` | {(sellers.get('saleFormats') or {}).get('sold_out') or 'なし'} |",
         "",
         "商品詳細の標本が1形式へ偏っていれば、その形式についてしか一致率を言えない。",
+        "",
+        "## 出品状態の内訳",
+        "",
+        "| 対象 | 要求した状態 | 返ってきた状態 |",
+        "|---|---|---|",
+        f"| 検索 | `on_sale` | {search.get('listingStatuses') or 'なし'} |",
+        f"| 商品詳細 | **Filterなし** | {items.get('listingStatuses') or 'なし'} |",
+        f"| Seller `on_sale` | `on_sale` | {(sellers.get('listingStatuses') or {}).get('on_sale') or 'なし'} |",
+        f"| Seller `sold_out` | `sold_out` | {(sellers.get('listingStatuses') or {}).get('sold_out') or 'なし'} |",
+        "",
+        "商品詳細だけは状態Filterが無い。検索から詳細取得までの間に購入されれば`trading`が返る。",
+        "他の3つで要求と違う状態が出た場合は、Filterが効いていない。",
         "",
         "## 終了済みAuction（合格基準外の観測）",
         "",
