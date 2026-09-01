@@ -16,6 +16,10 @@
 10. [Test運用規約](development/test-policy.md)
 11. [CIとMerge基準](development/ci-policy.md)
 
+振り返りは実装に必要ではないが、同じ失敗を繰り返さないために残す。
+
+- [検証の落とし穴（2026-09-01）](retrospectives/2026-09-01-verification-pitfalls.md)
+
 ## ディレクトリ
 
 ```text
@@ -30,6 +34,8 @@ docs/
 │   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
 │   └── test-policy.md
+├── retrospectives/
+│   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
     ├── poc-validation.md
     ├── phase-0-e-selection.md
@@ -63,6 +69,16 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [ci-policy.md](development/ci-policy.md):
   CIで実行する範囲、PR運用、Merge基準、Branch保護
 
+### `retrospectives/`
+
+うまくいかなかったことと、そこから何を学んだかを置く。**実装のための文書ではない。**
+
+- [2026-09-01-verification-pitfalls.md](retrospectives/2026-09-01-verification-pitfalls.md):
+  ライブ受入検証が全項目100%で合格した後に見つかった、6つの測定上の落とし穴と対策
+
+仕様・手順の正本は各仕様書に置き、この配下には**判断の経緯と教訓だけ**を書く。
+古くなっても消さない。当時そう考えたという記録自体に価値があるため。
+
 ### `phase-0/`
 
 Mercari取得方式の技術検証、選定、Adapter設計を置く。
@@ -83,6 +99,7 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - Phaseをまたぐ計画・進捗は`planning/`
 - Phaseをまたぐ開発・依存・Repositoryの運用手順は`development/`
 - 特定Phaseだけで使う調査・技術判断・実装仕様は`phase-N/`
+- 失敗の経緯と教訓は`retrospectives/`（実装の正本にはしない）
 - PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
 - `docs/`直下には、このIndex以外の文書を増やさない
 - 同じ決定を複数文書へ複製せず、正本へのLinkを置く

@@ -814,6 +814,26 @@ AUCTION_PAGE_MARKERS = (
 )
 
 
+#: The element that holds the price a buyer sees. Its text reads "現在 ¥900" on
+#: an auction and "¥3,000" on an ordinary listing.
+#:
+#: Until 2026-09-01 this probe searched the page text for the label "現在の価格"
+#: and, finding it on none of twenty pages, fell back to collecting every yen
+#: amount on the page and asking whether the API value was among them. The label
+#: is "現在", not "現在の価格", and the element carries a test id: the fallback was
+#: never necessary. What it produced was a containment check reported as an
+#: agreement rate.
+PRICE_SELECTOR = '[data-testid="price"]'
+
+
+def parse_page_price(text: str | None) -> int | None:
+    """The first yen amount in the price element, or None."""
+    if not text:
+        return None
+    found = re.search(r"[¥￥]\s?([\d,]+)", text)
+    return as_int(found.group(1).replace(",", "")) if found else None
+
+
 def analyze_item_page_text(text: str) -> dict[str, Any]:
     markers = {marker: (marker in text) for marker in AUCTION_PAGE_MARKERS}
     prices = []
@@ -823,10 +843,32 @@ def analyze_item_page_text(text: str) -> dict[str, Any]:
             prices.append(value)
     return {
         "markers": markers,
+        # Kept for context and for comparison with the 0-F-1 figures. The
+        # verdict no longer rests on it.
         "priceCandidates": prices[:10],
         "ruleBid": markers["入札"],
         "ruleBidWithoutPurchase": markers["入札"] and not markers["購入手続きへ"],
     }
+
+
+async def read_page_price(page: Any) -> dict[str, Any]:
+    """The price the buyer sees, read from the element that holds it.
+
+    A missing element is reported as such. It must never quietly become "no
+    match" or fall back to scanning the page, because either would turn "we
+    could not check" into a number in the agreement rate.
+    """
+    try:
+        element = await page.query_selector(PRICE_SELECTOR)
+    except Exception as exc:  # noqa: BLE001 - recorded, not retried
+        return {"found": False, "reason": truncate_message(repr(exc))}
+    if element is None:
+        return {"found": False, "reason": "price element not found"}
+    try:
+        text = (await element.inner_text()).strip()
+    except Exception as exc:  # noqa: BLE001 - recorded, not retried
+        return {"found": False, "reason": truncate_message(repr(exc))}
+    return {"found": True, "text": text[:40], "value": parse_page_price(text)}
 
 
 async def run_page_checks(
@@ -881,6 +923,7 @@ async def run_page_checks(
                     entry["httpStatus"] = response.status if response else None
                     entry["ok"] = bool(response and 200 <= response.status < 300)
                     entry.update(analyze_item_page_text(text))
+                    entry["pagePrice"] = await read_page_price(page)
                     error = (
                         classify_http_status_error(response.status)
                         if response
@@ -930,6 +973,9 @@ def evaluate(
     price_hits = 0
     price_total = 0
     changed = 0
+    strict_hits = 0
+    strict_total = 0
+    strict_unreadable = 0
 
     for record in detail_records:
         sale_format = record["searchSaleFormat"]
@@ -947,14 +993,28 @@ def evaluate(
             bucket["agreedBidWithoutPurchase"] += 1
 
         if expects_auction:
-            price_total += 1
-            candidates = page.get("priceCandidates") or []
             chosen = record["prices"].get("searchPrice")
             detail_highest = record["prices"].get("detailHighestBid")
+
+            # The verdict: the price element against the API value.
+            page_price = page.get("pagePrice") or {}
+            shown = page_price.get("value") if page_price.get("found") else None
+            if shown is None:
+                # Not a mismatch. We could not look, and say so rather than
+                # letting an unchecked listing count either way.
+                strict_unreadable += 1
+            else:
+                strict_total += 1
+                if shown in (chosen, detail_highest):
+                    strict_hits += 1
+                elif chosen is not None and detail_highest is not None and chosen != detail_highest:
+                    changed += 1
+
+            # The 0-F-1 measure, kept so the two runs stay comparable.
+            candidates = page.get("priceCandidates") or []
+            price_total += 1
             if chosen in candidates or detail_highest in candidates:
                 price_hits += 1
-            elif chosen is not None and detail_highest is not None and chosen != detail_highest:
-                changed += 1
 
     return {
         "saleFormatAgreement": {
@@ -968,10 +1028,21 @@ def evaluate(
             for name, bucket in sorted(per_format.items())
         },
         "auctionPriceAgreement": {
-            "compared": price_total,
-            "matched": price_hits,
-            "rate": rate(price_hits, price_total),
+            # The verdict. The page's price element against the API value.
+            "compared": strict_total,
+            "matched": strict_hits,
+            "rate": rate(strict_hits, strict_total),
             "priceChangedDuringComparison": changed,
+            # Counted, never folded into the rate above: a page whose price
+            # element could not be read was not checked at all.
+            "notComparable": strict_unreadable,
+            # The looser 0-F-1 measure: was the API value among the yen amounts
+            # anywhere on the page. Kept only so the two runs can be compared.
+            "containment": {
+                "compared": price_total,
+                "matched": price_hits,
+                "rate": rate(price_hits, price_total),
+            },
         },
     }
 

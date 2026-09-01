@@ -218,6 +218,82 @@ class ItemPageTest(unittest.TestCase):
         self.assertFalse(actual["ruleBidWithoutPurchase"])
 
 
+def _page(item_id, *, price_text="現在 ¥900", found=True, candidates=(900,)):
+    return {
+        "itemId": item_id,
+        "ok": True,
+        "ruleBid": True,
+        "ruleBidWithoutPurchase": True,
+        "priceCandidates": list(candidates),
+        "pagePrice": (
+            {"found": True, "text": price_text, "value": probe.parse_page_price(price_text)}
+            if found
+            else {"found": False, "reason": "price element not found"}
+        ),
+    }
+
+
+def _record(item_id, *, search_price=900, highest=900):
+    return {
+        "itemId": item_id,
+        "searchSaleFormat": "auction",
+        "prices": {"searchPrice": search_price, "detailHighestBid": highest},
+    }
+
+
+class PagePriceTest(unittest.TestCase):
+    def test_reads_the_amount_out_of_the_price_element(self):
+        self.assertEqual(900, probe.parse_page_price("現在 ¥900"))
+        self.assertEqual(20100, probe.parse_page_price("現在 ¥20,100"))
+        self.assertEqual(3000, probe.parse_page_price("¥3,000"))
+
+    def test_an_element_without_an_amount_is_not_a_price(self):
+        self.assertIsNone(probe.parse_page_price("入札する"))
+        self.assertIsNone(probe.parse_page_price(None))
+
+
+class StrictPriceComparisonTest(unittest.TestCase):
+    """The verdict compares one value with one value."""
+
+    def test_the_shown_price_agreeing_with_the_api_is_a_match(self):
+        result = probe.evaluate(
+            [_record("m1")], {"pages": [_page("m1")]}
+        )["auctionPriceAgreement"]
+
+        self.assertEqual(1, result["compared"])
+        self.assertEqual(1, result["matched"])
+        self.assertEqual(0, result["notComparable"])
+
+    def test_a_different_price_on_the_page_is_not_a_match(self):
+        """The failure the old containment check could miss."""
+        result = probe.evaluate(
+            [_record("m1", search_price=800, highest=800)],
+            {"pages": [_page("m1", price_text="現在 ¥900", candidates=(900, 800))]},
+        )["auctionPriceAgreement"]
+
+        self.assertEqual(1, result["compared"])
+        self.assertEqual(0, result["matched"])
+        # The old measure would have passed it: 800 is among the page amounts.
+        self.assertEqual(1, result["containment"]["matched"])
+
+    def test_an_unreadable_price_is_counted_apart_and_never_scored(self):
+        result = probe.evaluate(
+            [_record("m1")], {"pages": [_page("m1", found=False)]}
+        )["auctionPriceAgreement"]
+
+        self.assertEqual(0, result["compared"])
+        self.assertEqual(1, result["notComparable"])
+        self.assertIsNone(result["rate"])
+
+    def test_the_old_measure_is_still_reported(self):
+        """0-F-1 used containment. Both runs stay comparable."""
+        result = probe.evaluate(
+            [_record("m1")], {"pages": [_page("m1")]}
+        )["auctionPriceAgreement"]
+
+        self.assertEqual(1, result["containment"]["compared"])
+
+
 class SafetyTest(unittest.TestCase):
     def test_stops_after_three_consecutive_safety_errors(self):
         monitor = probe.SafetyMonitor(limit=3)
