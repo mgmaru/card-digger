@@ -409,11 +409,23 @@ value.astimezone(timezone.utc)
 
 | Field | 何が未確認か | いつ潰すか |
 |---|---|---|
-| **`created_at`** | `created`が**出品日時**か。再出品で更新されるかも不明 | **Phase 1の並び替え・Filter実装前。** [MVP仕様 §5](../product/mvp-spec.md)の`oldest`並び、掲載日Filter、経過日数表示がすべてこの値に依存する |
+| **`created_at`** | `created`が**出品日時**か。編集や再出品で更新されるかも不明 | **Phase 1の並び替え・Filter実装前。** [MVP仕様 §5](../product/mvp-spec.md)の`oldest`並び、掲載日Filter、経過日数表示がすべてこの値に依存する |
 | `rating` | 星評価のスケール（5段階か否か） | Seller画面へ評価を出す前 |
 
 `created_at`は**Productの中心価値に直結する。** 「古い出品を探す」という目的が、この値の意味に
-乗っている。再出品で`created`が更新されるなら「632日前」という表示も並び替えも成立しない。
+乗っている。編集や再出品で`created`が更新されるなら「632日前」という表示も並び替えも成立しない。
+
+確かめるべきことは3つに分かれ、それぞれ手段が違う。手順と実験は
+[TODO](../planning/todo.md#created_atcreated-最優先)を正本とする。
+
+| # | 問い | 手段 |
+|---|---|---|
+| a | `created`は出品日時か | 商品ページとの照合（即時） |
+| b | 編集で`created`は動くか | 縦断観測（1〜2日） |
+| c | 再出品でリセットされるか | 公式ガイドの確認 |
+
+**手元のデータでは答えられない。** 構造サンプルは匿名化済みで型しか持たず、L4のartifactsは
+商品ごとの`created`を保持していない。`created`と`updated`を並べて観測したこともない。
 
 ### 6.4 `listed_item_count`は販売件数ではない
 
