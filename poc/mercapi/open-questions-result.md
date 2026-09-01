@@ -106,7 +106,7 @@ num_ticket       用途不明。未調査
 
 > **反映済み（2026-09-01）。** Domain型は`Seller.listed_item_count`へ改名し、
 > MVP仕様・concept・TODOの表示要件も「出品件数」へ直した。根拠は
-> [Adapter仕様 §6.3](../../docs/phase-0/phase-0-f-adapter-spec.md#63-listed_item_countは販売件数ではない)。
+> [Adapter仕様 §6.4](../../docs/phase-0/phase-0-f-adapter-spec.md#64-listed_item_countは販売件数ではない)。
 
 **このまま画面に「累計販売件数 29」と出すと、評価247件のSellerに対して誤った数字を示す。**
 [Test運用規約 §2.3](../../docs/development/test-policy.md#23-静かな失敗の例)の言う静かな失敗に当たる。

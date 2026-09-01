@@ -366,7 +366,7 @@ Seller Knowledgeは取得した142件を対象に計算しています
 `num_sell_items`などProfileの累計値を、現在取得できる全商品数とみなさない。
 
 **`num_sell_items`は出品件数であり、累計販売件数ではない。**「累計販売件数」として
-表示しない。根拠は[Adapter仕様 §6.3](../phase-0/phase-0-f-adapter-spec.md#63-listed_item_countは販売件数ではない)。
+表示しない。根拠は[Adapter仕様 §6.4](../phase-0/phase-0-f-adapter-spec.md#64-listed_item_countは販売件数ではない)。
 Profileから累計販売件数は取得できないため、販売実績を示す場合は取得できた`sold_out`の件数を
 「取得範囲内の売却済み件数」として示す。
 

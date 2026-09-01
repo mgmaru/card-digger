@@ -1172,6 +1172,17 @@ Phase 0-FにもMVPにも必須ではない。**着手しないことがそのま
 - [ ] O-2 入札件数をDomain型とUIへ追加する
 - [ ] O-3 開始価格をDomain型とUIへ追加する（**Fork変更を伴う。着手前に再検討する**）
 
+## Phase 1の前に潰すもの
+
+[Field対応表](../phase-0/phase-0-f-adapter-spec.md#63-field対応表--どこから来て意味に根拠があるか)で
+`assumed`（意味が未検証）と分類したField。**`assumed`のまま画面へ出さない。**
+
+- [ ] `created_at`（`created`）が出品日時かを確かめる — **並び替え・掲載日Filter・経過日数表示がすべてこの値に依存する。** 再出品で更新されるかも未確認
+- [ ] `rating`（`star_rating_score`）のスケールを確かめる — 5段階か否か。Seller画面へ評価を出す前
+
+`created_at`はProductの中心価値に直結する。「古い出品を探す」という目的がこの値の意味に
+乗っており、再出品で`created`が更新されるなら経過日数の表示も並び替えも成立しない。
+
 ## 補足
 
 **O-1の注意点。** `Operation.SELLER_TRADING`が未定義のため、先にError Codeの記録先を足す。
