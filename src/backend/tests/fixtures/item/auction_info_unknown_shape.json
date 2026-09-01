@@ -6,8 +6,16 @@
     "price": 1200,
     "created": 1756600000,
     "num_likes": 0,
-    "photos": ["https://example.test/image-1.webp"],
-    "seller": { "id": 100000001, "name": "seller-sample-1" },
-    "auction_info": { "__unknown_field": "unrecognised" }
+    "photos": [
+      "https://example.test/image-1.webp"
+    ],
+    "seller": {
+      "id": 100000001,
+      "name": "seller-sample-1"
+    },
+    "auction_info": {
+      "__unknown_field": "unrecognised"
+    },
+    "updated": 1756686400
   }
 }

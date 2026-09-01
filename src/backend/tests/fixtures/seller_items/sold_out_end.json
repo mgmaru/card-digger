@@ -1,17 +1,24 @@
 {
   "result": "OK",
-  "meta": { "has_next": false },
+  "meta": {
+    "has_next": false
+  },
   "data": [
     {
       "id": "m000000000004",
-      "seller": { "id": 100000001, "name": "seller-sample-1" },
+      "seller": {
+        "id": 100000001,
+        "name": "seller-sample-1"
+      },
       "status": "sold_out",
       "name": "sample-item-4",
       "price": 500,
-      "thumbnails": ["https://example.test/image-4.webp"],
+      "thumbnails": [
+        "https://example.test/image-4.webp"
+      ],
       "num_likes": 1,
       "created": 1756300000,
-      "updated": 1756300000,
+      "updated": 1757077600,
       "pager_id": 6
     }
   ]

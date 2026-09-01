@@ -1,18 +1,28 @@
 {
   "result": "OK",
-  "meta": { "has_next": false },
+  "meta": {
+    "has_next": false
+  },
   "data": [
     {
       "id": "m000000000001",
-      "seller": { "id": 100000001, "name": "seller-sample-1" },
+      "seller": {
+        "id": 100000001,
+        "name": "seller-sample-1"
+      },
       "status": "on_sale",
       "name": "sample-unknown-shape-item",
       "price": 1200,
-      "thumbnails": ["https://example.test/image-1.webp"],
+      "thumbnails": [
+        "https://example.test/image-1.webp"
+      ],
       "num_likes": 0,
       "created": 1756600000,
       "pager_id": 9,
-      "auction_info": { "__unknown_field": "unrecognised" }
+      "auction_info": {
+        "__unknown_field": "unrecognised"
+      },
+      "updated": 1756686400
     }
   ]
 }

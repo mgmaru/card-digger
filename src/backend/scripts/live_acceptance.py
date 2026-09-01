@@ -155,6 +155,7 @@ def required_fields_present(item: MarketplaceItem) -> bool:
         and item.image_urls
         and all(url for url in item.image_urls)
         and item.created_at.tzinfo is not None
+        and item.updated_at.tzinfo is not None
         and item.listing_status
         and item.sale_format
         and item.seller_id

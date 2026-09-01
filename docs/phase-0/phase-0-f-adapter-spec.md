@@ -238,6 +238,7 @@ class MarketplaceItem:
     url: str
     image_urls: tuple[str, ...]
     created_at: datetime
+    updated_at: datetime          # 最終更新。商品ページが表示しているのはこちら
     listing_status: ListingStatus
     sale_format: SaleFormat
     seller_id: str
@@ -385,6 +386,7 @@ value.astimezone(timezone.utc)
 | `url` | `id`から生成 | 生成 | `observed` | 20 / 20でHTTP 200 |
 | `image_urls` | `photos` / `thumbnails` | 転記 | `observed` | 画像本体の取得・デコードに成功（Phase 0-B） |
 | **`created_at`** | **`created`** | **主張** | **`unverifiable`** | 商品ページに照合相手が無い。下記 |
+| **`updated_at`** | **`updated`** | 転記 | **`observed`** | 商品ページの経過時間と3 / 3一致（[観測結果](../../poc/mercapi/timestamp-result.md)） |
 | `listing_status` | `status` | 転記 | `observed` | `on_sale` / `trading` / `sold_out`の3値を実際に観測した |
 | `sale_format` | `auction` / `auction_info`の有無 | **主張** | **`observed`** | 商品ページを正として20 / 20一致 |
 | `seller_id` | `seller_id` / `seller.id_` | 転記 | `observed` | この値でProfileを取得できる |
@@ -427,6 +429,29 @@ value.astimezone(timezone.utc)
 
 `updated`は**商品ページが商品の経過時間として表示している値**であり`observed`。
 ただしページ側にラベル文字が無いため、「Mercariが更新日と呼んでいる」ことは確認していない。
+
+#### `updated_at`を持つ理由
+
+**検証できている唯一の時刻軸である。** `created_at`が`unverifiable`なのに対し、
+`updated_at`は商品ページの表示と一致することを確認している。
+
+| | `created_at` | `updated_at` |
+|---|---|---|
+| 意味の根拠 | **`unverifiable`** | **`observed`** |
+| 商品ページ | 表示されない | **表示されている** |
+| 動くか | 編集されても動かない（345件中253件で確認） | 編集で動く |
+| 答える問い | いつ出品されたか | **いつ最後に触られたか** |
+
+MVPは両方を並び替えの軸にする（[MVP仕様 §5.5](../product/mvp-spec.md)）。
+「更新が古い順」は**長く触られていない出品**を前に出すため、
+[Product目的](../product/concept.md)の「放置された引退品」に最も近い。
+
+必須Fieldとする。3経路すべてのForkモデルが必須で宣言しており、**`updated`を持たない商品は
+そもそも届かない。** 任意にすると、観測されたことのない状態を型が表現することになる。
+
+> **表示ラベルの注意。** 商品ページの経過時間には**ラベル文字が無い**。
+> 「Mercariが更新日と呼んでいる」ことは確認していないため、画面では
+> 「Mercariの商品ページに表示される経過時間」のように、**確認できた事実だけを書く。**
 
 #### 画面への影響
 
@@ -567,7 +592,7 @@ Adapterが送っているのは[共通検証プロトコル](poc-validation.md)�
 | 保証する | **取得した範囲の中での**並び替え |
 | 保証しない | Mercari全体での古い順。取得範囲外に、より古い商品が存在しうる |
 
-[MVP仕様 §5](../product/mvp-spec.md)の`oldest` / `newest` / `price_asc` / `price_desc`は
+[MVP仕様 §5](../product/mvp-spec.md)の`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`は
 すべてこの範囲内の並び替えである。**画面にもその旨を表示する。**
 
 ##### この方針を変えない理由

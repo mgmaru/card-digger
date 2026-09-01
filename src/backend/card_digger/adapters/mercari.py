@@ -245,6 +245,7 @@ def item_from_search_result(raw: Any) -> MarketplaceItem:
         url=ITEM_URL.format(item_id),
         image_urls=image_urls,
         created_at=to_utc(_required(getattr(raw, "created", None), "created", operation)),
+        updated_at=to_utc(_required(getattr(raw, "updated", None), "updated", operation)),
         listing_status=listing_status(getattr(raw, "status", None)),
         sale_format=format_,
         seller_id=str(_required(getattr(raw, "seller_id", None), "sellerId", operation)),
@@ -278,6 +279,7 @@ def item_from_item_detail(raw: Item) -> MarketplaceItem:
         url=ITEM_URL.format(item_id),
         image_urls=image_urls,
         created_at=to_utc(_required(getattr(raw, "created", None), "created", operation)),
+        updated_at=to_utc(_required(getattr(raw, "updated", None), "updated", operation)),
         listing_status=listing_status(getattr(raw, "status", None)),
         sale_format=format_,
         seller_id=str(
@@ -312,6 +314,7 @@ def item_from_seller_item(
         url=ITEM_URL.format(item_id),
         image_urls=image_urls,
         created_at=to_utc(_required(getattr(raw, "created", None), "created", operation)),
+        updated_at=to_utc(_required(getattr(raw, "updated", None), "updated", operation)),
         listing_status=listing_status(getattr(raw, "status", None)),
         sale_format=format_,
         seller_id=str(_required(getattr(raw, "seller_id", None), "seller.id", operation)),

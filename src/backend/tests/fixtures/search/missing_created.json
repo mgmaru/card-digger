@@ -1,5 +1,9 @@
 {
-  "meta": { "nextPageToken": "", "previousPageToken": "", "numFound": "1" },
+  "meta": {
+    "nextPageToken": "",
+    "previousPageToken": "",
+    "numFound": "1"
+  },
   "items": [
     {
       "id": "m000000000006",
@@ -7,8 +11,13 @@
       "price": "1200",
       "sellerId": "100000001",
       "status": "ITEM_STATUS_ON_SALE",
+      "updated": "1756686400",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-1.webp" }],
+      "photos": [
+        {
+          "uri": "https://example.test/image-1.webp"
+        }
+      ],
       "auction": null
     }
   ]

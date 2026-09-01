@@ -5,13 +5,24 @@
     "name": "sample-auction-item",
     "price": 1200,
     "created": 1756500000,
-    "updated": 1756500000,
+    "updated": 1757277600,
     "num_likes": 4,
     "num_comments": 0,
-    "photos": ["https://example.test/image-2.webp"],
-    "thumbnails": ["https://example.test/thumb-2.webp"],
-    "item_condition": { "id": 1, "name": "sample-condition", "subname": "" },
-    "seller": { "id": 100000001, "name": "seller-sample-1" },
+    "photos": [
+      "https://example.test/image-2.webp"
+    ],
+    "thumbnails": [
+      "https://example.test/thumb-2.webp"
+    ],
+    "item_condition": {
+      "id": 1,
+      "name": "sample-condition",
+      "subname": ""
+    },
+    "seller": {
+      "id": 100000001,
+      "name": "seller-sample-1"
+    },
     "auction_info": {
       "id": "100000001",
       "start_time": 1756400000,

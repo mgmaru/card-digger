@@ -12,11 +12,17 @@
       "sellerId": "100000001",
       "status": "ITEM_STATUS_ON_SALE",
       "created": "1756600000",
-      "updated": "1756600000",
+      "updated": "1757377600",
       "itemConditionId": "3",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-1.webp" }],
-      "thumbnails": ["https://example.test/thumb-1.webp"],
+      "photos": [
+        {
+          "uri": "https://example.test/image-1.webp"
+        }
+      ],
+      "thumbnails": [
+        "https://example.test/thumb-1.webp"
+      ],
       "auction": null
     },
     {
@@ -26,11 +32,17 @@
       "sellerId": "100000001",
       "status": "ITEM_STATUS_ON_SALE",
       "created": "1756500000",
-      "updated": "1756500000",
+      "updated": "1757277600",
       "itemConditionId": "1",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-2.webp" }],
-      "thumbnails": ["https://example.test/thumb-2.webp"],
+      "photos": [
+        {
+          "uri": "https://example.test/image-2.webp"
+        }
+      ],
+      "thumbnails": [
+        "https://example.test/thumb-2.webp"
+      ],
       "auction": {
         "id": "",
         "bidDeadline": "2026-09-01T11:52:24Z",

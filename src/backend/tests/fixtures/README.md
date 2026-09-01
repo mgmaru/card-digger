@@ -38,6 +38,7 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `search/auction_unknown_shape.json` | derived | `search/page_1_has_next.json` | 検索 | 未知キーだけの`auction`を`unknown`にする |
 | `search/statuses.json` | derived | `search/page_1_has_next.json` | 検索 | `trading`を独立状態として保持し、未知Statusを`unknown`にする |
 | `search/missing_created.json` | derived | `search/page_1_has_next.json` | 検索 | 出品日時欠落をParse Errorにする |
+| `search/missing_updated.json` | derived | `search/page_1_has_next.json` | 検索 | 更新日時欠落をParse Errorにする |
 | `search/missing_image.json` | derived | `search/page_1_has_next.json` | 検索 | 画像URL欠落をParse Errorにする |
 | `search/no_price.json` | derived | `search/page_1_has_next.json` | 検索 | `isNoPrice`のPlaceholder価格を実価格として扱わない |
 | `item/auction.json` | observed | — | 商品詳細 | `auction_info`の全Fieldを読み、`highest_bid`を価格にする |
@@ -57,6 +58,15 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 401 / 403 / 429 / Timeout / 通信失敗は**Response Bodyの問題ではない**ため、Fixtureを作らず
 Fake Fork Clientに例外を投げさせる（[Test運用規約 §5.4](../../../../docs/development/test-policy.md#54-異常系fixtureの作り方)）。
 Mercariが実際にどうErrorを返すかは未観測であり、推測した形をTestしない。
+
+## `created`と`updated`は必ず食い違わせる
+
+すべてのFixtureで`updated`を`created`の9日後にしている。**同じ値では、Adapterが誤って
+片方を読んでもTestが通ってしまう。**
+
+これは`initial_price`（開始価格）と`highest_bid`（現在価格）を必ず食い違わせているのと
+同じ理由である。実サービスでは一致することが多く（345件中92件が`created == updated`）、
+実測ではこの誤りを捕まえられない。**Fixtureだけが捕まえられる。**
 
 ## 未観測として残っているもの
 

@@ -52,6 +52,17 @@ class MarketplaceItem:
     url: str
     image_urls: tuple[str, ...]
     created_at: datetime
+    #: When the listing was last touched, as Mercari reports it.
+    #:
+    #: This is the one timestamp the marketplace shows: an item page displays
+    #: it as the elapsed time, with no label, and `created_at` appears nowhere
+    #: on the page. The two diverge often and widely: of 345 listings, 253 had
+    #: been updated after they were created, by up to 182 days.
+    #:
+    #: Required, like `created_at`. Every shape the fork parses declares it, so
+    #: a listing without one does not arrive; calling it optional would model a
+    #: state that has never been seen.
+    updated_at: datetime
     listing_status: ListingStatus
     sale_format: SaleFormat
     seller_id: str
