@@ -448,6 +448,55 @@ class MarketplacePort(Protocol):
 
 「Sellerの全商品」「全出品に占める比率」とは表現せず、状態ごとの取得数と打ち切り有無を返す。
 
+#### `trading`の扱い（2026-09-01決定）
+
+出品状態は`on_sale` / `trading`（取引中）/ `sold_out`の3つある。**要求するかどうかと、
+返ってきた値をどう扱うかは別の決定**であり、次のとおり分けて決める。
+
+| 決定 | 内容 | 理由 |
+|---|---|---|
+| **要求** | **`trading`を要求しない** | [MVP実装仕様](../product/mvp-spec.md)が販売中と売却済みの2画面と定めており、表示先が無い。1 Sellerあたり最大5ページ増える |
+| **正規化** | **`trading`を`trading`のまま保持する。`sold_out`や`unknown`へ寄せない** | 下記 |
+
+要求しているのは**Application層の`analyze_seller`**である。AdapterもForkも3状態すべてを
+要求でき、`ListingStatus.TRADING`は`_REQUESTABLE_STATUSES`に含まれる。
+**能力の制約ではなく、収集Policyの選択である。**
+
+##### 要求していないのに、正規化で潰さない理由
+
+要求していない状態でも、**商品詳細（`get_item`）には状態Filterが存在しない。**
+
+| 経路 | 状態Filter | `trading`が返る可能性 |
+|---|---|---|
+| 検索 | `status=on_sale`を送る | 低い（未確認） |
+| Seller商品一覧 | 要求した状態だけが返る（[0-F-1 §6.1](../../poc/mercapi/auction-result.md)で確認） | 低い |
+| **商品詳細** | **無し。IDで引くだけ** | **ある** |
+
+検索で見つけた商品を数分後に詳細取得する間に、その商品が購入されれば`trading`になる。
+**`trading`はCard Diggerへ実際に到達しうる。**
+
+そのとき`sold_out`へ丸めると、次の2つを取り違える。
+
+```text
+sold_out   取引完了。基本的に元へ戻らない
+trading    取引中。キャンセルや支払い期限切れで on_sale へ戻りうる（未確定の状態）
+```
+
+Seller Knowledgeを「売れた率」で測る場合、未確定の`trading`を売却済みへ数えると
+**過大評価**になる。また[Test運用規約 §2.3](../development/test-policy.md#23-静かな失敗の例)は
+「`trading`を`unknown`や`sold_out`へ変換する」を**静かな失敗の例**として挙げている。
+
+丸めても**Requestは1件も減らない。** 検知能力だけを失う選択になるため、行わない。
+
+##### この決定を見直す契機
+
+- 画面へ「取引中」を表示する要件が出たとき（**そのとき初めて要求側を実装する**）
+- Seller Knowledgeの特徴量で「売れた」の定義に`trading`を含めると決めたとき（Phase 1-4）
+- 終了済みAuctionの調査で`trading`を観測する必要が出たとき（単発Probe。収集Policyは変えない）
+
+なお**`trading`の実データはまだ1件も観測していない。** `trading`を扱うFixtureは
+`derived`であり、観測から起こしたものではない。
+
 ### 8.3 停止理由
 
 ```python
