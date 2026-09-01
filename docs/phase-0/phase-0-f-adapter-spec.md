@@ -353,7 +353,69 @@ value.astimezone(timezone.utc)
 > （[`normalize_search_item`](../../poc/mercapi/result.md)）は当初からLocal解釈で実装されており、
 > 実測結果はこの訂正の影響を受けない。
 
-### 6.3 `listed_item_count`は販売件数ではない
+### 6.3 Field対応表 — どこから来て、意味に根拠があるか
+
+`num_sell_items`を`total_sales_count`（累計販売件数）と誤って名付けた原因は、
+**改名に2種類あることを区別していなかった**ことにある。
+
+| 種類 | 例 | 根拠 |
+|---|---|---|
+| **転記** | `num_ratings` → `rating_count` | **不要。** 意味は変わらず、命名規則の違いだけ |
+| **主張** | `num_sell_items` → `total_sales_count` | **必要。** `sell`（出品）→ `sales`（販売）で意味が変わっている |
+
+主張には、[Fixture規約](../development/test-policy.md#5-fixture規約)と同じ語彙で根拠区分を付ける。
+
+| 区分 | 意味 |
+|---|---|
+| `observed` | 外部の正（商品ページなど）と**値を突き合わせた** |
+| `derived` | 他の観測から論理的に導ける |
+| `assumed` | **未検証。** 合格の根拠にしない |
+
+#### `MarketplaceItem`
+
+| Domain Field | 出所 | 種別 | 根拠区分 | 根拠 |
+|---|---|---|---|---|
+| `id` | `id_` | 転記 | — | — |
+| `title` | `name` | 主張 | `derived` | 商品ページに`data-testid="name"`がある。**値は突き合わせていない** |
+| `price_yen` | `real_price` / `price` / `auction.highest_bid` | **主張** | **`observed`** | 商品ページの価格要素と10 / 10一致（[L4 §12.8](phase-0-f-live-acceptance-result.md#128-auction価格と商品ページの照合step-2)） |
+| `url` | `id`から生成 | 生成 | `observed` | 20 / 20でHTTP 200 |
+| `image_urls` | `photos` / `thumbnails` | 転記 | `observed` | 画像本体の取得・デコードに成功（Phase 0-B） |
+| **`created_at`** | **`created`** | **主張** | **`assumed`** | **未検証。** 下記 |
+| `listing_status` | `status` | 転記 | `observed` | `on_sale` / `trading` / `sold_out`の3値を実際に観測した |
+| `sale_format` | `auction` / `auction_info`の有無 | **主張** | **`observed`** | 商品ページを正として20 / 20一致 |
+| `seller_id` | `seller_id` / `seller.id_` | 転記 | `observed` | この値でProfileを取得できる |
+| `item_condition` | `item_condition` / `item_condition_id` | 転記 | `derived` | 商品ページに`data-testid="商品の状態"`がある。**値は突き合わせていない** |
+| `like_count` | `num_likes` | 転記 | `derived` | 商品ページに`data-testid="icon-heart-button"`がある。**値は突き合わせていない** |
+
+#### `Seller`
+
+| Domain Field | 出所 | 種別 | 根拠区分 | 根拠 |
+|---|---|---|---|---|
+| `id` | `id_` | 転記 | — | — |
+| `name` | `name` | 転記 | — | — |
+| `rating` | `star_rating_score` | 主張 | **`assumed`** | **スケール未確認。** 5段階か100点かを観測していない |
+| `rating_count` | `num_ratings` | 転記 | — | — |
+| `listed_item_count` | `num_sell_items` | **主張** | **`observed`** | §6.4 |
+| `url` | `id`から生成 | 生成 | `observed` | Sellerページを開ける |
+
+#### 規則
+
+- **`assumed`の主張を画面へ出さない。** 出す必要が生じたら、先に観測して`observed`へ上げる
+- 主張を新設・改名するときは、根拠を1行で書く。**書けないなら元の名前に近い名前を使う**
+  （`num_sell_items` → `sell_item_count`なら何も主張していない）
+- 値を突き合わせていないものを`observed`と書かない。**要素の存在は値の一致ではない**
+
+#### 現在`assumed`の2件
+
+| Field | 何が未確認か | いつ潰すか |
+|---|---|---|
+| **`created_at`** | `created`が**出品日時**か。再出品で更新されるかも不明 | **Phase 1の並び替え・Filter実装前。** [MVP仕様 §5](../product/mvp-spec.md)の`oldest`並び、掲載日Filter、経過日数表示がすべてこの値に依存する |
+| `rating` | 星評価のスケール（5段階か否か） | Seller画面へ評価を出す前 |
+
+`created_at`は**Productの中心価値に直結する。** 「古い出品を探す」という目的が、この値の意味に
+乗っている。再出品で`created`が更新されるなら「632日前」という表示も並び替えも成立しない。
+
+### 6.4 `listed_item_count`は販売件数ではない
 
 Profileの`num_sell_items`を`Seller.listed_item_count`へ写す。**出品件数であって、
 累計販売件数ではない。**
