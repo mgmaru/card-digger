@@ -897,6 +897,11 @@ L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 
 経緯と教訓は[検証の落とし穴](../retrospectives/2026-09-01-verification-pitfalls.md)にまとめた。
 
+その後、`MarketplaceItem`へ必須Field`updated_at`を追加したため、**第3回**を実行して
+実サービスで壊れないことを確認した（2026-09-01 15:30Z、Request 110件）。
+**必須Field 3505 / 3505、Parse Error 0件。判定には使わない動作確認**である。
+実測は[結果 §13](../phase-0/phase-0-f-live-acceptance-result.md#13-updated_at追加後のstep-1)。
+
 | 基準 | 実測 |
 |---|---|
 | 検索5回の成功率80%以上 | 5 / 5（100%） |
