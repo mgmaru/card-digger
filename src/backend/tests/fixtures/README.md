@@ -87,7 +87,12 @@ Runnerへ入れた。
 | Testで検証できない | **これは原因ではない。** 標本さえあればFixtureで担保できる |
 
 `expected_winner_period_end_time`（落札者の手続き期限）がモデルに存在することから、
-終了直後のAuctionは`trading`にある可能性が高い。切り分けの実験案と実測は
+**落札された**Auctionは終了直後`trading`にある可能性が高い。ただし**入札なしで終了した**
+Auctionには落札者も支払い期間も無く、行き先を推測する材料が無い。
+
+なお`trading`は**`status`が取る値**であり、Auction固有ではない（通常出品にもある）。
+`search/statuses.json`は`derived`であり、**`trading`の実データは未観測**である。
+切り分けの実験案と実測は
 [ライブ受入検証結果 §12.6](../../../../docs/phase-0/phase-0-f-live-acceptance-result.md#126-終了済みauction合格基準外の観測)。
 
 標本が得られるまで`assumed` Fixtureは作らない。

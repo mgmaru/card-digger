@@ -938,6 +938,11 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 - [ ] 実験1: Sellerの`trading`を`with_auction=true`で取得し、`auction_info`の有無を確認する（数Request、待ち時間なし）
 - [ ] 実験1で決着しない場合、実験2: `bid_deadline`経過後のAuctionを追跡する（数Request、1〜2日の待ち）
 
+> `trading`は**Fieldではなく`status`の値**であり、**Auction固有でもない**（通常出品にもある）。
+> Card Diggerは`trading`を一度も要求しておらず、**実データを1件も観測していない**。
+> また、**入札なしで終了したAuction**（`STATE_NO_BID`。第2回は4 / 10）の行き先は
+> 実験1では分からず、実験2が要る。
+
 いずれもPhase 0-Fの完了条件ではない。**未観測のまま`assumed` Fixtureを作らない**という
 方針は維持したうえで、標本を得る手立てとして残す。
 

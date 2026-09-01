@@ -596,6 +596,50 @@ Auctionは終了後、**落札者が支払いを済ませるまでの期間**が
 期限があるということは、その間に置かれる状態がある。**それが`trading`であれば、
 `on_sale`と`sold_out`のどちらを見ても永久に見つからない。**
 
+##### `trading`はFieldではなく、Auction固有でもない
+
+誤解しやすいため明記する。`trading`は**`status`が取る値の1つ**であり、販売形式とは直交する。
+
+```text
+item.status         ∈ { on_sale, trading, sold_out }   ← trading はこの値の1つ
+item.auction_info   Auction固有のField（通常出品には無い）
+```
+
+| | `on_sale` | `trading` | `sold_out` |
+|---|:---:|:---:|:---:|
+| 通常出品 | あり | **あり** | あり |
+| Auction | あり | **未観測** | **未観測** |
+
+通常出品でも、買い手が購入してから発送・受取が完了するまでは`trading`になる。
+**Auction専用の状態ではない。**
+
+##### `trading`の実データを1件も観測していない
+
+L4もPoCも`trading`を一度も要求していないため、**実物を見たことがない。**
+
+| 経路 | 要求した状態 |
+|---|---|
+| 検索 | `on_sale`のみ（Adapterが固定） |
+| Seller商品一覧 | `on_sale`と`sold_out`のみ |
+
+`trading`を扱うL2 Fixture（`search/statuses.json`）は存在するが、区分は`derived`であり
+**観測から起こしたものではない**（[Fixture一覧](../../src/backend/tests/fixtures/README.md)）。
+「`trading`という状態がある」こと自体はForkの定数とMercariの一般的な取引の流れに基づく理解で、
+Card Diggerの実測ではない。
+
+##### 落札されたAuctionと、入札なしで終了したAuctionは分けて考える
+
+前段の推測が当てはまるのは**落札された場合**だけである。
+
+| 終了の仕方 | 落札者 | 支払い期間 | 遷移先の推測 |
+|---|---|---|---|
+| 落札された（`STATE_ONGOING`から） | いる | ある | `trading` → `sold_out`（推測） |
+| **入札なしで終了**（`STATE_NO_BID`のまま） | **いない** | **無い** | **不明。推測する材料が無い** |
+
+0-F-1で7 / 10、L4第2回で4 / 10が`STATE_NO_BID`だった。**未入札のまま終了するAuctionは
+珍しくない。** その行き先は`expected_winner_period_end_time`では説明できず、
+実験1（`trading`を見る）でも答えが出ない。**実験2の追跡が要る。**
+
 #### 切り分けるための実験
 
 | # | 内容 | Request | 待ち時間 | 分かること |
