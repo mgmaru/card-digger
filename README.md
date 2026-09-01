@@ -8,6 +8,10 @@ Phase 0-FとMVPの実装仕様を確定し、Auction情報の追加検証も**�
 `MarketplacePort`・Mercari Adapter・収集Policyを`src/backend`へ実装しました。
 2026-09-01のライブ受入検証（L4）も**合格**し、**Phase 0-Fは完了**しました。次はPhase 1のMVPです。
 
+L4は同日に2回実施しています。1回目は全項目合格したものの、標本の偏りと判定規則の緩さという
+**測定側の弱点**が見つかったため、方針を直して2回目を実行しました（判定は2回目を採用）。
+経緯と教訓は[検証の落とし穴](docs/retrospectives/2026-09-01-verification-pitfalls.md)にまとめています。
+
 ## ドキュメント
 
 - [ドキュメント一覧](docs/README.md)
