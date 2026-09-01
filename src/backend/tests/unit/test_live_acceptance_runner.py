@@ -11,13 +11,16 @@ accident breaks the access conditions the whole of Phase 0 was measured under.
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from conftest import make_item, make_items
+from conftest import FrozenClock, RecordingSleeper, make_item, make_items
 
+from card_digger.application.collection import RequestGate
+from card_digger.domain.errors import ErrorCode
 from card_digger.domain.models import SaleFormat
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
@@ -57,15 +60,19 @@ class TestItNeverRunsByAccident:
 
 class TestPlan:
     def test_states_the_request_budget_before_anything_is_sent(self):
-        plan = live_acceptance.render_plan(5, 20, 10)
+        plan = live_acceptance.render_plan(5, 20, 10, 0)
 
         assert "まだ1件も通信していない" in plan
         assert "最大180 Request" in plan
 
     def test_the_budget_follows_the_sample_sizes(self):
-        smaller = live_acceptance.render_plan(1, 1, 1)
+        smaller = live_acceptance.render_plan(1, 1, 1, 0)
 
         assert "最大22 Request" in smaller
+
+    def test_the_follow_up_is_counted_in_the_budget(self):
+        """Every request a run may send is stated before any of them is sent."""
+        assert "最大185 Request" in live_acceptance.render_plan(5, 20, 10, 5)
 
 
 class TestRate:
@@ -104,23 +111,62 @@ class TestRequiredFields:
         assert not live_acceptance.required_fields_present(broken)
 
 
+def _formats(sample):
+    counted = {}
+    for item in sample:
+        counted[item.sale_format] = counted.get(item.sale_format, 0) + 1
+    return counted
+
+
 class TestSampling:
-    def test_takes_the_rarer_formats_first(self):
-        """An auction carries the mapping most likely to be wrong."""
+    def test_an_unreadable_auction_is_always_looked_at(self):
+        """The one shape that must never be filed as an ordinary sale."""
         items = (
-            *make_items(5, start=1, sale_format=SaleFormat.FIXED_PRICE),
-            *make_items(2, start=6, sale_format=SaleFormat.AUCTION),
-            *make_items(1, start=8, sale_format=SaleFormat.UNKNOWN),
+            *make_items(30, start=1, sale_format=SaleFormat.FIXED_PRICE),
+            *make_items(30, start=31, sale_format=SaleFormat.AUCTION),
+            *make_items(2, start=61, sale_format=SaleFormat.UNKNOWN),
         )
 
-        sample = live_acceptance._sample_by_format(items, 4)
+        sample = live_acceptance._sample_by_format(items, 20)
 
-        assert [item.sale_format for item in sample] == [
-            SaleFormat.UNKNOWN,
-            SaleFormat.AUCTION,
-            SaleFormat.AUCTION,
-            SaleFormat.FIXED_PRICE,
-        ]
+        assert sample[0].sale_format is SaleFormat.UNKNOWN
+        assert sample[1].sale_format is SaleFormat.UNKNOWN
+
+    def test_a_plentiful_format_does_not_take_the_whole_sample(self):
+        """The failure this replaced: 23 auctions filled all 20 places.
+
+        The rate then covered auctions only while reading as though it covered
+        both formats.
+        """
+        items = (
+            *make_items(200, start=1, sale_format=SaleFormat.FIXED_PRICE),
+            *make_items(23, start=201, sale_format=SaleFormat.AUCTION),
+        )
+
+        sample = live_acceptance._sample_by_format(items, 20)
+
+        assert _formats(sample) == {SaleFormat.AUCTION: 10, SaleFormat.FIXED_PRICE: 10}
+
+    def test_a_scarce_format_gives_its_share_to_the_other(self):
+        items = (
+            *make_items(200, start=1, sale_format=SaleFormat.FIXED_PRICE),
+            *make_items(3, start=201, sale_format=SaleFormat.AUCTION),
+        )
+
+        sample = live_acceptance._sample_by_format(items, 20)
+
+        assert _formats(sample) == {SaleFormat.AUCTION: 3, SaleFormat.FIXED_PRICE: 17}
+
+    def test_a_sample_cut_short_is_still_balanced(self):
+        """A safety stop keeps the beginning of the sample, so interleave it."""
+        items = (
+            *make_items(200, start=1, sale_format=SaleFormat.FIXED_PRICE),
+            *make_items(200, start=201, sale_format=SaleFormat.AUCTION),
+        )
+
+        sample = live_acceptance._sample_by_format(items, 20)[:6]
+
+        assert _formats(sample) == {SaleFormat.AUCTION: 3, SaleFormat.FIXED_PRICE: 3}
 
     def test_takes_no_more_than_asked_for(self):
         sample = live_acceptance._sample_by_format(make_items(30), 20)
@@ -131,6 +177,17 @@ class TestSampling:
         sample = live_acceptance._sample_by_format(make_items(3), 20)
 
         assert len(sample) == 3
+
+    def test_counts_what_the_sample_was_made_of(self):
+        items = (
+            *make_items(2, start=1, sale_format=SaleFormat.FIXED_PRICE),
+            *make_items(3, start=3, sale_format=SaleFormat.AUCTION),
+        )
+
+        assert live_acceptance._count_formats(items) == {
+            "fixed_price": 2,
+            "auction": 3,
+        }
 
     def test_each_seller_is_visited_once(self):
         items = (
@@ -205,3 +262,204 @@ class TestReport:
 
         assert "**rate_limited_429**" in report
         assert "取得なし" in report
+
+
+class TestFinishedAuctions:
+    """A finished auction has never been observed. Say so, do not imply it."""
+
+    def test_nothing_found_is_not_reported_as_a_measurement(self):
+        lines = live_acceptance._finished_auction_lines(
+            {"candidateCount": 0, "sampleSize": 0, "observed": False}
+        )
+
+        assert "未観測のまま" in "\n".join(lines)
+        assert "0.0%" not in "\n".join(lines)
+
+    def test_the_step_never_ran_is_told_apart_from_nothing_found(self):
+        assert "未実施" in "\n".join(live_acceptance._finished_auction_lines({}))
+
+    def test_an_ending_that_was_seen_is_stated(self):
+        lines = live_acceptance._finished_auction_lines(
+            {
+                "candidateCount": 4,
+                "sampleSize": 2,
+                "observed": True,
+                "auctionInfoPresentRate": {"ok": 2, "total": 2, "percent": 100.0},
+                "finishTimePresentRate": {"ok": 2, "total": 2, "percent": 100.0},
+                "winnerIdPresentRate": {"ok": 2, "total": 2, "percent": 100.0},
+                "states": {"STATE_FINISHED": 2},
+                "keySignatures": {"finish_time,highest_bid,id_,state,winner_id": 2},
+            }
+        )
+        report = "\n".join(lines)
+
+        assert "終了済みAuctionを観測した" in report
+        assert "STATE_FINISHED" in report
+
+    def test_a_winner_is_counted_and_never_named(self):
+        """`winner_id` is a person. Only its presence is ever recorded."""
+        report = live_acceptance.render_markdown(
+            live_acceptance.Findings(
+                finished_auctions={
+                    "candidateCount": 1,
+                    "sampleSize": 1,
+                    "observed": True,
+                    "auctionInfoPresentRate": {"ok": 1, "total": 1, "percent": 100.0},
+                    "finishTimePresentRate": {"ok": 1, "total": 1, "percent": 100.0},
+                    "winnerIdPresentRate": {"ok": 1, "total": 1, "percent": 100.0},
+                    "states": {"STATE_FINISHED": 1},
+                    "keySignatures": {"winner_id": 1},
+                }
+            )
+        )
+
+        assert "1 / 1 (100.0%)" in report
+        assert "999888777" not in report
+
+
+class TestSampleCompositionIsReported:
+    def test_a_sample_of_one_format_is_visible_in_the_report(self):
+        """The gap that made the first run's agreement rate misleading."""
+        report = live_acceptance.render_markdown(
+            live_acceptance.Findings(
+                items={
+                    "sampleFormats": {"auction": 20},
+                    "saleFormatAgreementRate": {
+                        "ok": 20,
+                        "total": 20,
+                        "percent": 100.0,
+                    },
+                },
+                sellers={"saleFormats": {"on_sale": {"fixed_price": 5}, "sold_out": {}}},
+            )
+        )
+
+        assert "{'auction': 20}" in report
+        assert "{'fixed_price': 5}" in report
+
+
+class FakeAuctionInfo:
+    """Only the fork fields the follow up reads."""
+
+    def __init__(self, **fields):
+        for name in live_acceptance.ITEM_AUCTION_FIELDS:
+            setattr(self, name, fields.get(name))
+
+
+class FakeDetail:
+    def __init__(self, auction_info=None):
+        self.auction_info = auction_info
+
+
+class FakeClient:
+    """Stands in for the fork. Answers from a list, or raises."""
+
+    def __init__(self, answers):
+        self._answers = list(answers)
+        self.asked = []
+
+    async def item(self, id_):
+        self.asked.append(id_)
+        answer = self._answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+def _runner(client, *, finished_auctions=5):
+    clock = FrozenClock()
+    gate = RequestGate(clock, RecordingSleeper(clock=clock), max_retries=0)
+    runner = live_acceptance.LiveAcceptance(
+        port=None,
+        gate=gate,
+        search_trials=0,
+        item_details=0,
+        sellers=0,
+        finished_auctions=finished_auctions,
+        client=client,
+    )
+    return runner, gate
+
+
+class TestTheFinishedAuctionFollowUp:
+    def test_reads_the_ending_the_domain_type_does_not_carry(self):
+        client = FakeClient(
+            [
+                FakeDetail(
+                    FakeAuctionInfo(
+                        id_="1",
+                        state="STATE_FINISHED",
+                        finish_time=datetime(2026, 8, 30, tzinfo=timezone.utc),
+                        winner_id="999888777",
+                        highest_bid=4200,
+                    )
+                )
+            ]
+        )
+        runner, _ = _runner(client)
+        runner._finished_auction_candidates = ["m000000000001"]
+
+        asyncio.run(runner._measure_finished_auctions())
+        report = runner.findings.finished_auctions
+
+        assert report["observed"] is True
+        assert report["states"] == {"STATE_FINISHED": 1}
+        assert report["finishTimePresentRate"]["ok"] == 1
+
+    def test_a_winner_is_never_kept(self):
+        client = FakeClient(
+            [FakeDetail(FakeAuctionInfo(winner_id="999888777", finish_time=None))]
+        )
+        runner, _ = _runner(client)
+        runner._finished_auction_candidates = ["m000000000001"]
+
+        asyncio.run(runner._measure_finished_auctions())
+
+        assert "999888777" not in json.dumps(runner.findings.finished_auctions)
+
+    def test_an_item_still_running_does_not_count_as_finished(self):
+        client = FakeClient(
+            [FakeDetail(FakeAuctionInfo(state="STATE_ONGOING", finish_time=None))]
+        )
+        runner, _ = _runner(client)
+        runner._finished_auction_candidates = ["m000000000001"]
+
+        asyncio.run(runner._measure_finished_auctions())
+
+        assert runner.findings.finished_auctions["observed"] is False
+
+    def test_it_never_asks_for_more_than_it_said_it_would(self):
+        client = FakeClient([FakeDetail() for _ in range(10)])
+        runner, _ = _runner(client, finished_auctions=2)
+        runner._finished_auction_candidates = [f"m{i:012d}" for i in range(10)]
+
+        asyncio.run(runner._measure_finished_auctions())
+
+        assert len(client.asked) == 2
+
+    def test_no_candidate_means_no_request_at_all(self):
+        client = FakeClient([])
+        runner, _ = _runner(client)
+
+        asyncio.run(runner._measure_finished_auctions())
+
+        assert client.asked == []
+        assert runner.findings.finished_auctions["observed"] is False
+
+    def test_a_refusal_is_classified_and_counts_towards_the_safety_stop(self):
+        """The follow up bypasses the adapter, so it maps its own errors."""
+        import httpx
+
+        def refused():
+            request = httpx.Request("GET", "https://api.mercari.jp/items/get")
+            response = httpx.Response(429, request=request)
+            return httpx.HTTPStatusError("429", request=request, response=response)
+
+        client = FakeClient([refused() for _ in range(3)])
+        runner, gate = _runner(client)
+        runner._finished_auction_candidates = [f"m{i:012d}" for i in range(3)]
+
+        asyncio.run(runner._measure_finished_auctions())
+
+        assert runner._error_codes[ErrorCode.RATE_LIMITED_429.value] == 3
+        assert gate.stopped is True

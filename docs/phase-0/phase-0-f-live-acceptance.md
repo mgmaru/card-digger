@@ -75,6 +75,27 @@ uv run python scripts/live_acceptance.py --confirm     # 実行する
 | 標準出力のMarkdown | 合格基準との対応表。結果文書へ貼る | 結果文書として管理する |
 | `src/backend/artifacts/live-acceptance.json` | 全実測値と不一致商品のID | **管理外** |
 
+#### 標本の作り方
+
+商品詳細20件は**販売形式ごとの枠**で選ぶ。読めないAuction（`unknown`）を先に全件取り、
+残りをAuctionと通常出品へ交互に配る。片方が不足した分はもう片方へ回す。
+
+2026-09-01の初回実行では、Auctionを優先して詰める旧規則により**20件すべてがAuction**になり、
+「検索 vs 商品詳細」の一致率が通常出品を1件も含まないまま100%と表示された。
+率だけでは偏りが見えないため、Runnerは**標本の販売形式内訳も併せて記録する。**
+
+#### 終了済みAuctionの追跡（合格基準外）
+
+検索は`status=on_sale`固定のため、終了済みAuctionは構造上現れない。一方、Sellerの`sold_out`には
+現れうる。そこでSeller収集で`sold_out`かつAuction（または`unknown`）と判定された商品から
+**最大5件だけ商品詳細を取得**し、`finish_time`・`state`・`winner_id`の有無を記録する。
+
+- これは**合格基準ではない**。未観測のFixtureを`assumed`で作らずに済ませるための観測である
+- Seller一覧の`auction_info`には`finish_time`が無いため、商品詳細でしか確認できない
+- この1手順だけはDomain型が落とすFieldを読むため`mercapi`のモデルを直接参照する。
+  Error分類だけはAdapterと同じ規則を適用し、安全停止の判定から外れないようにする
+- `winner_id`は**有無だけ**を記録する。値は記録しない
+
 ### Step 2. 商品ページとの照合（`poc/mercapi`）
 
 Auction価格が**商品ページの現在価格**と一致するかは、APIだけでは確認できない。
