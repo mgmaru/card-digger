@@ -932,6 +932,15 @@ L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 未知形状は本実行でも標本0件だった。実サービスで再現できないため**未観測のまま残し**、
 L2のFixture Testで担保する現状を継続する（これは決定であり、Taskではない）。
 
+終了済みAuctionは、原因を切り分けられていない。**`trading`（取引中）を一度も要求していない**
+ことが有力な理由として残っている（[結果 §12.6](../phase-0/phase-0-f-live-acceptance-result.md#126-終了済みauction合格基準外の観測)）。
+
+- [ ] 実験1: Sellerの`trading`を`with_auction=true`で取得し、`auction_info`の有無を確認する（数Request、待ち時間なし）
+- [ ] 実験1で決着しない場合、実験2: `bid_deadline`経過後のAuctionを追跡する（数Request、1〜2日の待ち）
+
+いずれもPhase 0-Fの完了条件ではない。**未観測のまま`assumed` Fixtureを作らない**という
+方針は維持したうえで、標本を得る手立てとして残す。
+
 終了済みAuctionは扱いを変えた。検索は`status=on_sale`固定のため構造上現れないが、
 **Sellerの`sold_out`には現れうる**。前回はそこを642件取得しながら販売形式を記録して
 いなかったため、見落としていた可能性がある。追加Requestは最大5件に収まる。
