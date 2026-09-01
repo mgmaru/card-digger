@@ -88,6 +88,7 @@ def _mock_port() -> MockAdapter:
             url=f"https://jp.mercari.com/item/{id_}",
             image_urls=(f"https://example.test/{id_}.webp",),
             created_at=datetime.fromisoformat("2026-08-01T00:00:00+00:00"),
+            updated_at=datetime.fromisoformat("2026-08-20T00:00:00+00:00"),
             listing_status=status,
             sale_format=SaleFormat.FIXED_PRICE,
             seller_id=SELLER_ID,

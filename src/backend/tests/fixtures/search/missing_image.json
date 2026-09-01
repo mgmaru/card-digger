@@ -1,5 +1,9 @@
 {
-  "meta": { "nextPageToken": "", "previousPageToken": "", "numFound": "1" },
+  "meta": {
+    "nextPageToken": "",
+    "previousPageToken": "",
+    "numFound": "1"
+  },
   "items": [
     {
       "id": "m000000000007",
@@ -9,7 +13,8 @@
       "status": "ITEM_STATUS_ON_SALE",
       "created": "1756600000",
       "isNoPrice": false,
-      "auction": null
+      "auction": null,
+      "updated": "1756686400"
     }
   ]
 }

@@ -198,6 +198,7 @@ def make_item(
     id_: str,
     *,
     created_at: datetime = DEFAULT_CREATED_AT,
+    updated_at: datetime | None = None,
     seller_id: str = DEFAULT_SELLER_ID,
     status: ListingStatus = ListingStatus.ON_SALE,
     price_yen: int = 1000,
@@ -210,6 +211,9 @@ def make_item(
         url=f"https://jp.mercari.com/item/{id_}",
         image_urls=(f"https://example.test/{id_}.webp",),
         created_at=created_at,
+        # A listing nobody touched reads the same on both, which is the common
+        # case. Tests that care about the difference pass their own.
+        updated_at=updated_at if updated_at is not None else created_at,
         listing_status=status,
         sale_format=sale_format,
         seller_id=seller_id,

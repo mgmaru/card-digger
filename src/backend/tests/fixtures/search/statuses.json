@@ -1,5 +1,9 @@
 {
-  "meta": { "nextPageToken": "", "previousPageToken": "", "numFound": "4" },
+  "meta": {
+    "nextPageToken": "",
+    "previousPageToken": "",
+    "numFound": "4"
+  },
   "items": [
     {
       "id": "m000000000001",
@@ -9,8 +13,13 @@
       "status": "ITEM_STATUS_ON_SALE",
       "created": "1756600000",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-1.webp" }],
-      "auction": null
+      "photos": [
+        {
+          "uri": "https://example.test/image-1.webp"
+        }
+      ],
+      "auction": null,
+      "updated": "1756686400"
     },
     {
       "id": "m000000000002",
@@ -20,8 +29,13 @@
       "status": "ITEM_STATUS_TRADING",
       "created": "1756600000",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-2.webp" }],
-      "auction": null
+      "photos": [
+        {
+          "uri": "https://example.test/image-2.webp"
+        }
+      ],
+      "auction": null,
+      "updated": "1756686400"
     },
     {
       "id": "m000000000003",
@@ -31,8 +45,13 @@
       "status": "ITEM_STATUS_SOLD_OUT",
       "created": "1756600000",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-3.webp" }],
-      "auction": null
+      "photos": [
+        {
+          "uri": "https://example.test/image-3.webp"
+        }
+      ],
+      "auction": null,
+      "updated": "1756686400"
     },
     {
       "id": "m000000000004",
@@ -42,8 +61,13 @@
       "status": "ITEM_STATUS_UNRECOGNISED",
       "created": "1756600000",
       "isNoPrice": false,
-      "photos": [{ "uri": "https://example.test/image-4.webp" }],
-      "auction": null
+      "photos": [
+        {
+          "uri": "https://example.test/image-4.webp"
+        }
+      ],
+      "auction": null,
+      "updated": "1756686400"
     }
   ]
 }

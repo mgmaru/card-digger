@@ -224,9 +224,46 @@ class TestListingStatus:
         ]
 
 
+class TestTimestamps:
+    """Two timestamps, and they are not interchangeable.
+
+    `updated_at` is the one Mercari puts on an item page. `created_at` appears
+    nowhere on it. Reading one where the other was meant would show a listing
+    touched an hour ago as ten days old, or the reverse.
+    """
+
+    def test_both_timestamps_are_read_from_a_search_result(self):
+        item = item_from_search_result(search_item("search/page_1_has_next.json"))
+
+        assert item.created_at != item.updated_at
+        assert item.created_at < item.updated_at
+
+    def test_both_timestamps_are_read_from_an_item_detail(self):
+        item = item_from_item_detail(item_detail("item/auction.json"))
+
+        assert item.created_at < item.updated_at
+
+    def test_both_timestamps_are_read_from_a_seller_item(self):
+        item = item_from_seller_item(seller_item("seller_items/with_auction.json", 0))
+
+        assert item.created_at < item.updated_at
+
+    def test_both_carry_a_timezone(self):
+        """Naive values would shift the instant by the local offset."""
+        item = item_from_search_result(search_item("search/page_1_has_next.json"))
+
+        assert item.created_at.tzinfo is not None
+        assert item.updated_at.tzinfo is not None
+
+
 class TestRequiredFields:
     @pytest.mark.parametrize(
-        "fixture", ["search/missing_created.json", "search/missing_image.json"]
+        "fixture",
+        [
+            "search/missing_created.json",
+            "search/missing_updated.json",
+            "search/missing_image.json",
+        ],
     )
     def test_a_missing_required_field_fails_the_operation(self, fixture):
         """The record is never dropped so the rest can look complete."""
@@ -240,6 +277,12 @@ class TestRequiredFields:
             item_from_search_result(search_item("search/missing_created.json"))
 
         assert "created" in raised.value.detail
+
+    def test_a_missing_updated_names_that_field(self):
+        with pytest.raises(MarketplaceError) as raised:
+            item_from_search_result(search_item("search/missing_updated.json"))
+
+        assert "updated" in raised.value.detail
 
     def test_a_seller_without_a_name_is_a_parse_error(self):
         """Defence in depth.

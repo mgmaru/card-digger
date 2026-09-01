@@ -1,18 +1,17 @@
 {
   "meta": {
-    "nextPageToken": "",
+    "nextPageToken": "cursor-page-2",
     "previousPageToken": "",
-    "numFound": "1"
+    "numFound": "3"
   },
   "items": [
     {
-      "id": "m000000000005",
-      "name": "sample-unknown-shape-item",
+      "id": "m000000000001",
+      "name": "sample-fixed-price-item",
       "price": "1200",
       "sellerId": "100000001",
       "status": "ITEM_STATUS_ON_SALE",
       "created": "1756600000",
-      "updated": "1757377600",
       "itemConditionId": "3",
       "isNoPrice": false,
       "photos": [
@@ -23,9 +22,7 @@
       "thumbnails": [
         "https://example.test/thumb-1.webp"
       ],
-      "auction": {
-        "__unknown_field": "unrecognised"
-      }
+      "auction": null
     }
   ]
 }
