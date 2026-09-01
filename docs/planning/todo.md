@@ -946,6 +946,11 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 > `trading`の要求と正規化の扱いは
 > [Adapter仕様 §8.2](../phase-0/phase-0-f-adapter-spec.md#tradingの扱い2026-09-01決定)で決定済み。
 > **要求しない／正規化では潰さない。** 表示要件が出た時点で要求側を実装する。
+>
+> **この決定はいつでも覆せる。** Fork・Adapter・Domainは`trading`を扱える状態にあり、
+> 変更はApplication層に閉じる（Fork変更・依存SHA更新は不要）。
+> ただし`Operation.SELLER_TRADING`だけ未定義で、要求側を足す前に先に定義する。
+> 作業一覧は同§8.2の表にある。
 
 いずれもPhase 0-Fの完了条件ではない。**未観測のまま`assumed` Fixtureを作らない**という
 方針は維持したうえで、標本を得る手立てとして残す。

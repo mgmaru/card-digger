@@ -94,6 +94,7 @@ Auction価格と商品ページの照合だけは、Browserが必要なため`po
 | 制約 | 理由 |
 |---|---|
 | `MercariAdapter`はFork ClientをConstructorで受け取る | 外部通信なしで正規化とError分類を検証できる |
+| `trading`を要求しないのはUse caseの判断で、Adapterの制約ではない | 表示要件が出たらApplication層だけで要求を足せる（[Adapter仕様 §8.2](../../docs/phase-0/phase-0-f-adapter-spec.md#tradingの扱い2026-09-01決定)） |
 | Use caseは`Clock`と`Sleeper`を注入で受け取る | 30秒の上限と365日の基準を実時間を待たずに検証できる |
 | Use caseは`MarketplacePort`だけに依存する | 同じContract TestをMock Adapterへも流せる |
 | 例外→Error Codeの変換は純粋関数 | 再現できない失敗もFixtureなしで網羅できる |

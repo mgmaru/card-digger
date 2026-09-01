@@ -488,6 +488,29 @@ Seller Knowledgeを「売れた率」で測る場合、未確定の`trading`を�
 
 丸めても**Requestは1件も減らない。** 検知能力だけを失う選択になるため、行わない。
 
+##### 後から要求する場合に必要な作業
+
+**要求しないという決定は、いつでも覆せる。** Fork・Adapter・Domainは`trading`を扱える状態に
+あり、必要な変更は**Application層に閉じる。** Fork変更も依存SHA更新も不要である。
+
+| | 対象 | 状況 |
+|---|---|---|
+| ✅ | `ListingStatus.TRADING` | 定義済み |
+| ✅ | `_REQUESTABLE_STATUSES` | `TRADING`を含む。Adapterは要求を受け付ける |
+| ✅ | `listing_status()`の正規化 | `trading` / `ITEM_STATUS_TRADING`の両表記に対応済み。L2 Testで固定 |
+| ✅ | Forkの`items_page(statuses=...)` | `SELLER_ITEM_STATUSES`に`"trading"`を含む |
+| ⬜ | `Operation.SELLER_TRADING` | **未定義。** 下記 |
+| ⬜ | `_seller_operation()`の分岐 | `SOLD_OUT`以外を`SELLER_ON_SALE`にしている |
+| ⬜ | `SellerAnalysis.trading` | Fieldの追加 |
+| ⬜ | `analyze_seller`の収集呼び出し | 3状態目の追加と、失敗時の`_not_collected` |
+| ⬜ | Test | 収集とContractの追加 |
+| ⬜ | [MVP実装仕様](../product/mvp-spec.md) | 表示要件の変更 |
+| ⬜ | Request予算 | 1 Sellerあたり最大5ページ増える |
+
+**唯一の注意点は`Operation`である。** `SELLER_TRADING`が無いため、いま`trading`を要求すると
+**その失敗が`seller_on_sale`として記録される。** 要求側を実装する際は、Error Codeの
+記録先を先に足す。要求していない現在は発生しない。
+
 ##### この決定を見直す契機
 
 - 画面へ「取引中」を表示する要件が出たとき（**そのとき初めて要求側を実装する**）
