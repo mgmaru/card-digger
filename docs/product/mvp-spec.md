@@ -662,7 +662,7 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 
 - [ ] 価格・掲載日期間のValidation Test
 - [ ] 入力、Loading、0件、成功、部分成功、Error表示のComponent Test
-- [ ] 価格・掲載日・販売形式Filterと4種類のSortのTest
+- [ ] 価格・掲載日・販売形式Filterと6種類のSortのTest（`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`）
 - [ ] Asia/Tokyoの日付境界と開始日・終了日の片側指定Test
 - [ ] 通常出品・Auction・不明のBadgeと価格LabelのTest
 - [ ] 画像PlaceholderのTest
