@@ -982,13 +982,32 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 
 ## 1-0. Application基盤
 
+### 着手前に決めること
+
+**コードを書く前に決着させる。** いずれも仕様書が「実装開始時に決める」としているか、
+未記載のまま残っている項目である。
+
+- [ ] **FrontendのTest Frameworkを決める** — [Test運用規約 §4.1](../development/test-policy.md#41-framework)が「Phase 1のApplication基盤実装時に決定する」として保留中。決めたら同表を更新する
+- [ ] **Package Versionを固定する** — [MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)が「実装開始時に互換性と脆弱性を確認して固定する」としている。React / Vite / TypeScript / FastAPIが対象
+- [ ] **CIへ`frontend` Jobを追加する** — 現在は`docs` / `poc` / `backend`の3つ。[CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)の表と、必須Statusの一覧も更新する
+- [ ] **`GET /api/sellers/{sellerId}/analysis`とSeller Knowledgeの順序を決める** — [MVP仕様 §8](../product/mvp-spec.md#8-backend-api)はこのEndpointがSeller Knowledgeを返すと定めているが、`seller_knowledge.py`は[Phase 1-4](#phase-1-4--seller-knowledge-indicator)の実装である。**Knowledgeなしで先に作る**か、**1-4を先にやる**かを選ぶ
+
+### 実装
+
+依存関係の順に並べる。Domain / Use case / Adapterは0-Fで完成しており、**足すのは`api/`と
+`frontend/`だけ**である。
+
 - [ ] BackendをPython + FastAPIで作成する
-- [ ] FrontendをTypeScript + React + Viteで作成する
-- [ ] FrontendがForkやMercari Endpointを直接参照しない構成にする
+- [ ] Mercariへ接続しない`GET /api/health`を実装する
 - [ ] `POST /api/search`を実装する
 - [ ] `GET /api/sellers/{sellerId}/analysis`を実装する
-- [ ] Mercariへ接続しない`GET /api/health`を実装する
+- [ ] FrontendをTypeScript + React + Viteで作成する
+- [ ] FrontendがForkやMercari Endpointを直接参照しない構成にする
 - [ ] DatabaseとUser認証を導入しない
+
+[HTTP Status規則](../product/mvp-spec.md#http-status規則)は7パターンが確定済みで、
+`CollectionMeta`の`partial` / `errors` / `stop_reason`がそのまま対応する。
+**0-Fで実装した停止理由がAPIの形を決めている。**
 
 ---
 
