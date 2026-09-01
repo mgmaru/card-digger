@@ -540,6 +540,44 @@ class MarketplacePort(Protocol):
 365日以上の商品数、停止理由、Server側の完全な古い順ではないことを付与する。
 掲載日と販売形式のFilterは取得後にFrontendが適用し、この収集Policyの停止条件には使用しない。
 
+#### 並び替えはApplication側で行う（2026-09-01明記）
+
+**Server側の並び順を信用しない。** Adapterは`sort_by` / `sort_order`を送るが、
+返ってきた順序をそのまま画面へ出さず、**取得し終えた集合をApplication側で並べ替える。**
+
+##### なぜ送るのに信用しないのか
+
+Adapterが送っているのは[共通検証プロトコル](poc-validation.md)の条件を保つためであり、
+順序を当てにしているからではない。実測は次のとおり（[観測結果](../../poc/mercapi/timestamp-result.md)）。
+
+| 送った順序 | `created`の並び | `updated`の並び |
+|---|---|---|
+| `CREATED_TIME` + `ASC`（古い順） | **順不同**（破れ60%） | 部分的に降順（破れ21%） |
+| `CREATED_TIME` + `DESC`（新しい順） | **順不同**（破れ60%） | 部分的に降順（破れ21%） |
+
+- **`order`パラメータは結果に影響していない。** ASCとDESCで並びが完全に一致した
+- **Mercariに「古い順」という選択肢が無い。** `mercapi`の`_allowed_sorting`は
+  おすすめ順・新しい順・価格順・いいね順の5組だけで、`CREATED_TIME + ASC`を含まない
+- `SortBy.SORT_CREATED_TIME`の定義自体に`# Correct order is not guaranteed`とある
+
+##### 何を保証し、何を保証しないか
+
+| | |
+|---|---|
+| 保証する | **取得した範囲の中での**並び替え |
+| 保証しない | Mercari全体での古い順。取得範囲外に、より古い商品が存在しうる |
+
+[MVP仕様 §5](../product/mvp-spec.md)の`oldest` / `newest` / `price_asc` / `price_desc`は
+すべてこの範囲内の並び替えである。**画面にもその旨を表示する。**
+
+##### この方針を変えない理由
+
+Mercariが将来「古い順」を提供したとしても、次の3つが残るため並び替えはApplication側に置く。
+
+1. **ページをまたいで重複排除している。** 除外後の並びはServerの並びではない
+2. **MVPは4種類の並び替えを提供する。** Mercariが持たない順序（古い順）を含む
+3. **順序が保証されないことを実測している。** 保証の無いものを画面の前提にしない
+
 最大件数に達するPageが上限を超える場合は、Response順の先頭から上限までを採用し、残りを
 破棄した件数もMetadataへ記録する。Seller商品でも同じ規則を使う。
 

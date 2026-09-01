@@ -292,6 +292,17 @@ Mercari全体の最古順・指定期間の全件ではありません
 
 ### 5.5 SortとFilter
 
+**SortとFilterはすべてApplication側で行う。** Mercariへ送る`sort`は結果の順序を
+当てにしていない。理由と実測は
+[Adapter仕様 §8.1](../phase-0/phase-0-f-adapter-spec.md#並び替えはapplication側で行う2026-09-01明記)。
+
+- **Mercariに「古い順」という選択肢が存在しない**（おすすめ順・新しい順・価格順・いいね順のみ）
+- `order`パラメータを変えても**返る順序が変わらない**ことを実測した
+- したがって並び替えは**取得し終えた集合に対して**行う
+
+**`oldest`は「Mercari全体で最も古い商品」ではない。** 取得できた範囲の中で古い順である。
+この限界は§5.4の取得範囲表示とあわせて画面に出す。
+
 - `oldest`: `createdAt`昇順
 - `newest`: `createdAt`降順
 - `price_asc`: `priceYen`昇順。同額は`createdAt`昇順

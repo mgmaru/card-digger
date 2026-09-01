@@ -151,6 +151,52 @@ def _render(moment: datetime, now: datetime) -> str:
     return f"{int(age // (365 * 86400))}年前"
 
 
+#: Below this share of adjacent pairs breaking an order, call it sorted.
+SORTED_BREAK_RATE = 0.05
+#: Above this, call it unordered rather than partially sorted.
+UNORDERED_BREAK_RATE = 0.30
+
+
+def count_order_breaks(values: Sequence[datetime]) -> dict[str, Any]:
+    """How often the sequence breaks ascending and descending order.
+
+    The method Phase 0-B used on `created`: walk adjacent pairs and count the
+    ones that contradict an order. A sequence sorted oldest first breaks
+    ascending zero times; one sorted newest first breaks descending zero times;
+    an unsorted one breaks each about half the time.
+    """
+    pairs = list(zip(values, values[1:]))
+    ascending = sum(1 for before, after in pairs if after < before)
+    descending = sum(1 for before, after in pairs if after > before)
+    total = len(pairs)
+    return {
+        "pairs": total,
+        "ascendingBreaks": ascending,
+        "descendingBreaks": descending,
+        "ascendingBreakRate": round(ascending / total, 3) if total else None,
+        "descendingBreakRate": round(descending / total, 3) if total else None,
+        "reading": describe_order(ascending, descending, total),
+    }
+
+
+def describe_order(ascending: int, descending: int, total: int) -> str:
+    """Name what the sequence looks like, or refuse to name it.
+
+    `unordered` and `partially_*` are different answers. A partially sorted
+    sequence still carries information; an unordered one does not, and the
+    difference decides whether the order can be relied on at all.
+    """
+    if not total:
+        return "no_data"
+    low = min(ascending, descending) / total
+    high = max(ascending, descending) / total
+    if low <= SORTED_BREAK_RATE:
+        return "ascending" if ascending < descending else "descending"
+    if high >= UNORDERED_BREAK_RATE and low >= UNORDERED_BREAK_RATE:
+        return "unordered"
+    return "partially_ascending" if ascending < descending else "partially_descending"
+
+
 def summarise_pairs(pairs: Sequence[tuple[datetime, datetime]]) -> dict[str, Any]:
     """How often the two timestamps differ, and by how much.
 
@@ -190,7 +236,13 @@ class Refused(Exception):
     """A non success answer. The run stops rather than working around it."""
 
 
-async def collect(pages: int, samples: int) -> dict[str, Any]:
+ORDERS = {
+    "asc": SearchRequestData.SortOrder.ORDER_ASC,
+    "desc": SearchRequestData.SortOrder.ORDER_DESC,
+}
+
+
+async def collect(pages: int, samples: int, orders: Sequence[str], check_pages: bool) -> dict[str, Any]:
     client = Mercapi()
     now = datetime.now().astimezone()
     findings: dict[str, Any] = {
@@ -210,36 +262,57 @@ async def collect(pages: int, samples: int) -> dict[str, Any]:
 
     pairs: list[tuple[datetime, datetime]] = []
     candidates: list[dict[str, Any]] = []
-    cursor: str | None = None
-    for index in range(pages):
-        print(f"  search {index + 1}/{pages} ...", flush=True)
-        if index:
+    findings["ordering"] = {}
+    for order in orders:
+        # Each order is measured on its own sequence, in the order returned.
+        # Duplicates across pages are dropped: a repeat would break an order
+        # that the marketplace never violated.
+        seen: set[str] = set()
+        created_seq: list[datetime] = []
+        updated_seq: list[datetime] = []
+        duplicates = 0
+        cursor: str | None = None
+        for index in range(pages):
+            print(f"  search {order} {index + 1}/{pages} ...", flush=True)
             await asyncio.sleep(MINIMUM_INTERVAL_SECONDS)
-        results = await client.search(
-            KEYWORD,
-            sort_by=SearchRequestData.SortBy.SORT_CREATED_TIME,
-            sort_order=SearchRequestData.SortOrder.ORDER_ASC,
-            status=[SearchRequestData.Status.STATUS_ON_SALE],
-            page_token=cursor,
-        )
-        findings["requestCount"] += 1
-        for entry in results.items or ():
-            created = entry.created.astimezone()
-            updated = entry.updated.astimezone()
-            pairs.append((created, updated))
-            if discriminates(created, updated, now):
-                candidates.append(
-                    {"id": entry.id_, "created": created, "updated": updated}
-                )
-        token = getattr(results.meta, "next_page_token", None)
-        cursor = token or None
-        if cursor is None:
-            break
+            results = await client.search(
+                KEYWORD,
+                sort_by=SearchRequestData.SortBy.SORT_CREATED_TIME,
+                sort_order=ORDERS[order],
+                status=[SearchRequestData.Status.STATUS_ON_SALE],
+                page_token=cursor,
+            )
+            findings["requestCount"] += 1
+            for entry in results.items or ():
+                if entry.id_ in seen:
+                    duplicates += 1
+                    continue
+                seen.add(entry.id_)
+                created = entry.created.astimezone()
+                updated = entry.updated.astimezone()
+                created_seq.append(created)
+                updated_seq.append(updated)
+                if order == orders[0]:
+                    pairs.append((created, updated))
+                    if discriminates(created, updated, now):
+                        candidates.append(
+                            {"id": entry.id_, "created": created, "updated": updated}
+                        )
+            token = getattr(results.meta, "next_page_token", None)
+            cursor = token or None
+            if cursor is None:
+                break
+        findings["ordering"][order] = {
+            "items": len(created_seq),
+            "duplicates": duplicates,
+            "created": count_order_breaks(created_seq),
+            "updated": count_order_breaks(updated_seq),
+        }
 
     findings["pairs"] = summarise_pairs(pairs)
     findings["discriminatingCandidates"] = len(candidates)
 
-    chosen = candidates[:samples]
+    chosen = candidates[:samples] if check_pages else []
     findings["itemIds"] = [entry["id"] for entry in chosen]
     findings["pageChecks"] = []
     if chosen:
@@ -360,15 +433,48 @@ def render(findings: dict[str, Any]) -> str:
         )
     lines += [
         "",
+        "## 質問3: 検索は何順で返ってくるか",
+        "",
+        "隣接する商品どうしで順序が破れた回数を数える（Phase 0-Bと同じ手法）。",
+        "昇順で返っていれば昇順の破れが0、降順なら降順の破れが0、順不同なら両方が約半分になる。",
+        "",
+        "| 送った順序 | 件数 | 軸 | 昇順の破れ | 降順の破れ | 読み取り |",
+        "|---|---:|---|---|---|---|",
+    ]
+    for order, report in (findings.get("ordering") or {}).items():
+        for axis in ("created", "updated"):
+            breaks = report[axis]
+            lines.append(
+                f"| `{order}` | {report['items']} | `{axis}` | "
+                f"{breaks['ascendingBreaks']} ({_percent(breaks['ascendingBreakRate'])}) | "
+                f"{breaks['descendingBreaks']} ({_percent(breaks['descendingBreakRate'])}) | "
+                f"**{breaks['reading']}** |"
+            )
+    lines += [
+        "",
         f"Request: API {findings.get('requestCount')}件 / ページ {findings.get('pageLoadCount')}枚",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _percent(rate: float | None) -> str:
+    return "—" if rate is None else f"{rate * 100:.0f}%"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pages", type=int, default=DEFAULT_PAGES)
     parser.add_argument("--samples", type=int, default=3)
+    parser.add_argument(
+        "--orders",
+        default="asc,desc",
+        help="sort orders to measure. asc is the one the adapter sends.",
+    )
+    parser.add_argument(
+        "--skip-page-check",
+        action="store_true",
+        help="do not open item pages. Question 2 is then not measured.",
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args(argv)
 
@@ -376,7 +482,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_args(argv)
     try:
-        findings = asyncio.run(collect(arguments.pages, arguments.samples))
+        orders = [name.strip() for name in arguments.orders.split(",") if name.strip()]
+        unknown = [name for name in orders if name not in ORDERS]
+        if unknown:
+            raise SystemExit(f"unknown order: {', '.join(unknown)}")
+        findings = asyncio.run(
+            collect(
+                arguments.pages,
+                arguments.samples,
+                orders,
+                not arguments.skip_page_check,
+            )
+        )
     except Refused as failure:
         print(f"\n拒否された: {failure}\n回避も再試行もしない。時間を置くこと。")
         return 2

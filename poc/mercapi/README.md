@@ -118,9 +118,16 @@ poc/mercapi/.venv/bin/python poc/mercapi/open_questions_probe.py
 poc/mercapi/.venv/bin/python poc/mercapi/timestamp_probe.py
 ```
 
+検索の並び順も同時に測ります（Phase 0-Bと同じ逆転数の手法を`created`と`updated`の両方へ）。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/timestamp_probe.py --skip-page-check
+```
+
 結果は[`created`と`updated`の追加観測結果](timestamp-result.md)。判定は
 **`created`は編集で動かない**（347件中254件が`updated > created`）、
-**商品ページは`updated`を表示している**（3 / 3）でした。
+**商品ページは`updated`を表示している**（3 / 3）、
+**検索は`created`順ではなく`updated`の降順傾向があり、`order`パラメータは効いていない**でした。
 
 `created`が「出品日時」かどうかは**商品ページに照合相手が無く、検証できません。**
 
