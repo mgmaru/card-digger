@@ -365,11 +365,15 @@ value.astimezone(timezone.utc)
 
 主張には、[Fixture規約](../development/test-policy.md#5-fixture規約)と同じ語彙で根拠区分を付ける。
 
-| 区分 | 意味 |
-|---|---|
-| `observed` | 外部の正（商品ページなど）と**値を突き合わせた** |
-| `derived` | 他の観測から論理的に導ける |
-| `assumed` | **未検証。** 合格の根拠にしない |
+| 区分 | 意味 | 扱い |
+|---|---|---|
+| `observed` | 外部の正（商品ページなど）と**値を突き合わせた** | 画面へ出してよい |
+| `derived` | 他の観測から論理的に導ける | 画面へ出してよい |
+| `assumed` | **まだ検証していない** | **塞ぐべきTask。** 画面へ出す前に潰す |
+| `unverifiable` | **検証する手段が存在しない**（照合相手が無い） | **塞げない。** 出すなら限界を明示する |
+
+`assumed`と`unverifiable`は違う。前者は「やっていない」、後者は「やる方法が無い」。
+**前者はTODOに置く。後者はTODOに置かない**（永久に閉じないため）。限界として記録する。
 
 #### `MarketplaceItem`
 
@@ -380,7 +384,7 @@ value.astimezone(timezone.utc)
 | `price_yen` | `real_price` / `price` / `auction.highest_bid` | **主張** | **`observed`** | 商品ページの価格要素と10 / 10一致（[L4 §12.8](phase-0-f-live-acceptance-result.md#128-auction価格と商品ページの照合step-2)） |
 | `url` | `id`から生成 | 生成 | `observed` | 20 / 20でHTTP 200 |
 | `image_urls` | `photos` / `thumbnails` | 転記 | `observed` | 画像本体の取得・デコードに成功（Phase 0-B） |
-| **`created_at`** | **`created`** | **主張** | **`assumed`** | **未検証。** 下記 |
+| **`created_at`** | **`created`** | **主張** | **`unverifiable`** | 商品ページに照合相手が無い。下記 |
 | `listing_status` | `status` | 転記 | `observed` | `on_sale` / `trading` / `sold_out`の3値を実際に観測した |
 | `sale_format` | `auction` / `auction_info`の有無 | **主張** | **`observed`** | 商品ページを正として20 / 20一致 |
 | `seller_id` | `seller_id` / `seller.id_` | 転記 | `observed` | この値でProfileを取得できる |
@@ -401,31 +405,45 @@ value.astimezone(timezone.utc)
 #### 規則
 
 - **`assumed`の主張を画面へ出さない。** 出す必要が生じたら、先に観測して`observed`へ上げる
+- **`unverifiable`を画面へ出すときは、限界を画面に書く。** 塞げないものを黙って出さない
 - 主張を新設・改名するときは、根拠を1行で書く。**書けないなら元の名前に近い名前を使う**
   （`num_sell_items` → `sell_item_count`なら何も主張していない）
 - 値を突き合わせていないものを`observed`と書かない。**要素の存在は値の一致ではない**
 
-#### 現在`assumed`の2件
+#### `created_at`が`unverifiable`である理由（2026-09-01観測）
+
+実測は[`created`と`updated`の追加観測結果](../../poc/mercapi/timestamp-result.md)。
+
+**分かったこと。**
+
+| 主張 | 状態 | 根拠 |
+|---|---|---|
+| 編集・再出品で`created`は動かない | **確定** | 検索347件のうち**254件が`updated > created`**。更新されても`created`はそのまま。最大182日の差。矛盾例0件 |
+| 商品ページは`created`を表示しない | **確定** | ページの経過時間は**`updated`と3 / 3で一致**。`created`が10日前・2日前の標本でもページは`updated`を表示した |
+| `created`は**出品日時**である | **`unverifiable`** | 商品ページに照合相手が存在しない |
+
+**`created`は動かない安定した「始まりの時刻」**であることまでは実測で言える。
+それを「出品日時」と呼ぶ最後の一歩だけが、照合相手が無いため確認できない。
+
+`updated`は**商品ページが商品の経過時間として表示している値**であり`observed`。
+ただしページ側にラベル文字が無いため、「Mercariが更新日と呼んでいる」ことは確認していない。
+
+#### 画面への影響
+
+**同じ商品に対して、Mercariは`updated`基準の経過時間を、Card Diggerは`created`基準の
+経過日数を表示する。** 両者は食い違う（観測例では「1時間前」と「10日前」）。
+
+これは誤りではなく、**別の時刻を見ている**ことによる。利用者が両方の画面を見たときに
+混乱しないよう、[MVP仕様](../product/mvp-spec.md)へ限界の表示を要件として入れる。
+
+#### 現在`assumed`の1件
 
 | Field | 何が未確認か | いつ潰すか |
 |---|---|---|
-| **`created_at`** | `created`が**出品日時**か。編集や再出品で更新されるかも不明 | **Phase 1の並び替え・Filter実装前。** [MVP仕様 §5](../product/mvp-spec.md)の`oldest`並び、掲載日Filter、経過日数表示がすべてこの値に依存する |
 | `rating` | 星評価のスケール（5段階か否か） | Seller画面へ評価を出す前 |
 
-`created_at`は**Productの中心価値に直結する。** 「古い出品を探す」という目的が、この値の意味に
-乗っている。編集や再出品で`created`が更新されるなら「632日前」という表示も並び替えも成立しない。
-
-確かめるべきことは3つに分かれ、それぞれ手段が違う。手順と実験は
-[TODO](../planning/todo.md#created_atcreated-最優先)を正本とする。
-
-| # | 問い | 手段 |
-|---|---|---|
-| a | `created`は出品日時か | 商品ページとの照合（即時） |
-| b | 編集で`created`は動くか | 縦断観測（1〜2日） |
-| c | 再出品でリセットされるか | 公式ガイドの確認 |
-
-**手元のデータでは答えられない。** 構造サンプルは匿名化済みで型しか持たず、L4のartifactsは
-商品ごとの`created`を保持していない。`created`と`updated`を並べて観測したこともない。
+L4では`5.0`が返っていたが、取りうる範囲を観測していない。100点満点なら「5.0」は
+極端に低い評価を意味する。**`assumed`なので、画面へ出す前に潰す。**
 
 ### 6.4 `listed_item_count`は販売件数ではない
 

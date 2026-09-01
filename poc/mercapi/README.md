@@ -109,6 +109,21 @@ poc/mercapi/.venv/bin/python poc/mercapi/open_questions_probe.py
 結果は[未解決2件の追加観測結果](open-questions-result.md)に記録しています。判定は
 **`num_sell_items`は累計販売件数ではない**、**`trading`にAuction情報は付かない**でした。
 
+## `created`と`updated`の追加観測
+
+`created`が編集で動くか、商品ページがどちらを表示しているかを、1回の実行で確かめます。
+検索が両方の時刻を返すため、質問1にはほぼ追加Requestが要りません。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/timestamp_probe.py
+```
+
+結果は[`created`と`updated`の追加観測結果](timestamp-result.md)。判定は
+**`created`は編集で動かない**（347件中254件が`updated > created`）、
+**商品ページは`updated`を表示している**（3 / 3）でした。
+
+`created`が「出品日時」かどうかは**商品ページに照合相手が無く、検証できません。**
+
 ## テスト
 
 ```bash
@@ -127,6 +142,9 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `open_questions_probe.py`: `num_sell_items`の意味と`trading`のAuction情報を観測するランナー
 - `test_open_questions_probe.py`: 件数比較、Auction Field抽出、匿名化、安全停止の単体テスト
 - `open-questions-result.md`: 2026-09-01の追加観測結果
+- `timestamp_probe.py`: `created`と`updated`の意味を観測するランナー
+- `test_timestamp_probe.py`: ラベル解析、標本選択、時刻比較の単体テスト
+- `timestamp-result.md`: 2026-09-01の`created` / `updated`観測結果
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証
