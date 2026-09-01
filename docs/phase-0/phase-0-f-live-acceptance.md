@@ -9,7 +9,7 @@
 - 実施方法の正本: [Test運用規約 §9](../development/test-policy.md#9-ライブ受入検証l4の実施規約)
 - 合格基準の正本: [Adapter仕様 §10.3](phase-0-f-adapter-spec.md#103-ライブ受入検証)
 - 検証条件: [Phase 0 共通検証プロトコル](poc-validation.md)
-- 結果の記録先: [ライブ受入検証結果](phase-0-f-live-acceptance-result.md)（2026-09-01実施、**合格**）
+- 結果の記録先: [ライブ受入検証結果](phase-0-f-live-acceptance-result.md)（2026-09-01に2回実施、いずれも**合格**。判定は第2回を採用）
 
 ## 用語
 
