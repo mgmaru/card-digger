@@ -42,7 +42,8 @@ from typing import Any, Sequence
 from mercapi import Mercapi
 
 from card_digger.adapters.clock import AsyncSleeper, SystemClock
-from card_digger.adapters.mercari import MercariAdapter
+from card_digger.adapters.error_mapping import classify
+from card_digger.adapters.mercari import ITEM_AUCTION_FIELDS, MercariAdapter
 from card_digger.application.analyze_seller import SellerAnalysis, analyze_seller
 from card_digger.application.collect_search import collect_search
 from card_digger.application.collection import (
@@ -66,6 +67,10 @@ KEYWORD = "ポケカ 引退品"
 DEFAULT_SEARCH_TRIALS = 5
 DEFAULT_ITEM_DETAILS = 20
 DEFAULT_SELLERS = 10
+
+#: Sold out auctions to look at in full. A finished auction has never been
+#: observed; this is the cheapest place one could turn up.
+DEFAULT_FINISHED_AUCTIONS = 5
 
 
 # --- small helpers ------------------------------------------------------------
@@ -100,10 +105,14 @@ class Findings:
     search: dict[str, Any] = field(default_factory=dict)
     items: dict[str, Any] = field(default_factory=dict)
     sellers: dict[str, Any] = field(default_factory=dict)
+    finished_auctions: dict[str, Any] = field(default_factory=dict)
     safety: dict[str, Any] = field(default_factory=dict)
     #: Not printed and not committed. Written to the ignored artifacts file so a
     #: disagreement can be looked into without another full run.
     disagreements: list[dict[str, Any]] = field(default_factory=list)
+    #: Same rule. Ids of the sold out auctions that were looked at, kept so a
+    #: fixture can be built from an observed shape rather than a guessed one.
+    finished_auction_ids: list[str] = field(default_factory=list)
 
 
 def utc_now() -> str:
@@ -189,14 +198,22 @@ class LiveAcceptance:
         search_trials: int,
         item_details: int,
         sellers: int,
+        finished_auctions: int = 0,
+        client: Any = None,
     ) -> None:
         self._port = port
         self._gate = gate
+        # Only the finished auction follow up uses this, and only to read the
+        # fields the domain type deliberately drops. Everything measured against
+        # the acceptance criteria goes through the port.
+        self._client = client
         self._clock = SystemClock()
         self._sleeper = AsyncSleeper()
         self._search_trials = search_trials
         self._item_details = item_details
         self._sellers = sellers
+        self._finished_auctions = finished_auctions
+        self._finished_auction_candidates: list[str] = []
         self._error_codes: Counter[str] = Counter()
         self.findings = Findings()
 
@@ -218,6 +235,7 @@ class LiveAcceptance:
         if collected:
             await self._measure_item_details(collected)
             await self._measure_sellers(collected)
+            await self._measure_finished_auctions()
 
         self.findings.safety = {
             "retryCount": self._gate.retry_count,
@@ -322,6 +340,10 @@ class LiveAcceptance:
 
         self.findings.items = {
             "sampleSize": len(sample),
+            # Which formats the sample was actually made of. Without it a rate
+            # of 20/20 cannot be told apart from 20/20 auctions and no ordinary
+            # listing at all.
+            "sampleFormats": _count_formats(sample),
             "successRate": success.as_dict(),
             "conditionRate": condition.as_dict(),
             "likeCountRate": likes.as_dict(),
@@ -339,6 +361,13 @@ class LiveAcceptance:
         paging = {
             ListingStatus.ON_SALE: Rate(),
             ListingStatus.SOLD_OUT: Rate(),
+        }
+        # What a seller's listings are made of, per status. The search only ever
+        # asks for listings on sale, so a sold out auction can be seen here and
+        # nowhere else in this run.
+        formats: dict[ListingStatus, Counter[str]] = {
+            ListingStatus.ON_SALE: Counter(),
+            ListingStatus.SOLD_OUT: Counter(),
         }
         format_agrees = Rate()
         reports: list[dict[str, Any]] = []
@@ -384,6 +413,13 @@ class LiveAcceptance:
                 for error in meta.errors:
                     self._error_codes[error.code.value] += 1
                 for item in collection.items:
+                    formats[status][item.sale_format.value] += 1
+                    if (
+                        status is ListingStatus.SOLD_OUT
+                        and item.sale_format
+                        in (SaleFormat.AUCTION, SaleFormat.UNKNOWN)
+                    ):
+                        self._finished_auction_candidates.append(item.id)
                     if item.id in by_search:
                         agrees = item.sale_format is by_search[item.id]
                         format_agrees.record(agrees)
@@ -406,8 +442,96 @@ class LiveAcceptance:
             "onSalePagingRate": paging[ListingStatus.ON_SALE].as_dict(),
             "soldOutPagingRate": paging[ListingStatus.SOLD_OUT].as_dict(),
             "saleFormatAgreementRate": format_agrees.as_dict(),
+            "saleFormats": {
+                status.value: dict(counted) for status, counted in formats.items()
+            },
             "perSeller": reports,
         }
+
+    async def _measure_finished_auctions(self) -> None:
+        """Look for an auction that has already ended.
+
+        This project has never observed one. The search asks for listings on
+        sale, so a finished auction cannot appear there; a seller's sold out
+        listings are the only place in this run where one could show up.
+
+        The seller items endpoint carries no `finish_time`, so confirming an
+        ending needs the item detail. This is the one measurement that reads the
+        fork's model rather than a domain type, because `MarketplaceItem` drops
+        the auction state on purpose. The question here is what Mercari returns,
+        not what the adapter makes of it, and no acceptance criterion depends on
+        the answer.
+        """
+        candidates = self._finished_auction_candidates
+        sample = candidates[: self._finished_auctions]
+        report: dict[str, Any] = {
+            "candidateCount": len(candidates),
+            "sampleSize": len(sample),
+            "observed": False,
+        }
+        if not sample or self._client is None:
+            self.findings.finished_auctions = report
+            return
+
+        present = Rate()
+        finished = Rate()
+        winner = Rate()
+        states: Counter[str] = Counter()
+        signatures: Counter[str] = Counter()
+
+        for index, item_id in enumerate(sample, start=1):
+            print(f"  sold out auction {index}/{len(sample)} ...", flush=True)
+            try:
+                raw = await self._gate.run(
+                    Operation.ITEM, lambda id_=item_id: self._raw_item(id_)
+                )
+            except (MarketplaceError, SafetyStop) as failure:
+                self._note(failure)
+                if isinstance(failure, SafetyStop):
+                    break
+                continue
+
+            auction = getattr(raw, "auction_info", None) if raw is not None else None
+            present.record(auction is not None)
+            if auction is None:
+                continue
+
+            carried = sorted(
+                name
+                for name in ITEM_AUCTION_FIELDS
+                if getattr(auction, name, None) is not None
+            )
+            signatures[",".join(carried) or "empty"] += 1
+            state = getattr(auction, "state", None)
+            states[str(state) if state is not None else "absent"] += 1
+            finished.record(getattr(auction, "finish_time", None) is not None)
+            # Presence only. Who won is a person, and never leaves this line.
+            winner.record(getattr(auction, "winner_id", None) is not None)
+            self.findings.finished_auction_ids.append(item_id)
+
+        report.update(
+            {
+                "auctionInfoPresentRate": present.as_dict(),
+                "finishTimePresentRate": finished.as_dict(),
+                "winnerIdPresentRate": winner.as_dict(),
+                "states": dict(states),
+                "keySignatures": dict(signatures),
+                "observed": finished.ok > 0,
+            }
+        )
+        self.findings.finished_auctions = report
+
+    async def _raw_item(self, item_id: str) -> Any:
+        """One fork call, classified the way the adapter classifies its own.
+
+        Reproduces the error mapping and nothing else, so that a refusal here
+        still counts towards the safety stop instead of escaping as an
+        unclassified exception.
+        """
+        try:
+            return await self._client.item(item_id)
+        except Exception as exc:
+            raise MarketplaceError(classify(exc), Operation.ITEM) from exc
 
     def _note(self, failure: BaseException) -> None:
         if isinstance(failure, MarketplaceError):
@@ -433,15 +557,46 @@ def _limits(limits) -> dict[str, Any]:
 def _sample_by_format(
     items: Sequence[MarketplaceItem], size: int
 ) -> list[MarketplaceItem]:
-    """Take auctions first, then the rest.
+    """Fill the sample from every format rather than from the rarest one.
 
-    An auction is the rarer of the two and carries the mapping most likely to be
-    wrong, so the sample is weighted towards it rather than left to chance.
+    An earlier version took unknowns, then every auction, then whatever was
+    left. On a search that returned more auctions than the sample size, that
+    spent the whole budget on auctions and measured nothing about ordinary
+    listings: the agreement between search and item detail then said something
+    about auctions only, while reading as though it covered both.
+
+    Unknowns still come first. An auction object we cannot read is the one shape
+    that must never be quietly filed as an ordinary sale, and it is rare enough
+    that taking all of them costs little.
+
+    The remainder alternates between auctions and ordinary listings, so a run cut
+    short by a safety stop still leaves a balanced sample behind. A format with
+    too few listings gives its share to the other rather than shrinking the
+    sample.
     """
-    auctions = [item for item in items if item.sale_format is SaleFormat.AUCTION]
     unknown = [item for item in items if item.sale_format is SaleFormat.UNKNOWN]
+    auctions = [item for item in items if item.sale_format is SaleFormat.AUCTION]
     fixed = [item for item in items if item.sale_format is SaleFormat.FIXED_PRICE]
-    return (unknown + auctions + fixed)[:size]
+
+    sample = unknown[:size]
+    queues = [iter(auctions), iter(fixed)]
+    while len(sample) < size and queues:
+        for queue in list(queues):
+            if len(sample) >= size:
+                break
+            entry = next(queue, None)
+            if entry is None:
+                queues.remove(queue)
+                continue
+            sample.append(entry)
+    return sample
+
+
+def _count_formats(items: Sequence[MarketplaceItem]) -> dict[str, int]:
+    counted: Counter[str] = Counter()
+    for item in items:
+        counted[item.sale_format.value] += 1
+    return dict(counted)
 
 
 def _distinct_sellers(items: Sequence[MarketplaceItem], size: int) -> list[str]:
@@ -500,9 +655,20 @@ def render_markdown(findings: Findings) -> str:
         f"| 安全停止 | {'発動' if safety.get('stopped') else '未発動'} |",
         f"| 観測したError Code | {safety.get('errorCodes') or 'なし'} |",
         "",
-        "## 販売形式の内訳（検索）",
+        "## 販売形式の内訳",
         "",
-        f"{search.get('saleFormats')}",
+        "| 対象 | 内訳 |",
+        "|---|---|",
+        f"| 検索（全試行） | {search.get('saleFormats') or 'なし'} |",
+        f"| 商品詳細の標本 | {items.get('sampleFormats') or 'なし'} |",
+        f"| Seller `on_sale` | {(sellers.get('saleFormats') or {}).get('on_sale') or 'なし'} |",
+        f"| Seller `sold_out` | {(sellers.get('saleFormats') or {}).get('sold_out') or 'なし'} |",
+        "",
+        "商品詳細の標本が1形式へ偏っていれば、その形式についてしか一致率を言えない。",
+        "",
+        "## 終了済みAuction（合格基準外の観測）",
+        "",
+        *_finished_auction_lines(findings.finished_auctions),
         "",
         "## 検索の各試行",
         "",
@@ -525,16 +691,52 @@ def render_markdown(findings: Findings) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _finished_auction_lines(report: dict[str, Any]) -> list[str]:
+    """Say plainly when nothing was found, rather than printing empty rates.
+
+    "Not observed" and "observed and absent" are different answers, and a table
+    of dashes reads like the second when it means the first.
+    """
+    candidates = report.get("candidateCount")
+    if not report:
+        return ["売却済みの収集に到達しなかったため、**未実施**。"]
+    if not report.get("sampleSize"):
+        return [
+            f"売却済みのAuction候補 **{candidates or 0}件**。"
+            " 候補がないため取得していない。終了済みAuctionは**未観測のまま**。",
+        ]
+    return [
+        "| 項目 | 実測 |",
+        "|---|---|",
+        f"| 売却済みのAuction候補 | {candidates}件 |",
+        f"| 商品詳細を取得した件数 | {report.get('sampleSize')}件 |",
+        f"| `auction_info`あり | {_rate(report.get('auctionInfoPresentRate'))} |",
+        f"| `finish_time`あり | {_rate(report.get('finishTimePresentRate'))} |",
+        f"| `winner_id`あり | {_rate(report.get('winnerIdPresentRate'))} |",
+        f"| 観測した`state` | {report.get('states') or 'なし'} |",
+        f"| 観測したKey構成 | {report.get('keySignatures') or 'なし'} |",
+        "",
+        "**終了済みAuctionを観測した。**"
+        if report.get("observed")
+        else "`finish_time`を持つ商品はなかった。終了済みAuctionは**未観測のまま**。",
+    ]
+
+
 def _rate(value: dict[str, Any] | None) -> str:
     if not value or value.get("total") == 0:
         return "— (0件)"
     return f"{value['ok']} / {value['total']} ({value['percent']}%)"
 
 
-def render_plan(search_trials: int, item_details: int, sellers: int) -> str:
+def render_plan(
+    search_trials: int,
+    item_details: int,
+    sellers: int,
+    finished_auctions: int = DEFAULT_FINISHED_AUCTIONS,
+) -> str:
     search_requests = search_trials * SEARCH_LIMITS.max_pages
     seller_requests = sellers * (1 + 2 * SELLER_ITEMS_LIMITS.max_pages)
-    total = search_requests + item_details + seller_requests
+    total = search_requests + item_details + seller_requests + finished_auctions
     minutes = total * MIN_REQUEST_INTERVAL_SECONDS / 60
     return "\n".join(
         [
@@ -543,6 +745,7 @@ def render_plan(search_trials: int, item_details: int, sellers: int) -> str:
             f"  検索          {search_trials}回 × 最大{SEARCH_LIMITS.max_pages}ページ = 最大{search_requests} Request",
             f"  商品詳細      {item_details}件                       = {item_details} Request",
             f"  Seller        {sellers}人 × (Profile 1 + 2状態 × 最大{SELLER_ITEMS_LIMITS.max_pages}ページ) = 最大{seller_requests} Request",
+            f"  終了済Auction 最大{finished_auctions}件（売却済みにAuctionがあった場合だけ） = 最大{finished_auctions} Request",
             f"  ---------------------------------------------",
             f"  合計          最大{total} Request",
             f"  所要時間      間隔{MIN_REQUEST_INTERVAL_SECONDS}秒として最短{minutes:.0f}分",
@@ -570,6 +773,12 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--item-details", type=int, default=DEFAULT_ITEM_DETAILS)
     parser.add_argument("--sellers", type=int, default=DEFAULT_SELLERS)
     parser.add_argument(
+        "--finished-auctions",
+        type=int,
+        default=DEFAULT_FINISHED_AUCTIONS,
+        help="sold out auctions to fetch in full. 0 skips the follow up.",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=ARTIFACTS / "live-acceptance.json",
@@ -580,7 +789,12 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 async def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_arguments(argv)
-    plan = render_plan(arguments.search_trials, arguments.item_details, arguments.sellers)
+    plan = render_plan(
+        arguments.search_trials,
+        arguments.item_details,
+        arguments.sellers,
+        arguments.finished_auctions,
+    )
 
     if arguments.plan or not arguments.confirm:
         print(plan)
@@ -593,13 +807,19 @@ async def main(argv: Sequence[str] | None = None) -> int:
 
     # No automatic retry: a retry is a request the protocol did not account for.
     gate = RequestGate(SystemClock(), AsyncSleeper(), max_retries=0)
-    port = MercariAdapter(Mercapi())
+    # One client, shared. The adapter answers every acceptance criterion; the
+    # runner keeps a handle only for the finished auction follow up, which
+    # needs fields the domain type does not carry.
+    client = Mercapi()
+    port = MercariAdapter(client)
     runner = LiveAcceptance(
         port,
         gate,
         search_trials=arguments.search_trials,
         item_details=arguments.item_details,
         sellers=arguments.sellers,
+        finished_auctions=arguments.finished_auctions,
+        client=client,
     )
     findings = await runner.run()
 
