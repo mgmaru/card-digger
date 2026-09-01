@@ -2,9 +2,10 @@
 
 > 掘り出し物を効率よく探索するためのMercari検索・出品者分析アプリ。
 >
-> 最初の目標だったMercari取得方式の選定はPhase 0-Eで完了した。現在は、選定した
-> **`kynacio/mercapi`方式のAuction情報を追加検証し、Mercari Adapterとして安全に分離すること**が
-> 次の目標。
+> 最初の目標だったMercari取得方式の選定はPhase 0-Eで完了した。選定した`kynacio/mercapi`方式の
+> Auction情報を追加検証し、Mercari Adapterとして分離するPhase 0-Fも、2026-09-01の
+> [ライブ受入検証（L4）](../phase-0/phase-0-f-live-acceptance-result.md)合格をもって完了した。
+> 現在は**Phase 1のSearch MVP**が次の目標。
 
 ---
 
@@ -858,26 +859,41 @@ L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 - [x] L4 Runner（人が手で起動する実行Script）と手順書を用意する
 - [x] `RequestGate`へ自動再試行を止める設定を追加する（L4は`max_retries=0`）
 - [x] Runnerが`--confirm`なしで通信しないことをTestで固定する
-- [ ] 検索を5回実行し、成功率と必須Field取得率を確認する
-- [ ] 商品詳細20件のコンディション・いいねの取得率を確認する
-- [ ] Seller Profile 最大10人の名前取得率を確認する
-- [ ] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
-- [ ] 販売形式の判定が検索・商品詳細・Seller一覧で一致することを確認する
-- [ ] Auction価格が商品ページの取得時点価格と一致することを確認する（**PoC側で実施**）
-- [ ] 401 / 403 / 429 / Challengeを回避せず記録する
-- [ ] ライブ受入検証（L4）結果を`docs/phase-0/phase-0-f-live-acceptance-result.md`へ記録する
-- [ ] [Adapter仕様のPhase 0-F完了条件](../phase-0/phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
+- [x] 検索を5回実行し、成功率と必須Field取得率を確認する
+- [x] 商品詳細20件のコンディション・いいねの取得率を確認する
+- [x] Seller Profile 最大10人の名前取得率を確認する
+- [x] 最大10 Sellerの`on_sale` / `sold_out`で、2ページ目取得または1ページ終端を確認する
+- [x] 販売形式の判定が検索・商品詳細・Seller一覧で一致することを確認する
+- [x] Auction価格が商品ページの取得時点価格と一致することを確認する（**PoC側で実施**）
+- [x] 401 / 403 / 429 / Challengeを回避せず記録する
+- [x] ライブ受入検証（L4）結果を`docs/phase-0/phase-0-f-live-acceptance-result.md`へ記録する
+- [x] [Adapter仕様のPhase 0-F完了条件](../phase-0/phase-0-f-adapter-spec.md#11-phase-0-f完了条件)をすべて満たす
 
-### 準備完了（2026-08-31）
+### 実施完了（2026-09-01）
+
+**判定は合格。** 実測は[ライブ受入検証結果](../phase-0/phase-0-f-live-acceptance-result.md)を正本とする。
 
 | 項目 | 内容 |
 |---|---|
-| Runner | `src/backend/scripts/live_acceptance.py` |
-| 実行 | `uv run python scripts/live_acceptance.py --plan` / `--confirm` |
-| Request予算 | 最大180 Request、間隔2秒として最短6分（`--plan`で確認できる） |
-| 実施条件 | 同時実行数1、間隔2秒以上、**自動再試行なし**、3回連続の安全Errorで停止 |
-| 出力 | 標準出力のMarkdown（結果文書へ貼る）と`artifacts/live-acceptance.json`（Git管理外） |
-| Test | 214 passed / 0 failed（190 → 214。Runnerの純粋関数24件を追加） |
+| Runner | `src/backend/scripts/live_acceptance.py` / `poc/mercapi/auction_probe.py` |
+| 実行日時 | `2026-09-01T05:09:45Z` 〜 `05:16:29Z`（Step 1が3分04秒、Step 2が2分11秒） |
+| Fork commit | `b3bdec98d7ed56d0e3f1270f9852a2a170c5896c` |
+| Card Digger commit | `c49ba1b48bc2db7385612212468f51dfbe1ebbaa` |
+| Request数 | API 123件（予算は最大180件）。すべてHTTP 200 |
+| 実施条件 | 同時実行数1、間隔2秒以上、**自動再試行0回**、安全停止は未発動 |
+| 事前Test | Fork 94 passed（L1）/ Backend 214 passed（L2・L3） |
+| 出力 | 結果文書（Git管理）と`artifacts/`の実測値（**Git管理外**） |
+
+| 基準 | 実測 |
+|---|---|
+| 検索5回の成功率80%以上 | 5 / 5（100%） |
+| 必須商品Field各100% | 1185 / 1185（100%） |
+| 商品詳細のコンディション・いいね各95%以上 | 各20 / 20（100%） |
+| Seller Profileの名前90%以上 | 10 / 10（100%） |
+| `on_sale` / `sold_out`の2ページ目取得または終端 | 各10 / 10（100%） |
+| 販売形式の判定が各100%一致 | 検索 vs 詳細 20 / 20、検索 vs Seller一覧 24 / 24 |
+| Auction価格が商品ページと95%以上一致 | 10 / 10（100%） |
+| 401 / 403 / 429 / Challenge | **0件** |
 
 **Runnerは`--confirm`が無い限り1件も通信しない。** CIは`tests/`だけを実行するため、
 `scripts/`はどのJobからも呼ばれない。
@@ -889,10 +905,16 @@ L1〜L3は自動Test Suite、L4は手動・低頻度で実行する。
 | 1 | 検索・商品詳細・Seller Profile・Seller商品一覧 | `src/backend` | Adapterと収集Policyの実測 |
 | 2 | Auction価格 vs **商品ページ**の現在価格 | `poc/mercapi` | Browserが要るため。`src/backend`にPlaywrightを持ち込まない |
 
-#### 未実施の理由
+#### 実施後に残った課題
 
-L4は実Mercariへ接続する手動作業であり、実行そのものは人が判断して開始する。
-Runnerと手順は用意したが、**まだ1件も通信していない。**
+不合格項目はない。次の3点を[結果 §9](../phase-0/phase-0-f-live-acceptance-result.md#9-次に見直す点)へ
+改善余地として記録した。合否には影響しないため、Phase 1と並行して扱う。
+
+- [ ] Runnerへ商品詳細標本の販売形式内訳を記録させる
+- [ ] 通常出品の「検索 vs 商品詳細」一致をStep 1でも測れるようにする
+
+未知形状と終了済みAuctionは本実行でも標本0件だった。実サービスで再現できないため
+**未観測のまま残し**、L2のFixture Testで担保する現状を継続する（これは決定であり、Taskではない）。
 
 ---
 

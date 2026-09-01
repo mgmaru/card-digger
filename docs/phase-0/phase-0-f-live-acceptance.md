@@ -3,12 +3,13 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-31**
-- ステータス: **実施基準として採用。実施は未完了**
+- 実施日: **2026-09-01**
+- ステータス: **実施基準として採用。実施完了・判定は合格**
 - 対象: Mercari AdapterとUse caseを実Mercariへ向けて実測する手順と合格基準
 - 実施方法の正本: [Test運用規約 §9](../development/test-policy.md#9-ライブ受入検証l4の実施規約)
 - 合格基準の正本: [Adapter仕様 §10.3](phase-0-f-adapter-spec.md#103-ライブ受入検証)
 - 検証条件: [Phase 0 共通検証プロトコル](poc-validation.md)
-- 結果の記録先: `docs/phase-0/phase-0-f-live-acceptance-result.md`（実施時に作成する）
+- 結果の記録先: [ライブ受入検証結果](phase-0-f-live-acceptance-result.md)（2026-09-01実施、**合格**）
 
 ## 用語
 

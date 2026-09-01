@@ -545,6 +545,9 @@ Proxy切替、複数Accountによる回避は行わない。
 
 Seller数が10人に満たない場合は、取得できた全Sellerを母数とし、その事実を結果へ記載する。
 
+実施結果は[ライブ受入検証結果](phase-0-f-live-acceptance-result.md)を正本とする。
+2026-09-01の実施で**10項目すべて合格**した。
+
 ## 11. Phase 0-F完了条件
 
 - [x] 管理下のForkが作成され、ライセンスと著作権表示が維持されている
@@ -557,7 +560,7 @@ Seller数が10人に満たない場合は、取得できた全Sellerを母数と
 - [x] ForkとAdapterの全自動Test（L1〜L3）が成功している
 - [x] Fixtureが[Test運用規約 §5](../development/test-policy.md#5-fixture規約)の匿名化規則を満たしている
 - [x] 時計、待機、Fork Clientが注入可能になっている
-- [ ] ライブ受入検証（L4）が合格し、結果文書が追加されている
+- [x] ライブ受入検証（L4）が合格し、結果文書が追加されている
 - [x] Application / Domain層に`mercapi`型とPrivate Memberが漏れていない
 - [x] [MVP実装仕様](../product/mvp-spec.md)から利用できる状態になっている
 

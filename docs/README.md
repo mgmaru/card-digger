@@ -11,9 +11,10 @@
 5. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
 6. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
 7. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
-8. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
-9. [Test運用規約](development/test-policy.md)
-10. [CIとMerge基準](development/ci-policy.md)
+8. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
+9. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+10. [Test運用規約](development/test-policy.md)
+11. [CIとMerge基準](development/ci-policy.md)
 
 ## ディレクトリ
 
@@ -34,7 +35,8 @@ docs/
     ├── phase-0-e-selection.md
     ├── phase-0-f-auction-validation.md
     ├── phase-0-f-adapter-spec.md
-    └── phase-0-f-live-acceptance.md
+    ├── phase-0-f-live-acceptance.md
+    └── phase-0-f-live-acceptance-result.md
 ```
 
 ### `product/`
@@ -72,6 +74,8 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - [phase-0-f-adapter-spec.md](phase-0/phase-0-f-adapter-spec.md): ForkとAdapterの実装仕様
 - [phase-0-f-live-acceptance.md](phase-0/phase-0-f-live-acceptance.md):
   実Mercariへ接続するライブ受入検証（L4）の条件、手順、合格基準
+- [phase-0-f-live-acceptance-result.md](phase-0/phase-0-f-live-acceptance-result.md):
+  2026-09-01に実施したライブ受入検証（L4）の実測値と判定
 
 ## 配置ルール
 

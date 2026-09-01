@@ -6,7 +6,7 @@ Phase 0-A〜0-Eの技術検証を完了し、Mercari取得には **`kynacio/merc
 Phase 0-FとMVPの実装仕様を確定し、Auction情報の追加検証も**合格**しました。管理下の
 `mercapi` ForkへSeller商品の状態別ページングと`with_auction`を追加し、Domain型・
 `MarketplacePort`・Mercari Adapter・収集Policyを`src/backend`へ実装しました。
-残るのはライブ受入検証（L4）です。
+2026-09-01のライブ受入検証（L4）も**合格**し、**Phase 0-Fは完了**しました。次はPhase 1のMVPです。
 
 ## ドキュメント
 
@@ -17,6 +17,7 @@ Phase 0-FとMVPの実装仕様を確定し、Auction情報の追加検証も**�
 - [Phase 0-E Mercari取得方式の選定結果](docs/phase-0/phase-0-e-selection.md)
 - [Phase 0-F Mercari Adapter実装仕様](docs/phase-0/phase-0-f-adapter-spec.md)
 - [Phase 0-F Auction情報の追加検証計画](docs/phase-0/phase-0-f-auction-validation.md) / [実測結果](poc/mercapi/auction-result.md)
+- [Phase 0-F ライブ受入検証実施計画](docs/phase-0/phase-0-f-live-acceptance.md) / [実測結果](docs/phase-0/phase-0-f-live-acceptance-result.md)
 - [Test運用規約](docs/development/test-policy.md)
 - [CIとMerge基準](docs/development/ci-policy.md)
 
