@@ -592,7 +592,7 @@ Adapterが送っているのは[共通検証プロトコル](poc-validation.md)�
 | 保証する | **取得した範囲の中での**並び替え |
 | 保証しない | Mercari全体での古い順。取得範囲外に、より古い商品が存在しうる |
 
-[MVP仕様 §5](../product/mvp-spec.md)の`oldest` / `newest` / `price_asc` / `price_desc`は
+[MVP仕様 §5](../product/mvp-spec.md)の`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`は
 すべてこの範囲内の並び替えである。**画面にもその旨を表示する。**
 
 ##### この方針を変えない理由

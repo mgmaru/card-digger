@@ -200,10 +200,10 @@ dependencies = [
 | 掲載日期間 | 両方指定時は掲載開始日 `<=` 掲載終了日 |
 | 販売状態 | UIでは`on_sale`固定。変更Controlは設けない |
 | 販売形式 | `all`、`fixed_price`、`auction`。初期値は`all` |
-| Sort | `oldest`、`newest`、`price_asc`、`price_desc` |
+| Sort | `created_asc`、`created_desc`、`updated_asc`、`updated_desc`、`price_asc`、`price_desc` |
 
 価格、掲載日、販売形式のFilterとSortはFrontendが取得済み範囲へ適用し、BackendやMercariへ
-再Requestしない。初期Sortは`oldest`とする。
+再Requestしない。初期Sortは`created_asc`とする。
 
 掲載開始日だけなら指定日以降、掲載終了日だけなら指定日以前、両方なら指定期間内を表す。
 時刻指定はMVPへ含めず、日付境界を必ずAsia/Tokyoで計算する。
@@ -300,8 +300,8 @@ Mercari全体の最古順・指定期間の全件ではありません
 - `order`パラメータを変えても**返る順序が変わらない**ことを実測した
 - したがって並び替えは**取得し終えた集合に対して**行う
 
-**`oldest`は「Mercari全体で最も古い商品」ではない。** 取得できた範囲の中で古い順である。
-この限界は§5.4の取得範囲表示とあわせて画面に出す。`updated_oldest`も同様。
+**`created_asc`は「Mercari全体で最も古い商品」ではない。** 取得できた範囲の中で古い順である。
+この限界は§5.4の取得範囲表示とあわせて画面に出す。`updated_asc`も同様。
 
 #### 2つの日時を並び替えの軸にする
 
@@ -312,14 +312,14 @@ Mercari全体の最古順・指定期間の全件ではありません
 | `createdAt` | いつ出品されたか | 長く存在している出品 |
 | **`updatedAt`** | **いつ最後に触られたか** | **長く放置されている出品** |
 
-**`updated_oldest`が[Productの目的](concept.md)に最も近い。** 「引退して放置されている出品」を
+**`updated_asc`が[Productの目的](concept.md)に最も近い。** 「引退して放置されている出品」を
 探すなら、出品からの経過よりも「触られていない期間」のほうが直接的である。
 
 さらに、検索は**更新の新しい順に傾いて返ってくる**（隣接ペアの79%が降順。
 [観測結果](../../poc/mercapi/timestamp-result.md)）。**目的の商品ほど後ろに埋もれる**ため、
-`updated_oldest`はそれを取得範囲内で引き上げる手段になる。
+`updated_asc`はそれを取得範囲内で引き上げる手段になる。
 
-`updated_newest`はMercariの既定の並びとほぼ同じで、追加の情報量は小さい。対称性のために置く。
+`updated_desc`はMercariの既定の並びとほぼ同じで、追加の情報量は小さい。対称性のために置く。
 
 #### `updatedAt`の表示ラベル
 
@@ -335,12 +335,18 @@ Mercari全体の最古順・指定期間の全件ではありません
 何と呼んでいるかは確認していない**ためである
 （[Adapter仕様 §6.3](../phase-0/phase-0-f-adapter-spec.md#63-field対応表--どこから来て意味に根拠があるか)）。
 
-- `oldest`: `createdAt`昇順（掲載が古い順）
-- `newest`: `createdAt`降順（掲載が新しい順）
-- **`updated_oldest`: `updatedAt`昇順（更新が古い順）**
-- **`updated_newest`: `updatedAt`降順（更新が新しい順）**
-- `price_asc`: `priceYen`昇順。同額は`createdAt`昇順
-- `price_desc`: `priceYen`降順。同額は`createdAt`昇順
+Sortの値は`<軸>_<方向>`で揃える。**軸を省略しない。**
+日時の軸が2つあるため、`oldest`のように軸を書かない名前は「何の古い順か」を言えない。
+人間向けの言葉はUIラベルが持つ。
+
+| 値 | 並び | UI表示 |
+|---|---|---|
+| `created_asc` | `createdAt`昇順 | 掲載が古い順 |
+| `created_desc` | `createdAt`降順 | 掲載が新しい順 |
+| **`updated_asc`** | `updatedAt`昇順 | **更新が古い順** |
+| `updated_desc` | `updatedAt`降順 | 更新が新しい順 |
+| `price_asc` | `priceYen`昇順。同額は`createdAt`昇順 | 価格の安い順 |
+| `price_desc` | `priceYen`降順。同額は`createdAt`昇順 | 価格の高い順 |
 - 最低価格: 以上を残す
 - 最高価格: 以下を残す
 - 掲載開始日: `createdAt >= 開始日の00:00:00 Asia/Tokyo`を残す
