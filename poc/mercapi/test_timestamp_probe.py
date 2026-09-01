@@ -106,6 +106,52 @@ class SampleSelectionTest(unittest.TestCase):
         self.assertFalse(probe.discriminates(moment, moment, NOW))
 
 
+class OrderBreakTest(unittest.TestCase):
+    """Phase 0-B's method: count adjacent pairs that contradict an order."""
+
+    def test_a_sequence_sorted_oldest_first_never_breaks_ascending(self):
+        actual = probe.count_order_breaks(
+            [ago(days=9), ago(days=5), ago(days=1)]
+        )
+
+        self.assertEqual(0, actual["ascendingBreaks"])
+        self.assertEqual("ascending", actual["reading"])
+
+    def test_a_sequence_sorted_newest_first_never_breaks_descending(self):
+        actual = probe.count_order_breaks(
+            [ago(days=1), ago(days=5), ago(days=9)]
+        )
+
+        self.assertEqual(0, actual["descendingBreaks"])
+        self.assertEqual("descending", actual["reading"])
+
+    def test_an_unsorted_sequence_breaks_both_ways(self):
+        """Phase 0-B measured 495 breaks in 825 items on created."""
+        actual = probe.count_order_breaks(
+            [ago(days=5), ago(days=1), ago(days=9), ago(days=3), ago(days=7)]
+        )
+
+        self.assertEqual("unordered", actual["reading"])
+
+    def test_a_mostly_sorted_sequence_is_not_called_sorted(self):
+        """One break in ten is not "sorted", and saying so hides the exception."""
+        values = [ago(days=n) for n in range(20, 0, -1)]
+        values[5], values[6] = values[6], values[5]
+
+        actual = probe.count_order_breaks(values)
+
+        self.assertEqual("partially_ascending", actual["reading"])
+
+    def test_a_single_item_cannot_be_ordered(self):
+        self.assertEqual("no_data", probe.count_order_breaks([ago(days=1)])["reading"])
+
+    def test_an_empty_sequence_reports_no_data(self):
+        actual = probe.count_order_breaks([])
+
+        self.assertEqual("no_data", actual["reading"])
+        self.assertIsNone(actual["ascendingBreakRate"])
+
+
 class PairSummaryTest(unittest.TestCase):
     def test_counts_listings_whose_created_stayed_put(self):
         """The evidence that created is not a last touched time."""
