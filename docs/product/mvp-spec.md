@@ -147,7 +147,7 @@ dependencies = [
 ### 3.2 Seller分析
 
 - Seller Profile
-- Seller名、評価、評価件数、累計販売件数
+- Seller名、評価、評価件数、出品件数（**累計販売件数ではない**）
 - 元Mercari SellerページへのLink
 - 販売中商品を最大100件取得
 - 売却済み商品を最大100件取得
@@ -342,7 +342,7 @@ Auctionの残り時間Countdownと自動更新は行わず、最新情報はMerc
 ### 6.2 表示
 
 - Seller名
-- 評価、評価件数、累計販売件数。取得不能項目は`-`表示
+- 評価、評価件数、出品件数。取得不能項目は`-`表示
 - 元Mercari Sellerページ
 - 販売中Tab
 - 売却済みTab
@@ -364,6 +364,11 @@ Seller Knowledgeは取得した142件を対象に計算しています
 ```
 
 `num_sell_items`などProfileの累計値を、現在取得できる全商品数とみなさない。
+
+**`num_sell_items`は出品件数であり、累計販売件数ではない。**「累計販売件数」として
+表示しない。根拠は[Adapter仕様 §6.3](../phase-0/phase-0-f-adapter-spec.md#63-listed_item_countは販売件数ではない)。
+Profileから累計販売件数は取得できないため、販売実績を示す場合は取得できた`sold_out`の件数を
+「取得範囲内の売却済み件数」として示す。
 
 ## 7. Seller Knowledge Indicator
 

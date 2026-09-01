@@ -7,9 +7,10 @@ need only one small run, so they are asked together.
 
 1. **What does `num_sell_items` count?**
 
-   The adapter maps it to `Seller.total_sales_count` and the MVP means to put it
-   on screen as a cumulative number of sales. The name reads just as easily as a
-   count of listings. `total_bid` was misread the same way earlier, so the value
+   The adapter mapped it to `Seller.total_sales_count` and the MVP meant to put
+   it on screen as a cumulative number of sales. The name reads just as easily
+   as a count of listings. (It is one: the field was renamed to
+   `listed_item_count` after this probe ran.) `total_bid` was misread the same way earlier, so the value
    is checked against something observable rather than trusted: for a seller
    whose listings fit in one page per status, `num_sell_items` is compared with
    the on sale, trading and sold out counts actually returned.

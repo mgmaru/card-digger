@@ -104,6 +104,10 @@ num_ticket       用途不明。未調査
 | [MVP仕様](../../docs/product/mvp-spec.md) | 「Profileの累計販売件数表示」 | 累計販売件数は**取得できない** |
 | [TODO 1-3](../../docs/planning/todo.md) | 同上 | 同上 |
 
+> **反映済み（2026-09-01）。** Domain型は`Seller.listed_item_count`へ改名し、
+> MVP仕様・concept・TODOの表示要件も「出品件数」へ直した。根拠は
+> [Adapter仕様 §6.3](../../docs/phase-0/phase-0-f-adapter-spec.md#63-listed_item_countは販売件数ではない)。
+
 **このまま画面に「累計販売件数 29」と出すと、評価247件のSellerに対して誤った数字を示す。**
 [Test運用規約 §2.3](../../docs/development/test-policy.md#23-静かな失敗の例)の言う静かな失敗に当たる。
 
@@ -196,7 +200,7 @@ Seller IDと商品IDはGit管理外の`artifacts/open-questions.json`にだけ�
 
 | # | 内容 | 優先 |
 |---|---|---|
-| 1 | `Seller.total_sales_count`の名称とMVPの表示要件を実態へ合わせる | **高**。誤った数字を表示する手前で止める |
+| 1 | ~~`Seller.total_sales_count`の名称とMVPの表示要件を実態へ合わせる~~ | **完了**（2026-09-01。`listed_item_count`へ改名） |
 | 2 | 打ち切られないSellerを増やし、`num_sell_items = 全状態の合計`を再確認する | 中 |
 | 3 | 実験2（Auctionの追跡）で終了後の姿を観測する | 中。1〜2日の待ちが要る |
 | 4 | `num_ticket`の用途を確認する | 低 |

@@ -287,5 +287,19 @@ class TestOtherFields:
         assert seller.name == "seller-sample-1"
         assert seller.rating == 5.0
         assert seller.rating_count == 128
-        assert seller.total_sales_count == 342
+        assert seller.listed_item_count == 342
         assert seller.url == "https://jp.mercari.com/user/profile/100000001"
+
+    def test_the_profile_counter_is_listings_and_not_sales(self):
+        """`num_sell_items` counts listings. Measured, not assumed.
+
+        A seller was observed with 247 ratings and 29 here, which no sales
+        figure allows, and the profile carries no sales field to read instead.
+        The name it lands on says listings so a screen cannot label it sales.
+        """
+        from conftest import profile as load_profile
+
+        seller = seller_from_profile(load_profile("seller/profile.json"))
+
+        assert not hasattr(seller, "total_sales_count")
+        assert seller.listed_item_count == 342

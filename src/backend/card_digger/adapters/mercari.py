@@ -329,9 +329,8 @@ def seller_from_profile(raw: Profile) -> Seller:
         name=_required(getattr(raw, "name", None), "name", operation),
         rating=float(rating) if rating is not None else None,
         rating_count=getattr(raw, "num_ratings", None),
-        # Mercari's own running total. Not the number of listings we can reach,
-        # and never presented as one.
-        total_sales_count=getattr(raw, "num_sell_items", None),
+        # `num_sell_items` counts listings, not sales. See the domain type.
+        listed_item_count=getattr(raw, "num_sell_items", None),
         url=SELLER_URL.format(seller_id),
     )
 

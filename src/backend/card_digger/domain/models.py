@@ -65,7 +65,14 @@ class Seller:
     name: str
     rating: float | None
     rating_count: int | None
-    total_sales_count: int | None
+    #: Mercari's own count of this seller's listings, across every state.
+    #:
+    #: Not a count of sales. It was named `total_sales_count` until a seller
+    #: turned up with 247 ratings and 29 here, which cannot both be true of a
+    #: sales figure, and the profile carries no sales field at all. Nor is it
+    #: the number of listings this application can reach, and it is never
+    #: presented as one.
+    listed_item_count: int | None
     url: str
 
 

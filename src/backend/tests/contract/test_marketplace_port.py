@@ -108,7 +108,7 @@ def _mock_port() -> MockAdapter:
                 name="seller-sample-1",
                 rating=5.0,
                 rating_count=128,
-                total_sales_count=342,
+                listed_item_count=342,
                 url=f"https://jp.mercari.com/user/profile/{SELLER_ID}",
             ),
         ),

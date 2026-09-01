@@ -366,7 +366,7 @@ class LiveAcceptance:
         by_search = {item.id: item.sale_format for item in collected}
         name = Rate()
         rating = Rate()
-        sales = Rate()
+        listed = Rate()
         paging = {
             ListingStatus.ON_SALE: Rate(),
             ListingStatus.SOLD_OUT: Rate(),
@@ -408,9 +408,9 @@ class LiveAcceptance:
             rating.record(
                 analysis.seller is not None and analysis.seller.rating is not None
             )
-            sales.record(
+            listed.record(
                 analysis.seller is not None
-                and analysis.seller.total_sales_count is not None
+                and analysis.seller.listed_item_count is not None
             )
             if analysis.profile_error is not None:
                 self._error_codes[analysis.profile_error.code.value] += 1
@@ -454,7 +454,7 @@ class LiveAcceptance:
             "sampleSize": len(seller_ids),
             "nameRate": name.as_dict(),
             "ratingRate": rating.as_dict(),
-            "totalSalesCountRate": sales.as_dict(),
+            "listedItemCountRate": listed.as_dict(),
             "onSalePagingRate": paging[ListingStatus.ON_SALE].as_dict(),
             "soldOutPagingRate": paging[ListingStatus.SOLD_OUT].as_dict(),
             "saleFormatAgreementRate": format_agrees.as_dict(),
