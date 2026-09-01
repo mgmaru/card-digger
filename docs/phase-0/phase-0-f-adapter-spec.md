@@ -250,7 +250,7 @@ class Seller:
     name: str
     rating: float | None
     rating_count: int | None
-    total_sales_count: int | None
+    listed_item_count: int | None   # 出品件数。販売件数ではない
     url: str
 
 @dataclass(frozen=True)
@@ -352,6 +352,31 @@ value.astimezone(timezone.utc)
 > `TZ=UTC`以外の環境で成立しないことが判明したため訂正した。Phase 0-BのPoC
 > （[`normalize_search_item`](../../poc/mercapi/result.md)）は当初からLocal解釈で実装されており、
 > 実測結果はこの訂正の影響を受けない。
+
+### 6.3 `listed_item_count`は販売件数ではない
+
+Profileの`num_sell_items`を`Seller.listed_item_count`へ写す。**出品件数であって、
+累計販売件数ではない。**
+
+2026-09-01の[追加観測](../../poc/mercapi/open-questions-result.md)で次を確認した。
+
+| 根拠 | 内容 |
+|---|---|
+| 件数の一致 | 全状態が1ページで終端したSellerで、`on_sale` 1 + `trading` 3 + `sold_out` 25 = **29**が`num_sell_items`と完全一致した。他の解釈はいずれも不一致 |
+| 評価件数との矛盾 | **評価247件に対し`num_sell_items`が29**のSellerがいた。累計販売が29なら247の評価は成立しない |
+| 代替Fieldの不在 | Profileの`num_`系Fieldは`num_ratings` / `num_sell_items` / `num_ticket`の3つだけ。**`num_sold_items`は存在しない** |
+
+> **2026-09-01の訂正。** この型は当初`total_sales_count`という名前で、
+> [MVP実装仕様](../product/mvp-spec.md)も「累計販売件数」として表示する想定だった。
+> 実測と食い違うため改名した。旧名のままなら、評価247件のSellerに
+> 「累計販売件数 29」と表示していた。
+
+**Profileから累計販売件数は取得できない。** 販売実績を示す必要が出た場合は、
+取得できた`sold_out`の件数を「取得範囲内の売却済み件数」として示す。Profileの累計値を
+販売件数として読み替えない。
+
+判定できたSellerは1人であり、「全状態の合計と一致する」ことの標本は足りない。
+**「販売件数ではない」ことは確定、「出品件数である」ことは有力**という状態で記録する。
 
 ## 7. Marketplace Interface
 
