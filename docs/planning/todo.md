@@ -935,8 +935,13 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 終了済みAuctionは、原因を切り分けられていない。**`trading`（取引中）を一度も要求していない**
 ことが有力な理由として残っている（[結果 §12.6](../phase-0/phase-0-f-live-acceptance-result.md#126-終了済みauction合格基準外の観測)）。
 
-- [ ] 実験1: Sellerの`trading`を`with_auction=true`で取得し、`auction_info`の有無を確認する（数Request、待ち時間なし）
-- [ ] 実験1で決着しない場合、実験2: `bid_deadline`経過後のAuctionを追跡する（数Request、1〜2日の待ち）
+- [x] 実験1: Sellerの`trading`を`with_auction=true`で取得し、`auction_info`の有無を確認する（2026-09-01実施。**23件中0件**）
+- [ ] 実験2: `bid_deadline`経過後のAuctionを追跡する（数Request、1〜2日の待ち）
+
+実験1で**(d)は否定された。** 3状態すべてを観測して`auction_info`が付いたのは`on_sale`だけで
+（`on_sale` 451件中30件、`trading` 23件中0件、`sold_out` 642件中0件）、
+**進行中のAuctionにしかAuction情報が付かない**という新しい仮説が立った。
+実測は[追加観測結果](../../poc/mercapi/open-questions-result.md)。
 
 > `trading`は**Fieldではなく`status`の値**であり、**Auction固有でもない**（通常出品にもある）。
 > Card Diggerは`trading`を一度も要求しておらず、**実データを1件も観測していない**。
@@ -1046,7 +1051,7 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 - [ ] Seller名表示
 - [ ] 評価表示
 - [ ] 評価件数表示
-- [ ] Profileの累計販売件数表示
+- [ ] Profileの出品件数表示（**`num_sell_items`は累計販売件数ではない**。[追加観測結果](../../poc/mercapi/open-questions-result.md)）
 - [ ] SellerのMercariページへのリンク
 - [ ] 販売中商品を最大100件表示
 - [ ] 売却済み商品を最大100件表示

@@ -86,9 +86,13 @@ Runnerへ入れた。
 | **探している状態が間違っている** | **有力。`trading`（取引中）を一度も要求していない** |
 | Testで検証できない | **これは原因ではない。** 標本さえあればFixtureで担保できる |
 
-`expected_winner_period_end_time`（落札者の手続き期限）がモデルに存在することから、
-**落札された**Auctionは終了直後`trading`にある可能性が高い。ただし**入札なしで終了した**
-Auctionには落札者も支払い期間も無く、行き先を推測する材料が無い。
+`trading`（取引中）も2026-09-01に調べたが、23件中0件で**Auction情報は付いていなかった**
+（[追加観測結果](../../../../poc/mercapi/open-questions-result.md)）。同じ実行の`on_sale`では
+`auction_info`が返っているため、要求の誤りではない。
+
+3状態すべてを観測して`auction_info`が付いたのは`on_sale`だけであり、
+**進行中のAuctionにしかAuction情報が付かない**可能性が高い。そうであれば、Seller商品一覧から
+終了済みAuctionを識別することは構造的にできない。
 
 なお`trading`は**`status`が取る値**であり、Auction固有ではない（通常出品にもある）。
 `search/statuses.json`は`derived`であり、**`trading`の実データは未観測**である。
