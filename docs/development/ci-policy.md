@@ -146,6 +146,27 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 
 現在の基準線は[TODO](../planning/todo.md)へ記録する。
 
+### Merge後もBranchを消さない（2026-09-02決定）
+
+**Merge時に`--delete-branch`を付けない。** GitHubのRepository設定
+「Automatically delete head branches」も有効にしない。
+
+[§6](#6-branch保護)がSquashまたはRebaseを要求するため、**Merge後の`main`にはBranch上の
+個々のcommitが残らない。** 1つのcommitへ潰れる。Branchを消すと、潰れる前の過程を
+参照する手段が無くなる。
+
+| 残すと参照できるもの |
+|---|
+| 途中のcommitの分け方と、その順序 |
+| 失敗した試行と、それを戻した経緯 |
+| PRのDiffが指すcommit（Branchが消えると到達不能になりうる） |
+
+**`main`の`Allow deletions`が「無効」なのとは別の話である。** あちらは`main`そのものを
+消せなくする設定で、こちらはMerge済みのfeature branchの扱いを指す。
+
+> 溜まったBranchが読みにくくなった場合は、消すのではなく命名か一覧の見方で対処する。
+> **消すのは元に戻せない。**
+
 ---
 
 ## 6. Branch保護
