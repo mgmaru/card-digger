@@ -1,7 +1,18 @@
 /* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
 
 .shell {
-  max-width: 60rem;
+  /* 記録と断り書きは --measure で別に絞ってある。ここが効くのは
+     1-2の画像Gridで、狭いと一次選別の視界が減る。 */
+  max-width: 90rem;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-5);
+  padding: var(--space-5) var(--space-5) var(--space-7);
+}
+
+/* 記録の声（視覚方針 §3.4）。太らせない ―― 道具の名前であって見出しではない。 */
+.wordmark {
+  font-family: var(--font-record);
+  font-size: var(--text-head);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  margin: 0;
 }

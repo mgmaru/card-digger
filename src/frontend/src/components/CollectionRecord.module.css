@@ -1,0 +1,65 @@
+/* 記録の声。明朝で組む（視覚方針 §3.4）。 */
+
+.record {
+  font-family: var(--font-record);
+  max-width: var(--measure);
+  padding: var(--space-6) 0 var(--space-5);
+}
+
+.partial {
+  border-top: 2px solid var(--shu);
+}
+
+/* 朱で書く文字はこれだけ（視覚方針 §3.3）。 */
+.warning {
+  margin: var(--space-5) 0 var(--space-3);
+  color: var(--shu);
+  font-size: var(--text-sub);
+}
+
+.tally {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sub);
+  line-height: var(--leading-record);
+}
+
+.tally b {
+  font-size: var(--text-record);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.extent,
+.taken {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.taken {
+  margin-top: var(--space-3);
+}
+
+.refetch {
+  font-family: var(--font-ui);
+  font-size: var(--text-note);
+  margin-left: var(--space-3);
+}
+
+/* 朱の縦罫は1つの意味しか持たない —— Card Diggerが自分の限界を書き足した行。
+   文字は墨のまま。段落単位で赤くするとError画面に見える（視覚方針 §3.3）。 */
+.limits {
+  margin-top: var(--space-4);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.limits p {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink);
+}

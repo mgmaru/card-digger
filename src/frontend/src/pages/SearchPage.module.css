@@ -1,0 +1,47 @@
+.loading {
+  margin: var(--space-6) 0;
+  color: var(--ink-quiet);
+}
+
+/* 外部Errorも「Card Diggerが取れなかった」ことの表明なので、
+   断り書きと同じ朱の縦罫で示す（視覚方針 §3.3）。 */
+.failure {
+  margin: var(--space-6) 0;
+  max-width: var(--measure);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.failureMessage {
+  margin: 0 0 var(--space-3);
+  line-height: var(--leading-dense);
+}
+
+.empty {
+  margin: var(--space-6) 0;
+  max-width: var(--measure);
+  color: var(--ink-quiet);
+}
+
+.items {
+  list-style: none;
+  margin: var(--space-5) 0 0;
+  padding: 0;
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+}

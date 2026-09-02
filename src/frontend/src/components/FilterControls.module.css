@@ -1,0 +1,48 @@
+.controls {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+.number {
+  width: 7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.date {
+  width: 9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+/* 朱の縦罫だけ。文字は墨のまま（視覚方針 §3.3）。 */
+.error {
+  margin: var(--space-3) 0 0;
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
