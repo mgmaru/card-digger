@@ -1,8 +1,24 @@
 """Collect one search.
 
-The goal is a hundred unique listings including at least one a year old or
-more, which is the point at which a screen has enough to sort through and the
-range has reached far enough back to be worth showing.
+**There is no early goal.** Collecting runs until the page, item or time
+budget is spent, or until Mercari says there is no next page.
+
+There used to be one — a hundred unique listings including at least one listed
+a year ago or more — and it was aimed at the wrong clock. Search results come
+back roughly newest-*updated* first (adjacent pairs break a descending
+`updated` order only 21% of the time, against 40% for `created`; see
+`poc/mercapi/timestamp-result.md`), so the listings this product exists to
+find are the ones furthest from page one. Meanwhile a single listing that was
+*created* long ago but updated yesterday satisfied the old goal — and a
+listing whose seller is still adjusting the price is precisely not the find.
+
+The result was that almost every search stopped at `target_reached` after two
+or three pages holding nothing but freshly-touched listings. The goal was
+reached and the product's job was not done.
+
+Spending the whole budget costs twenty to thirty seconds a search. That is the
+honest price of digging, and section 5.2 already keeps the result on screen so
+the trip is paid once.
 
 What comes back is never "the oldest listings on Mercari". It is the range this
 run happened to reach, and the metadata says so.
@@ -25,11 +41,8 @@ from card_digger.domain.models import CollectionMeta, MarketplaceItem
 from card_digger.domain.ports import Clock, MarketplacePort, Sleeper
 
 
-#: Unique listings that make a search worth showing.
-TARGET_UNIQUE_ITEMS = 100
-
 #: How old a listing has to be to count as an old one. A working figure, not a
-#: measured one.
+#: measured one. Reported in the metadata; it no longer stops anything.
 OLD_LISTING_DAYS = 365
 
 
@@ -48,17 +61,10 @@ async def collect_search(
     sleeper: Sleeper,
     gate: RequestGate | None = None,
     limits: CollectionLimits = SEARCH_LIMITS,
-    target_unique_items: int = TARGET_UNIQUE_ITEMS,
     old_listing_days: int = OLD_LISTING_DAYS,
 ) -> SearchCollection:
     gate = gate or RequestGate(clock, sleeper)
     started_at = clock.now()
-
-    def has_enough(items) -> bool:
-        return (
-            len(items) >= target_unique_items
-            and count_older_than(items, now=started_at, days=old_listing_days) >= 1
-        )
 
     async def fetch(cursor: str | None):
         page = await port.search_items_page(keyword, cursor)
@@ -70,7 +76,9 @@ async def collect_search(
         limits=limits,
         gate=gate,
         clock=clock,
-        target_reached=has_enough,
+        # No `target_reached`. `collect_pages` still supports one, so a goal
+        # aimed at how long a listing has gone *untouched* could be handed in
+        # here later without reopening anything else.
         old_listing_count=lambda items: count_older_than(
             items, now=started_at, days=old_listing_days
         ),
