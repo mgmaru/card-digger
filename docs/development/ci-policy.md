@@ -60,8 +60,7 @@ CIの並列実行や再実行はこの条件を守れない。
 | `frontend` | `npm ci` → `typecheck` → `test` → `build`（`src/frontend`） | **2026-09-02追加** |
 | `backend` | `uv run pytest`によるL2 / L3（`src/backend`） | 導入済み |
 
-`frontend` Jobは`src/frontend/package.json`の3つのScriptに依存する。**Frontendを作るときに
-この名前で定義する。**
+`frontend` Jobは`src/frontend/package.json`の3つのScriptに依存する。
 
 | Script | 中身 | 落ちたときに分かること |
 |---|---|---|
@@ -72,19 +71,21 @@ CIの並列実行や再実行はこの条件を守れない。
 Node.jsのVersionはJob内で`26`に固定する。根拠は
 [MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)。
 
-#### `src/frontend`ができるまでの扱い
+#### Guardは外した（2026-09-02）
 
-**このJobは`src/frontend/package.json`が無い間、緑のまま何も検査しない。** Jobごと落とすと
-[§1](#1-目的)の「赤の常態化に気付かない」を自分で作ることになるためで、代わりに次の2つで
-見えるようにしている。
+`src/frontend`ができるまでの間、このJobは`package.json`の有無を見るGuardを持ち、
+**緑のまま何も検査しない**期間があった。`src/frontend`を作った同じCommitでGuardを外し、
+4Stepすべてが常に走るようにした。
 
-- Workflow logへ`::warning::`を出し、**何も検査しなかったこと**をPRのCheck画面に残す
-- `ci.yml`のComment に、**Frontendを作る同じCommitでGuardを消す**と書く
+| | Guardがあった間 | 現在 |
+|---|---|---|
+| `npm ci` / `typecheck` / `test` / `build` | `package.json`が無ければSkip | 常に実行 |
+| 何も検査しなかったことの申告 | Workflow logへ`::warning::` | 不要になった |
 
-> **緑であることと、検査したことは別である。** これは
+> **緑であることと、検査したことは別である。** Guardを外すまでの期間はこの区別が
+> 必要だった。記録として残す。形は
 > [検証の落とし穴 §3](../retrospectives/2026-09-01-verification-pitfalls.md)の
-> 「構造上100%にしかならない指標」と同じ形であり、**消すのではなく読み方を固定する**という
-> 同じ対応を取っている。
+> 「構造上100%にしかならない指標」と同じである。
 
 E2E受入Flow（Playwright）のJobはまだ足していない。Frontendと`GET /api/sellers/{sellerId}/analysis`が
 揃ってから、Versionの固定とあわせて追加する。

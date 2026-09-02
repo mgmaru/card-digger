@@ -14,6 +14,12 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCH_PATHS = ("README.md", "docs", "poc", "src")
+#: Directory names whose Markdown is not ours. A dependency's README breaks
+#: its own relative links all the time, and reporting that would bury the one
+#: broken cross reference this check exists to find.
+SKIPPED_DIRECTORIES = frozenset(
+    {".venv", "venv", "node_modules", "dist", "build", ".pytest_cache"}
+)
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
 EXTERNAL = ("http://", "https://", "mailto:")
@@ -41,6 +47,10 @@ def headings(text: str) -> list[str]:
     return found
 
 
+def is_ours(path: Path) -> bool:
+    return SKIPPED_DIRECTORIES.isdisjoint(path.relative_to(REPO_ROOT).parts)
+
+
 def markdown_files() -> list[Path]:
     files: list[Path] = []
     for entry in SEARCH_PATHS:
@@ -48,7 +58,7 @@ def markdown_files() -> list[Path]:
         if target.is_file() and target.suffix == ".md":
             files.append(target)
         elif target.is_dir():
-            files.extend(sorted(target.rglob("*.md")))
+            files.extend(sorted(p for p in target.rglob("*.md") if is_ours(p)))
     return sorted(set(files))
 
 

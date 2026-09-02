@@ -1129,16 +1129,71 @@ CIで解決する課題として挙げているので、それを自分で作る
 - [x] `POST /api/search`を実装する
 - [x] `application/seller_knowledge.py`を実装する（**Endpointより前**。[1-4](#phase-1-4--seller-knowledge-indicator)の計算部分）
 - [x] `GET /api/sellers/{sellerId}/analysis`を実装する（Seller Knowledgeを含む§8どおりの形で）
-- [ ] FrontendをTypeScript + React + Viteで作成する（`typecheck` / `test` / `build`のScriptを定義する）
-- [ ] **`ci.yml`の`frontend` JobからGuardを消す**（Frontendを作る同じCommitで行う）
-- [ ] FrontendがForkやMercari Endpointを直接参照しない構成にする
-- [ ] Backend APIへのRequestを`frontend/src/api/`の1モジュールへ閉じる（**後からCacheを足す継ぎ目**）
-- [ ] 検索結果とSort / Filter状態をRouterより上のApplication Stateへ置く
+- [x] FrontendをTypeScript + React + Viteで作成する（`typecheck` / `test` / `build`のScriptを定義する）
+- [x] **`ci.yml`の`frontend` JobからGuardを消す**（Frontendを作る同じCommitで行った）
+- [x] FrontendがForkやMercari Endpointを直接参照しない構成にする
+- [x] Backend APIへのRequestを`frontend/src/api/`の1モジュールへ閉じる（**後からCacheを足す継ぎ目**）
+- [x] 検索結果とSort / Filter状態をRouterより上のApplication Stateへ置く（`src/searchState.tsx`）
 - [x] DatabaseとUser認証を導入しない（Backendは依存を1つも増やしていない）
 
 [HTTP Status規則](../product/mvp-spec.md#http-status規則)は7パターンが確定済みで、
 `CollectionMeta`の`partial` / `errors` / `stop_reason`がそのまま対応する。
 **0-Fで実装した停止理由がAPIの形を決めている。**
+
+### 2026-09-02に決着した — Stylingとデザイン用SKILLの置き場所
+
+Frontendの骨組みを作る前に、デザインをどう決めるかを議論して2件を決めた。
+
+- [x] **Styling方式を決めた** — **CSS Modules。** 追加依存0個で、
+  [MVP仕様 §2.2](../product/mvp-spec.md#frontend-styling2026-09-02決定)のPackage表は無変更。
+  理由は「Data取得Libraryを入れない」「Cacheを入れない」と同じで、利用者1人のLocal実行に
+  依存を増やす見返りが無い
+- [x] **`frontend-design` SKILLをRepositoryへ置いた** — `.claude/skills/frontend-design/`。
+  取り込みの記録・License・Card Diggerでの使用境界は
+  [同ディレクトリのREADME](../../.claude/skills/frontend-design/README.md)
+
+#### なぜUser領域ではなくRepositoryへ置いたか
+
+`claude plugin install`（user scope）だと、**このRepositoryをCloneした環境にSKILLが付いてこない。**
+見た目の判断基準がRepositoryの外にあると、
+[アーキテクチャ §1](../development/architecture.md#1-この文書がある理由)が問題にしている
+「決定の在り処が1か所に無い」状態をDesign側で作り直すことになる。
+
+**このSKILLは視覚の方針だけに使い、画面の文言には使わない。** MVP仕様は §5.4 / §5.6 / §6.3 / §7.7 で
+画面の日本語文言そのものを確定させており、SKILLの作文指針をそこへ当てると衝突する。境界の表は
+上記READMEにある。
+
+#### 見つかった1件 — `docs` Jobが`node_modules`を検査していた
+
+`src/frontend`を作った時点で`tools/check_docs_links.py`が依存のREADMEまで読み、
+**156件のNGを出した。** 自分たちのLinkは1件も壊れていない。
+
+`SEARCH_PATHS`が`src`を丸ごとrglobしていたためで、`node_modules` / `.venv` / `dist` /
+`build` / `.pytest_cache`を除外した。**CIは常にClean checkoutなのでこれらは存在せず、
+CIでは顕在化しない。** 手元の実行だけが落ちる形だったので、手元とCIの結果を一致させた。
+
+### 2026-09-02に決着した — Routing
+
+- [x] **Routing Libraryを決めた** — **`react-router` 8.3.1。** 選定理由は
+  [MVP仕様 §2.2](../product/mvp-spec.md#routing--react-router2026-09-02決定)
+
+Routeは`/`と`/sellers/:sellerId`の2つだけだが、[MVP仕様 §6.1](../product/mvp-spec.md#61-取得開始)が
+「Browser Refresh時は再取得する」と定めている以上**Seller画面はURLを持つ**。`popstate`・
+戻る / 進む・URLからの復元を自前で書くと、この1行のためにTestの要るコードが増える。
+
+追加packageは2つ（本体と`cookie-es`）で、`npm audit`は0件のままである。
+
+#### Testに歯があることを確かめた
+
+「戻っても再検索しない」は、**Backendへ出る唯一のModuleの呼び出し回数**で検査している。
+画面に商品が残っていることだけを見るTestは、裏で同じ結果を取り直していても緑になる。
+
+意図的に壊して落ちることを確認した。
+
+| 壊し方 | 結果 |
+|---|---|
+| Stateを**Route Componentの中**へ移す（§5.2が禁じている置き方） | **2件が落ちる** |
+| ProviderをBrowserRouterの内側へ移す | **落ちない**（`<Routes>`より上である点は変わらないため。振る舞いが同じなので検査対象ではない） |
 
 ### 実装中に見つかった1件 — 2秒間隔と安全停止がRequestをまたがない
 
