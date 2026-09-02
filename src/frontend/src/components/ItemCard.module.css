@@ -1,0 +1,159 @@
+/* Cardに枠を与えない。写真が主役で、画面はその台（視覚方針 §3.1）。 */
+
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 角を丸めない。丸みは「操作できるもの」の印に予約している（視覚方針 §3.7）。 */
+.shot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--sheet);
+  margin-bottom: var(--space-3);
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  margin: 0 0 var(--space-3);
+  background: var(--sheet);
+  color: var(--ink-quiet);
+  font-size: var(--text-note);
+  text-align: center;
+  padding: var(--space-3);
+}
+
+/* 3種を色相・塗り・地紋のすべてで分ける（視覚方針 §3.5）。 */
+.badge {
+  align-self: flex-start;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-note);
+  line-height: 1.4;
+  padding: 1px var(--space-2);
+  border: 1px solid;
+}
+
+.fixed {
+  color: var(--ink-quiet);
+  border-color: var(--ink-quiet);
+}
+
+.auction {
+  color: var(--sheet);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.unknown {
+  color: var(--shu);
+  border-color: var(--shu);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--shu-hatch) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.price {
+  margin: 0 0 var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.priceLabel {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  margin-right: var(--space-2);
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-note);
+  font-weight: 400;
+  line-height: var(--leading-dense);
+}
+
+.titleLink {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.titleLink:hover {
+  text-decoration: underline;
+}
+
+.dates {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.dates dt {
+  grid-column: 1;
+  white-space: nowrap;
+}
+
+.dates dd {
+  grid-column: 2;
+  margin: 0;
+}
+
+.dates dd .nowrap + .nowrap {
+  margin-left: var(--space-2);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-note);
+}
+
+/* Mercariへ出ていくLinkは破線で下線を引き、Card Digger内のLinkと見分ける
+   （MVP仕様 §3.3「外部Linkであることが分かる表示」）。 */
+.external {
+  text-decoration-style: dashed;
+}
+
+/* 未更新期間の棒（MVP仕様 §5.6 / 視覚方針 §3.8）。
+   Cardの最後に置き、上のmarginをautoにする。Grid行のCardは同じ高さへ伸びるので、
+   それだけで行内の棒が1本の帯に揃う。文の行数に左右されない。 */
+.bar {
+  display: block;
+  /* autoでなければ揃わない。Cardの文の行数は隣と違うので、固定marginだと
+     棒の位置がCardごとにずれ、行を見わたして長さを較べられなくなる。 */
+  margin: auto 0 0;
+  /* 上の余白はpaddingで確保する。marginはautoに使い切っている。 */
+  padding-top: var(--space-4);
+}
+
+.barFill {
+  display: block;
+  height: 4px;
+  min-width: 2px;
+  background: var(--ink);
+  /* 角丸は値の終わり。 */
+  border-radius: 0 2px 2px 0;
+}
+
+/* 直角は「切り詰めた」印。365日を超えた分は描いていない。 */
+.barCapped {
+  border-radius: 0;
+}
