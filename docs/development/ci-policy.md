@@ -57,7 +57,37 @@ CIの並列実行や再実行はこの条件を守れない。
 |---|---|---|
 | `docs` | 相対Link、見出しAnchor、code fenceの検査（`tools/check_docs_links.py`） | 導入済み |
 | `poc` | `poc/mercapi`のUnit Test | 導入済み |
+| `frontend` | `npm ci` → `typecheck` → `test` → `build`（`src/frontend`） | **2026-09-02追加** |
 | `backend` | `uv run pytest`によるL2 / L3（`src/backend`） | 導入済み |
+
+`frontend` Jobは`src/frontend/package.json`の3つのScriptに依存する。**Frontendを作るときに
+この名前で定義する。**
+
+| Script | 中身 | 落ちたときに分かること |
+|---|---|---|
+| `typecheck` | `tsc --noEmit` | 型の不整合。**Testとbuildが通っても落ちうる**（[MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)） |
+| `test` | `vitest run` | Component / 単体の失敗 |
+| `build` | `vite build` | 本番Buildだけで出る設定・解決の失敗 |
+
+Node.jsのVersionはJob内で`26`に固定する。根拠は
+[MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)。
+
+#### `src/frontend`ができるまでの扱い
+
+**このJobは`src/frontend/package.json`が無い間、緑のまま何も検査しない。** Jobごと落とすと
+[§1](#1-目的)の「赤の常態化に気付かない」を自分で作ることになるためで、代わりに次の2つで
+見えるようにしている。
+
+- Workflow logへ`::warning::`を出し、**何も検査しなかったこと**をPRのCheck画面に残す
+- `ci.yml`のComment に、**Frontendを作る同じCommitでGuardを消す**と書く
+
+> **緑であることと、検査したことは別である。** これは
+> [検証の落とし穴 §3](../retrospectives/2026-09-01-verification-pitfalls.md)の
+> 「構造上100%にしかならない指標」と同じ形であり、**消すのではなく読み方を固定する**という
+> 同じ対応を取っている。
+
+E2E受入Flow（Playwright）のJobはまだ足していない。Frontendと`GET /api/sellers/{sellerId}/analysis`が
+揃ってから、Versionの固定とあわせて追加する。
 
 ### 3.2 `mgmaru/mercapi`
 
@@ -130,7 +160,8 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 | Include administrators | **無効** | §4の「`docs/`は直接pushを許容する」を成立させる |
 | Allow deletions | **無効** | `main`を消せないようにする |
 
-必須Statusは`Docs links`、`PoC unit tests`、`Backend unit and contract tests`の3つとする。
+必須Statusは`Docs links`、`PoC unit tests`、`Frontend unit and component tests`、
+`Backend unit and contract tests`の4つとする（2026-09-02に`Frontend`を追加）。
 
 Linear historyを要求するため、Pull RequestはSquashまたはRebaseでMergeする。
 Merge commitは`main`へ作らない。

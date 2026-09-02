@@ -174,10 +174,17 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 | Backend / Adapter | `pytest` + `pytest-asyncio` | Adapterがasync。同一Contractを複数実装へ流すParametrizeを明確に書ける |
 | Fork | `pytest` + `pytest-asyncio` + `httpx.MockTransport` | 上流のFrameworkへ合わせる。ただし新規cassetteは記録しない（[§4.4](#44-forkのtestに関する例外)） |
 | PoC (`poc/`) | 標準ライブラリ`unittest`を継続 | 既存資産があり、依存を増やさない |
-| Frontend | Phase 1のApplication基盤実装時に決定する | MVP着手時まで確定不要 |
+| Frontend | `vitest` + `@testing-library/react` + `jsdom` | **Viteの変換Pipelineをそのまま使い、Test用のBuild設定を二重に持たない。** Jestは同じ変換をもう一度組む必要がある |
+| E2E受入Flow | `Playwright` | Frontend・FastAPI・Mock Adapterを通した経路をBrowserで動かす。Versionは着手時に固定する |
 
 > Python依存管理Toolは**`uv`**とする（[MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)）。
-> 本文のコマンドは`uv run`を前置きして実行する。
+> 本文のコマンドは`uv run`を前置きして実行する。Package Versionは
+> [MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)で固定した。
+
+**PlaywrightをTestに使うことは、[MVP仕様 §4](../product/mvp-spec.md#4-mvpに含めない機能)が除外している
+「Playwrightへの自動Fallback」とは別である。** 除外しているのは**Mercariからの取得手段**としての
+Playwrightで、こちらは自分のUIを操作するTest Runnerである。MVP完了条件の
+「Playwright Fallbackが実装へ混入していない」も前者だけを指す。
 
 ### 4.2 配置
 
@@ -193,8 +200,13 @@ src/backend/
     │   ├── seller/
     │   └── seller_items/
     ├── unit/                # L2
-    └── contract/            # L3
+    ├── contract/            # L3
+    └── api/                 # Phase 1。Backend API Test（L3と同じ扱い）
 ```
+
+`tests/api/`はMock Adapterと`ScriptedPort`だけを使い、外部通信しない。Contract Testと分けるのは、
+`tests/contract/`が**`MarketplacePort`の全実装へ同じTestを流す**場所であり、HTTPの
+Status規則とJSONの形はその対象ではないためである。
 
 ### 4.3 実行コマンド
 

@@ -982,32 +982,214 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 
 ## 1-0. Application基盤
 
-### 着手前に決めること
+### 着手前に決めること — **2026-09-02にすべて決着した**
 
-**コードを書く前に決着させる。** いずれも仕様書が「実装開始時に決める」としているか、
-未記載のまま残っている項目である。
+**コードを書く前に決着させる**として置いた4件は、以下のとおり全部片付いた。実装へ進んでよい。
 
-- [ ] **FrontendのTest Frameworkを決める** — [Test運用規約 §4.1](../development/test-policy.md#41-framework)が「Phase 1のApplication基盤実装時に決定する」として保留中。決めたら同表を更新する
-- [ ] **Package Versionを固定する** — [MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)が「実装開始時に互換性と脆弱性を確認して固定する」としている。React / Vite / TypeScript / FastAPIが対象
-- [ ] **CIへ`frontend` Jobを追加する** — 現在は`docs` / `poc` / `backend`の3つ。[CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)の表と、必須Statusの一覧も更新する
-- [ ] **`GET /api/sellers/{sellerId}/analysis`とSeller Knowledgeの順序を決める** — [MVP仕様 §8](../product/mvp-spec.md#8-backend-api)はこのEndpointがSeller Knowledgeを返すと定めているが、`seller_knowledge.py`は[Phase 1-4](#phase-1-4--seller-knowledge-indicator)の実装である。**Knowledgeなしで先に作る**か、**1-4を先にやる**かを選ぶ
+| # | 決めること | 結果 |
+|---|---|---|
+| 1 | `GET /api/sellers/{sellerId}/analysis`とSeller Knowledgeの順序 | **計算を先。** [下記](#2026-09-02に決着した--seller-knowledgeの順序) |
+| 2 | Package Versionの固定 | **固定した。** [下記](#2026-09-02に決着した--package-versionとtest-framework) |
+| 3 | FrontendのTest Framework | **`vitest` + Testing Library + `jsdom`。** 同上 |
+| 4 | CIへ`frontend` Jobを追加する | **追加した。** [下記](#2026-09-02に決着した--frontend-ci-job) |
+
+あわせて、仕様が未記載だった「戻ったときの再取得」とCacheの扱いも決めた（[下記](#2026-09-02に決着した--再取得とcache)）。
+
+### 2026-09-02に決着した — 再取得とCache
+
+**きっかけは「同じ期間で並べ替え直したら全部取り直すのではないか」という問いだった。**
+調べたところSortとFilterは[MVP仕様 §5.1](../product/mvp-spec.md#51-入力)が既に再Requestしないと
+定めており、**穴は別の場所に1つだけ空いていた。**
+
+- [x] **画面を戻ったときに再検索するかを決めた** — **しない。** 仕様は「Sellerを分析」で遷移することしか
+  書いておらず、戻ったときの挙動が未記載だった。検索結果とSort / Filter状態をRouterより上の
+  Application Stateへ置く（[MVP仕様 §5.2](../product/mvp-spec.md#52-検索開始)）
+- [x] **Data取得Libraryを入れるかを決めた** — **入れない。** 標準の`fetch`とReactのStateで足りる
+  （[MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)）。理由は[O-5](#オプション--判断済みで保留しているもの)
+- [x] **Cacheを入れるかを決めた** — **入れない。** 理由・後から入れるときの継ぎ目・再開の契機は
+  [O-5](#オプション--判断済みで保留しているもの)
+
+**Package Versionを固定する対象は増えていない。** 決めたことの2つが「増やさない」であるためである。
+
+### 2026-09-02に決着した — Seller Knowledgeの順序
+
+- [x] **`GET /api/sellers/{sellerId}/analysis`とSeller Knowledgeの順序を決めた** — **計算を先にやる。**
+  [Phase 1-4](#phase-1-4--seller-knowledge-indicator)を**計算**と**表示**に分け、
+  `application/seller_knowledge.py`を1-0で実装する。Endpointは
+  [MVP仕様 §8](../product/mvp-spec.md#8-backend-api)どおりの形で**一度だけ**書く。UIへの表示は1-4に残す
+
+理由は**依存の向きが一方通行**であることに尽きる。
+
+| | 依存先 |
+|---|---|
+| Seller Knowledgeの計算 | **無い。** 純粋関数で、FastAPI・通信・Clock・`MarketplacePort`のどれにも依存しない |
+| `GET /api/sellers/{sellerId}/analysis` | Seller Knowledge（§8が返すと規定している） |
+
+入力は`analyze_seller()`が返す`on_sale.items`と`sold_out.items`の`title`だけで、**0-Fの実装で
+すでに揃っている。** Domain型の追加もMercariへの追加Requestも要らない。
+
+- **仕様を書き換えずに済む。** §8は既に「Seller Knowledgeを返す」と規定している。Knowledgeなしで
+  先に作ると、§8を一度書き換えて1-4で戻すことになる
+- **Endpointの形が一度で決まる。** Response Schemaを2回書かず、Frontendの型も作り直さない
+- **見える成果は遅れない。** 検索（[1-1](#1-1-検索ui)・[1-2](#1-2-商品画像一覧)）はKnowledgeを使わず、
+  Seller画面（[1-3](#1-3-seller画面)）はどちらにせよ後ろにある
+- **未決項目に一つもBlockされない。** Package Version・Test Framework・CIのどれが決まっていなくても
+  書ける。Phase 1の実装作業でこれに当てはまるのは`seller_knowledge.py`だけである
+
+#### 早くやってもKeyword一覧の検証にはならない
+
+L4のartifactsは**商品Titleを1件も保存していない**（[MVP仕様 §10](../product/mvp-spec.md#10-data取扱い)の
+Data取扱いどおりであり、欠陥ではない）。実データでKeyword一覧や閾値を確かめる手段は現時点で無く、
+Unit Testが照合するのは[§7](../product/mvp-spec.md#7-seller-knowledge-indicator)の定義だけである。
+
+**実装したことは検証したことではない。** 閾値とKeywordはMVPの仮説のままであり、§7.6の
+「精度が実証された値とは表示しない」をそのまま画面にも守る。
+
+### 2026-09-02に決着した — Package VersionとTest Framework
+
+- [x] **Package Versionを固定した** — 一覧と決め手は
+  [MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)
+- [x] **FrontendのTest Frameworkを決めた** — `vitest` + `@testing-library/react` + `jsdom`。
+  E2E受入FlowはPlaywright。[Test運用規約 §4.1](../development/test-policy.md#41-framework)を更新済み
+
+#### Version表を読むのではなく、実際に組んで確かめた
+
+使い捨てProjectへ同じVersionでinstallし、次を実行した。
+
+| 確認したこと | 結果 |
+|---|---|
+| `npm install`（React 19 / Vite 8 / TypeScript 7 / Vitest 4） | 115 package。競合なし |
+| `tsc --noEmit` | 通る |
+| `vitest run`（Testing Library + jsdom + user-event） | 1 passed |
+| `vite build` | 通る |
+| `mercapi` Fork + FastAPI + uvicornの依存解決 | 競合なし |
+| FastAPI `TestClient`（httpx 0.27.2） | HTTP 200 |
+| 既存Backend Test（pytest 9.1.1 + pytest-asyncio 1.4.0） | **240 passed** |
+
+**この過程で2つ見つかった。** どちらもVersion表を眺めているだけでは出てこない。
+
+- **`defineConfig`は`vitest/config`から取る。** `vite`から取ると`test`キーが型に無く、
+  `tsc --noEmit`だけが落ちる。**Testもbuildも通るため気付きにくい**
+- **`httpx`はこちらでは選べない。** `mercapi`が`>=0.27.2,<0.28.0`で上限を決めている。
+  starlette 1.6は`httpx2`を勧める警告を出すが、`TestClient`は0.27.2で動く（実測）
+
+#### 脆弱性の確認
+
+| 対象 | 手段 | 結果 |
+|---|---|---|
+| Frontend 115 package | `npm audit` | **0件** |
+| Backend 34 package（installed全件） | OSV API（`api.osv.dev`） | **2件**。いずれも今回固定した対象ではなく**既存の依存** |
+
+**1件は直した。** `pytest` 8.4.2の`GHSA-6w46-j5rx-g56g`（MODERATE。`/tmp/pytest-of-{user}`という
+予測可能なPathに依存する）。9.0.3で修正済みのため`pytest>=9.1,<10`・`pytest-asyncio>=1.4,<2`へ上げ、
+240件が通ることを確認した。
+
+**1件は直せない。** `ecdsa` 0.19.2の`GHSA-wj6h-64fc-37mp`（HIGH。**修正予定なし**）で、
+[O-6](#オプション--判断済みで保留しているもの)へ記録した。
+
+### 2026-09-02に決着した — Frontend CI Job
+
+- [x] **CIへ`frontend` Jobを追加した** — `npm ci` → `typecheck` → `test` → `build`。
+  [CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)の表と
+  [§6](../development/ci-policy.md#6-branch保護)の必須Status（3つ → **4つ**）を更新済み
+
+#### `src/frontend`がまだ無いことをどう扱ったか
+
+**ここが唯一の判断だった。** Jobをそのまま足すと、Frontendができるまで**CIが赤のまま**になる。
+[CI規約 §1](../development/ci-policy.md#1-目的)が「赤の常態化に気付かない」を
+CIで解決する課題として挙げているので、それを自分で作ることになる。
+
+| 案 | 問題 |
+|---|---|
+| そのまま足す | Frontendができるまで赤。**赤が常態化する** |
+| できてから足す | 忘れる。Frontendが**Gateなしで入りうる** |
+| **Guardを付けて足す** | **緑だが何も検査していない期間ができる** ← 採用 |
+
+3案目を採り、その弱点を**隠さずに見せる**ことで扱った。
+
+- `src/frontend/package.json`が無い間は`::warning::`をWorkflow logへ出し、
+  **何も検査しなかったことをPRのCheck画面に残す**
+- `ci.yml`のCommentに「**Frontendを作る同じCommitでGuardを消す**」と書く
+- Guardの分岐は、`package.json`がある場合と無い場合の両方を手元で実行して確認した
+
+**緑であることと、検査したことは別である。** これは
+[検証の落とし穴 §3](../retrospectives/2026-09-01-verification-pitfalls.md)の
+「構造上100%にしかならない指標」と同じ形で、**消さずに読み方を固定する**という同じ対応を取った。
+
+> E2E受入Flow（Playwright）のJobはまだ無い。FrontendとSeller分析Endpointが揃ってから、
+> Versionの固定とあわせて追加する。
 
 ### 実装
 
-依存関係の順に並べる。Domain / Use case / Adapterは0-Fで完成しており、**足すのは`api/`と
-`frontend/`だけ**である。
+依存関係の順に並べる。Domain / Adapterは0-Fで完成している。足すのは`api/`と`frontend/`、
+そしてUse caseに**1つだけ**`seller_knowledge.py`である。
 
-- [ ] BackendをPython + FastAPIで作成する
-- [ ] Mercariへ接続しない`GET /api/health`を実装する
-- [ ] `POST /api/search`を実装する
-- [ ] `GET /api/sellers/{sellerId}/analysis`を実装する
-- [ ] FrontendをTypeScript + React + Viteで作成する
+- [x] BackendをPython + FastAPIで作成する
+- [x] Mercariへ接続しない`GET /api/health`を実装する
+- [x] `POST /api/search`を実装する
+- [x] `application/seller_knowledge.py`を実装する（**Endpointより前**。[1-4](#phase-1-4--seller-knowledge-indicator)の計算部分）
+- [x] `GET /api/sellers/{sellerId}/analysis`を実装する（Seller Knowledgeを含む§8どおりの形で）
+- [ ] FrontendをTypeScript + React + Viteで作成する（`typecheck` / `test` / `build`のScriptを定義する）
+- [ ] **`ci.yml`の`frontend` JobからGuardを消す**（Frontendを作る同じCommitで行う）
 - [ ] FrontendがForkやMercari Endpointを直接参照しない構成にする
-- [ ] DatabaseとUser認証を導入しない
+- [ ] Backend APIへのRequestを`frontend/src/api/`の1モジュールへ閉じる（**後からCacheを足す継ぎ目**）
+- [ ] 検索結果とSort / Filter状態をRouterより上のApplication Stateへ置く
+- [x] DatabaseとUser認証を導入しない（Backendは依存を1つも増やしていない）
 
 [HTTP Status規則](../product/mvp-spec.md#http-status規則)は7パターンが確定済みで、
 `CollectionMeta`の`partial` / `errors` / `stop_reason`がそのまま対応する。
 **0-Fで実装した停止理由がAPIの形を決めている。**
+
+### 実装中に見つかった1件 — 2秒間隔と安全停止がRequestをまたがない
+
+`RequestGate`は収集ごとに作られるため、[MVP仕様 §5.3](../product/mvp-spec.md#53-収集範囲)の
+「**すべてのMercari Request**は同時実行数1、開始間隔2秒以上」が、**1回のRequestの内側でしか
+成立していなかった。**
+
+検索を2本同時に投げ、Mercariへの到達時刻を記録した実測。
+
+| | 修正前 | 修正後 |
+|---|---|---|
+| 同時にMercariを叩いた | **あり**（0.00秒差） | なし |
+| Request間の最小間隔 | **0.06秒** | **2.00秒** |
+| 同じ検索を2本同時（連打・Reload） | Mercariへ**4回** | Mercariへ**2回** |
+| 同じ検索を3本同時 | Mercariへ6回 | Mercariへ**2回** |
+
+#### 直したもの（2026-09-02）
+
+**寿命の違う状態を分けた。** 何をどこへ置いたか、なぜそう決まるかは
+[アーキテクチャ §2.2](../development/architecture.md#22-状態の寿命--置き場所は何についての事実かで決まる)を正本とする。
+
+- [x] 間隔を`RequestPacer`へ分離し、アプリに1つだけ持たせる
+- [x] 収集の同時実行を1件に制限する
+- [x] 同一Keyword・同一Sellerの重複した収集を1本へ合流させる（Single-flight）
+
+**Single-flightはCacheではない。** 保存も有効期限も持たず、合流した側が受け取るのは
+**今まさに行われている収集**の結果なので`collectedAt`は正しい。
+[O-5](#オプション--判断済みで保留しているもの)の判断とは衝突しない。
+
+#### 残っているもの — **未決**
+
+**安全停止（Circuit Breaker）だけがRequest単位のまま。** そのため`stop_reason = safety_stop`は
+Endpoint経由では今も発生しない（1 Requestで数えられる拒否は最大2、必要なのは3）。
+
+これだけ**決めることがある**ためである。`stopped`は一度立つと戻らないので、共有すると
+Processを再起動するまで一切取得できなくなる。
+[MVP仕様 §9](../product/mvp-spec.md#9-ui状態とerror表示)は「時間を置くよう表示」としており、
+時間で回復する前提に読める。これは
+[アーキテクチャ §5.2](../development/architecture.md#52-requestgateは3つのpatternを1つにしたもの)の
+とおり、Circuit Breakerの**half-open**が無いということである。
+
+- [ ] 安全停止からの回復条件を決める（時間経過で解除 / 明示操作で解除 / 解除しない）
+- [ ] 決めたうえで、Circuit Breaker部分もProcessで共有する
+
+#### 残る限界
+
+**`uvicorn --workers 2`のように複数Processで起動すると、保証はまた壊れる。** MVPは1 Processで
+動かす前提とし、`src/backend/README.md`へ明記した。
+
+**Frontendの二重Submit抑止（[MVP仕様 §5.2](../product/mvp-spec.md#52-検索開始)）に頼らない。**
+外部Serviceへのアクセス頻度は、こちらのUIの都合で守られる約束ではない。
 
 ---
 
@@ -1033,6 +1215,9 @@ L2のFixture Testで担保する現状を継続する（これは決定であり
 - [ ] 価格の高い順
 - [ ] 取得ページ数・件数・最古・最新日時・取得時刻・打ち切り理由の表示
 - [ ] 掲載日FilterがMercari全体を網羅しないことの表示
+- [ ] **Seller画面から戻っても再検索しない**（結果とSort / Filter状態を保持する）
+- [ ] 明示操作の再取得Button。時間経過・Focus復帰では再取得しない
+- [ ] 表示中の結果が`collectedAt`時点のSnapshotであることの表示
 
 ---
 
@@ -1148,17 +1333,28 @@ TCG比率             64.1%
 
 ### TODO
 
+定義は完了済み。残りは**計算**と**表示**に分かれ、**計算は[Phase 1-0](#1-0-application基盤)で実装する**
+（2026-09-02決定）。
+
+#### 定義（完了）
+
 - [x] ポケカ判定キーワードを定義する
 - [x] TCG判定キーワードを定義する
 - [x] 専門用語一覧を定義する
 - [x] Titleの正規化方法を定義する
 - [x] `低 / 中 / 高`のScoreと標本信頼度を定義する
-- [ ] Seller商品を分類する
-- [ ] ポケカ比率を計算する
-- [ ] TCG比率を計算する
-- [ ] 専門用語出現数を計算する
-- [ ] `低 / 中 / 高` の簡易判定を実装する
-- [ ] `判定不能 / 低 / 中 / 高`の標本信頼度を実装する
+
+#### 計算 — `application/seller_knowledge.py`（**Phase 1-0で実装済み**）
+
+- [x] Seller商品を分類する
+- [x] ポケカ比率を計算する
+- [x] TCG比率を計算する
+- [x] 専門用語出現数を計算する
+- [x] `低 / 中 / 高` の簡易判定を実装する
+- [x] `判定不能 / 低 / 中 / 高`の標本信頼度を実装する
+
+#### 表示 — Seller画面（**Phase 1-4で実装する**）
+
 - [ ] 取得範囲と打ち切り有無を表示する
 - [ ] UIに表示する
 
@@ -1194,11 +1390,15 @@ Phase 0-FにもMVPにも必須ではない。**着手しないことがそのま
 | O-1 | Seller商品で`trading`を要求する | MVPが販売中・売却済みの2画面で、表示先が無い | 「取引中」を表示する要件／Seller Knowledgeで「売れた」に含めると決めたとき | **小。** Application層に閉じる。Fork変更・SHA更新なし |
 | O-2 | 入札件数`total_bids`をDomainへ追加する | MVPの表示要件に無い | Auctionの盛り上がりを画面に出したくなったとき | **小。** 3経路すべてで取得済み。Fork変更なし |
 | O-3 | 開始価格`initial_price`をDomainへ追加する | 検索モデルに無くFork変更が要る。**商品ページにも表示されず、正しさを検証できない** | 「開始価格300円 → 現在900円」のような推移を表示する要件 | **大。** Fork変更＋依存SHA更新が必要 |
+| O-6 | DPoP署名を`ecdsa`から`cryptography` backendへ切り替える | `ecdsa`の`GHSA-wj6h-64fc-37mp`（HIGH、**修正予定なし**）を`mercapi`が直接踏んでいる。ただしDPoP鍵は自分のRequestを証明するだけで、MVPは未認証・単一利用者である | 認証を伴う操作を足すとき／upstreamが対応したとき | **中。** Fork変更＋依存SHA更新が必要 |
+| O-5 | 検索結果・Seller情報をCacheする | **TTLを決める根拠が無い。** Auctionの`highest_bid`は入札のたびに動くが、入札間隔を測っていない。MVPが必要とする「戻っても再検索しない」はCacheなしで足りる | 同じ取得を繰り返す画面が増えたとき／入札間隔を実測してTTLの根拠ができたとき | **小。** `MarketplacePort`を実装するDecoratorで包む。`application/`と`domain/`は変更なし |
 
 - [ ] O-1 `trading`の要求を実装する（[Adapter仕様 §8.2](../phase-0/phase-0-f-adapter-spec.md#tradingの扱い2026-09-01決定)に作業一覧）
 - [ ] O-2 入札件数をDomain型とUIへ追加する
 - [ ] O-3 開始価格をDomain型とUIへ追加する（**Fork変更を伴う。着手前に再検討する**）
 - [ ] O-4 終了済みAuctionの標本を得る（**保留。下記のとおり探索を打ち切った**）
+- [ ] O-5 検索結果Cacheを実装する（**TTLの根拠を先に測る。下記のとおり判断済み**）
+- [ ] O-6 DPoP署名のbackendを切り替える（**Fork変更を伴う。下記のとおり判断済み**）
 
 ### O-4 — 終了済みAuctionの探索を打ち切った理由（2026-09-01）
 
@@ -1233,6 +1433,79 @@ Seller商品一覧から終了済みAuctionを識別することは**構造的�
 - 売却済みのAuctionを画面で区別する要件が出たとき
 - `sold_out`または`trading`で`auction_info`を持つ商品を偶然観測したとき
 - 残っている手段は**実験2**（`bid_deadline`経過後の同一商品を追跡する。数Request、1〜2日の待ち）
+
+### O-5 — Cacheを今やらない理由（2026-09-02）
+
+**MVPが必要としているのは「戻っても再検索しない」だけで、これはCacheではない。**
+取得済みの結果をRouterより上のStateへ置くだけで済み、TTLも無効化も再検証も要らない
+（[MVP仕様 §5.2](../product/mvp-spec.md#52-検索開始)）。
+
+#### TTLを決める根拠が無い
+
+Cacheの本体は保存ではなく、**「何秒間まで新しいものとして扱ってよいか」を決めること**である。
+そしてそれは対象データについての主張なので、測っていなければ書けない。1回の検索結果には
+性質の違う値が混ざっている。
+
+| 値 | 期限を決められるか | 根拠 |
+|---|---|---|
+| `createdAt` | **決められる**（動かない） | 編集・再出品でも動かないと実測（[観測結果](../../poc/mercapi/timestamp-result.md)） |
+| `updatedAt` | 決められない | 触られれば動く。商品ページの経過時間と同じ値 |
+| Auctionの`highest_bid` | **決められない** | 入札のたびに動く。**入札間隔を測っていない** |
+| 到達範囲そのもの | 決められない | 実行ごとに237 → 357 → 約700件（[§13.4](../phase-0/phase-0-f-live-acceptance-result.md#134-検索の到達範囲は実行のたびに変わる)） |
+
+測っていない値に期限を付けるのは、`num_sell_items`を「販売件数」と読んだのと同じ形である
+（[検証の落とし穴](../retrospectives/2026-09-01-verification-pitfalls.md)）。
+
+#### 順序として、後から入れるほうが安全である
+
+| 順序 | 影響範囲 |
+|---|---|
+| Cache **なし → あり** | `MarketplacePort`を実装するDecoratorで包む。`application/`と`domain/`は変更なし |
+| Cache **あり → なし** | `collectedAt` / `partial` / `stop_reason`の意味が全画面で変わり、表示文言とTestを書き直す |
+
+Cacheを入れると「画面の取得時刻は収集した時刻か、表示した時刻か」という問いが全画面に発生する。
+**入れるより剥がすほうが高い**ため、後回しは妥協ではなく安全な順序である。
+
+#### Data取得Libraryを入れない理由
+
+TanStack Query / SWRは`refetchOnWindowFocus`相当が**既定で有効**で、押していないのにMercariへ
+Requestが飛ぶ。[MVP仕様 §5.2](../product/mvp-spec.md#52-検索開始)の「検索Button押下時だけ開始」と
+正面から衝突し、3回連続拒否で安全停止に入る確率を上げる（`application/collection.py`）。
+既定をすべて切ると残る機能がほとんど無く、**それが「今は要らない」という合図である。**
+導入する契機が来たときは、自動再取得を切ることを前提に選ぶ。既定はVersionで変わるため、
+採用時点で必ず確認する。
+
+### O-6 — `ecdsa`の脆弱性を今直さない理由（2026-09-02）
+
+**HIGHの脆弱性を「受け入れる」と書くので、根拠を残す。**
+
+`ecdsa` 0.19.2は`GHSA-wj6h-64fc-37mp`（P-256へのMinervaタイミング攻撃）の影響を受ける。
+**upstreamはSide Channelを対象外としており、修正版は存在しない。**
+
+#### 踏んでいるのは確かである
+
+最初は「`python-jose`は既定で`cryptography` backendを選ぶので当たらない」と考えた。**違った。**
+
+```text
+jose.backends.ECKey            → CryptographyECKey   ← 既定はこちら
+mercapi/util/jwt.py            → from jose.backends.ecdsa_backend import ECDSAECKey
+                                 ec_key = ECDSAECKey(key, ALGORITHMS.ES256)
+```
+
+**`mercapi`は既定を迂回して`ECDSAECKey`を名指しでimportしている。** 呼び出し元まで読まずに
+「当たらない」と書くところだった（[検証の落とし穴 §5](../retrospectives/2026-09-01-verification-pitfalls.md)と同じ形）。
+
+#### それでも今は直さない
+
+| 問い | 答え |
+|---|---|
+| 攻撃者が得るもの | DPoPの秘密鍵 |
+| その鍵で何ができるか | **自分のRequestの所持証明だけ。** MVPは未認証で、背後にAccountも秘密も無い |
+| 攻撃に必要な位置 | 署名処理の時間を多数回observeできること |
+| 直す手段 | `ECDSAECKey`を`CryptographyECKey`へ替える。**Fork変更＋依存SHA更新が要る** |
+
+**再開する契機は、DPoP鍵が守るものが増えたときである。** Loginや認証つき操作をMVPへ足すと、
+この鍵の価値が変わり、判断もやり直しになる。
 
 ## Phase 1の前に潰すもの
 
@@ -1329,6 +1602,7 @@ flowchart TD
 - [ ] Seller情報を確認できる
 - [ ] Sellerの商品一覧を確認できる
 - [ ] Seller Knowledgeを確認できる
+- [ ] Seller画面から検索へ戻り、再検索せずに続きから探索できる
 - [ ] 検索・Seller分析の取得範囲と停止理由を確認できる
 - [ ] Mercari全体の最古順・指定期間の全件・Seller全商品だと誤認させる表示がない
 - [ ] Auctionを通常出品または確定価格だと誤認させる表示がない
@@ -1440,10 +1714,10 @@ Marketplace
 ## パフォーマンス
 
 - [ ] 画像Lazy Load
-- [ ] Seller情報Cache
-- [ ] 検索結果Cache
+- [ ] Seller情報Cache（判断と再開の契機は[O-5](#オプション--判断済みで保留しているもの)）
+- [ ] 検索結果Cache（判断と再開の契機は[O-5](#オプション--判断済みで保留しているもの)）
 - [ ] ページング
-- [ ] 無駄な再取得を防止する
+- [ ] 無駄な再取得を防止する（**戻ったときの再検索はPhase [1-1](#1-1-検索ui)で潰す**）
 
 ---
 
