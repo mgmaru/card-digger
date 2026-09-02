@@ -2,10 +2,9 @@
  * The search screen.
  *
  * Scaffolding. The inputs, the metadata block, the filters and the image grid
- * are Phase 1-1 and 1-2, and the visual direction is not decided yet. What is
- * here is the part 1-0 needs: the search runs from the button, the result is
- * read from the state above the router, and nothing on this page calls the
- * API directly.
+ * are Phase 1-1 and 1-2. What is here is the part 1-0 needs: the search runs
+ * from the button, the result is read from the state above the router, and
+ * nothing on this page calls the API directly.
  */
 
 import { useState } from "react";
