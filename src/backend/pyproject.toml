@@ -5,12 +5,20 @@ description = "Card Digger backend: domain model, Mercari adapter and collection
 requires-python = ">=3.11"
 dependencies = [
   "mercapi @ git+https://github.com/mgmaru/mercapi.git@b3bdec98d7ed56d0e3f1270f9852a2a170c5896c",
+  "fastapi>=0.141.1,<0.142",
+  # Plain uvicorn, not uvicorn[standard]: the MVP binds to loopback for one
+  # user and uses neither websockets nor uvloop. Reload is a development
+  # convenience, so watchfiles sits in the dev extra instead.
+  "uvicorn>=0.52.4,<0.53",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.3,<9",
-  "pytest-asyncio>=0.24,<0.25",
+  # pytest 9.0.3 fixes GHSA-6w46-j5rx-g56g, a predictable /tmp/pytest-of-{user}
+  # path. pytest-asyncio 1.x is what supports pytest 9.
+  "pytest>=9.1,<10",
+  "pytest-asyncio>=1.4,<2",
+  "watchfiles>=1.2,<2",
 ]
 
 [build-system]
