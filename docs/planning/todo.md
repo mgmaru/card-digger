@@ -1141,6 +1141,24 @@ CIで解決する課題として挙げているので、それを自分で作る
 `CollectionMeta`の`partial` / `errors` / `stop_reason`がそのまま対応する。
 **0-Fで実装した停止理由がAPIの形を決めている。**
 
+### Test
+
+[MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)のBackend / Domainは全件済み。
+
+- [x] KeywordのValidation Test
+- [x] `SaleFormat`とAuction価格LabelのDomain / Schema Test
+- [x] 検索・Seller収集の全停止理由のUnit Test（7種類すべて）
+- [x] Seller Knowledgeの正規化、Keyword、境界、Score、信頼度のUnit Test
+- [x] 0件、29件、30件、99件、100件の境界Test
+- [x] Mock Adapterを使うAPI Test
+- [x] 外部Error・部分成功のAPI Test
+- [x] 安全停止のStatus規則のTest（**Endpoint経由では再現できない**。[下記](#実装中に見つかった1件--2秒間隔と安全停止がrequestをまたがない)）
+
+Frontend側でこの節が書いたもの。
+
+- [x] `POST /api/search`・`GET /api/sellers/{id}/analysis`のStatus規則をUIの分類へ写すTest
+- [x] Seller画面へ遷移して戻ったとき、再検索せず**Sort**が保持されるTest（**Filterの保持は[1-1](#1-1-検索ui)**）
+
 ### 2026-09-02に決着した — Stylingとデザイン用SKILLの置き場所
 
 Frontendの骨組みを作る前に、デザインをどう決めるかを議論して2件を決めた。
@@ -1726,24 +1744,12 @@ flowchart TD
 
 ### 完了チェック
 
-- [ ] 商品を検索できる
-- [ ] 商品画像を一覧表示できる
-- [ ] 取得範囲内で古い順に表示できる
-- [ ] 取得範囲内で掲載開始日・終了日・期間を指定できる
-- [ ] 通常出品・Auctionを判別して絞り込める
-- [ ] Auction価格が取得時点の値であり、確定落札額ではないと確認できる
-- [ ] 元商品ページへ移動できる
-- [ ] Seller情報を確認できる
-- [ ] Sellerの商品一覧を確認できる
-- [ ] Seller Knowledgeを確認できる
-- [ ] Seller画面から検索へ戻り、再検索せずに続きから探索できる
-- [ ] 検索・Seller分析の取得範囲と停止理由を確認できる
-- [ ] Mercari全体の最古順・指定期間の全件・Seller全商品だと誤認させる表示がない
-- [ ] Auctionを通常出品または確定価格だと誤認させる表示がない
-- [ ] 外部取得Errorを0件や成功として隠さない
-- [ ] MobileとKeyboardで主要Flowを操作できる
-- [ ] Mock Adapterを使うE2E受入Flowが成功する
-- [ ] 人間が見る商品を効率的に絞れる
+**[MVP仕様のMVP完了条件](../product/mvp-spec.md#mvp完了条件)が正本である。** ここには複製しない。
+
+以前は18件をここに並べていたが、そのうち7件はMVP仕様と**ほぼ同じ文**で、
+残りの11件は同仕様の[E2E受入Flow](../product/mvp-spec.md#e2e受入flow)10手順が
+そのまま確認する内容だった。**同じ条件を2か所で追うと、片方だけが未達に見える。**
+唯一どちらにも無かった「人間が見る商品を効率的に絞れる」は仕様側へ移した。
 
 ---
 

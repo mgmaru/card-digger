@@ -6,16 +6,17 @@
 
 1. [アプリコンセプト](product/concept.md)
 2. [MVP実装仕様](product/mvp-spec.md)
-3. [開発ロードマップ / TODO](planning/todo.md)
-4. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
-5. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
-6. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
-7. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
-8. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
-9. [アーキテクチャと用語](development/architecture.md)
-10. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
-11. [Test運用規約](development/test-policy.md)
-12. [CIとMerge基準](development/ci-policy.md)
+3. [視覚方針 — 色・書体・余白](product/design-tokens.md)
+4. [開発ロードマップ / TODO](planning/todo.md)
+5. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
+6. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
+7. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
+8. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
+9. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
+10. [アーキテクチャと用語](development/architecture.md)
+11. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+12. [Test運用規約](development/test-policy.md)
+13. [CIとMerge基準](development/ci-policy.md)
 
 振り返りは実装に必要ではないが、同じ失敗を繰り返さないために残す。
 
@@ -28,6 +29,7 @@ docs/
 ├── README.md
 ├── product/
 │   ├── concept.md
+│   ├── design-tokens.md
 │   └── mvp-spec.md
 ├── planning/
 │   └── todo.md
@@ -53,6 +55,8 @@ docs/
 
 - [concept.md](product/concept.md): Productの目的、背景、将来像
 - [mvp-spec.md](product/mvp-spec.md): MVP実装時の機能範囲と受入条件の正本
+- [design-tokens.md](product/design-tokens.md):
+  色・書体・余白・Badgeの見え方を決めるときの制約と、決めた値。**未決**
 
 ### `planning/`
 
@@ -108,6 +112,35 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
 - `docs/`直下には、このIndex以外の文書を増やさない
 - 同じ決定を複数文書へ複製せず、正本へのLinkを置く
+- **進捗の`- [ ]`は`planning/todo.md`だけに置く**（[下記](#checkboxは3種類ある)）
 - 「何をテストするか」は各仕様書、「どうテストするか」は`development/test-policy.md`
 - 「どんな構造で、どの語が何を指すか」は`development/architecture.md`
 - 「いつ自動実行し、何を満たしたらMergeするか」は`development/ci-policy.md`
+
+## checkboxは3種類ある
+
+**混ぜると、終わった作業が未完了に見える。** 2026-09-02に4文書へ散っていた進捗を
+`planning/todo.md`へ寄せたときに、この区別を決めた。
+
+| 種類 | 性質 | 置き場所 |
+|---|---|---|
+| **作業の進捗** | 一度潰したら終わり | **`planning/todo.md`だけ** |
+| **使い回すチェックリスト** | **実行のたびに使う。永久に`[ ]`が正しい** | その手順の文書 |
+| **受入条件** | 完了の定義 | その仕様の文書 |
+
+2つ目を`todo.md`へ寄せてはならない。Fork運用手順やMerge基準は「次に作業するとき開くもの」で
+あって進捗ではなく、todoへ混ぜると使いたいときに見つからない。
+
+| 例 | 種類 |
+|---|---|
+| [todo.md](planning/todo.md)のPhase別Task | 進捗 |
+| [ci-policy.md](development/ci-policy.md)のMerge基準 | 使い回す |
+| [test-policy.md](development/test-policy.md)の「Testを追加するとき」 | 使い回す |
+| [mercapi-fork-operations.md](development/mercapi-fork-operations.md)の手順 | 使い回す |
+| [phase-0-f-live-acceptance.md](phase-0/phase-0-f-live-acceptance.md)の実施前確認 | 使い回す |
+| [検証の落とし穴](retrospectives/2026-09-01-verification-pitfalls.md)の指標を疑う問い | 使い回す |
+| [mvp-spec.md](product/mvp-spec.md)のMVP完了条件 | 受入条件 |
+| [phase-0-e-selection.md](phase-0/phase-0-e-selection.md)の`[x]` | 受入条件（達成済み） |
+
+**仕様書は「何をTestするか」を定義するが、済んだかどうかは追わない。** それは進捗であり、
+[todo.md](planning/todo.md)が持つ。

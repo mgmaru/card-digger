@@ -791,29 +791,32 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 [Test運用規約](../development/test-policy.md)を正本とする。Phase 1のTestはすべて
 Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 
+**進捗はここで追わない。** どのTestをどのPhaseでやるかと、済んだかどうかは
+[TODO](../planning/todo.md)が持つ。この節は**何をTestするか**だけを定義する。
+
 ### Backend / Domain
 
-- [x] KeywordのValidation Test
-- [x] `SaleFormat`とAuction価格LabelのDomain / Schema Test
-- [x] 検索・Seller収集の全停止理由のUnit Test（7種類すべて。0-Fで実装済み）
-- [x] Seller Knowledgeの正規化、Keyword、境界、Score、信頼度のUnit Test
-- [x] 0件、29件、30件、99件、100件の境界Test
-- [x] Mock Adapterを使うAPI Test
-- [x] 外部Error・部分成功のAPI Test
-- [x] 安全停止のStatus規則のTest（**Endpoint経由では再現できない**。[TODO](../planning/todo.md#実装中に見つかった1件--2秒間隔と安全停止がrequestをまたがない)）
+- KeywordのValidation Test
+- `SaleFormat`とAuction価格LabelのDomain / Schema Test
+- 検索・Seller収集の全停止理由のUnit Test（7種類すべて。0-Fで実装済み）
+- Seller Knowledgeの正規化、Keyword、境界、Score、信頼度のUnit Test
+- 0件、29件、30件、99件、100件の境界Test
+- Mock Adapterを使うAPI Test
+- 外部Error・部分成功のAPI Test
+- 安全停止のStatus規則のTest（**Endpoint経由では再現できない**。[TODO](../planning/todo.md#実装中に見つかった1件--2秒間隔と安全停止がrequestをまたがない)）
 
 ### Frontend
 
-- [ ] 価格・掲載日期間のValidation Test
-- [ ] 入力、Loading、0件、成功、部分成功、Error表示のComponent Test
-- [ ] 価格・掲載日・販売形式Filterと6種類のSortのTest（`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`）
-- [ ] Asia/Tokyoの日付境界と開始日・終了日の片側指定Test
-- [ ] Seller画面へ遷移して戻ったとき、再検索せずSort / Filter状態が保持されるTest
-- [ ] 通常出品・Auction・不明のBadgeと価格LabelのTest
-- [ ] 画像PlaceholderのTest
-- [ ] Sellerの状態別Tabと取得範囲表示のTest
-- [ ] Seller KnowledgeのScoreと注意書き表示のTest
-- [ ] Mobile / Desktopの主要Flow確認
+- 価格・掲載日期間のValidation Test
+- 入力、Loading、0件、成功、部分成功、Error表示のComponent Test
+- 価格・掲載日・販売形式Filterと6種類のSortのTest（`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`）
+- Asia/Tokyoの日付境界と開始日・終了日の片側指定Test
+- Seller画面へ遷移して戻ったとき、再検索せずSort / Filter状態が保持されるTest
+- 通常出品・Auction・不明のBadgeと価格LabelのTest
+- 画像PlaceholderのTest
+- Sellerの状態別Tabと取得範囲表示のTest
+- Seller KnowledgeのScoreと注意書き表示のTest
+- Mobile / Desktopの主要Flow確認
 
 ### E2E受入Flow
 
@@ -842,3 +845,8 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 - [ ] 主要操作がKeyboardとMobile Layoutで利用できる
 - [ ] Playwright Fallback、Database、定期Crawl、Cacheが実装へ混入していない
 - [ ] 利用規約確認が必要な公開・商用・継続取得へ進んでいない
+- [ ] **人間が見る商品を効率的に絞れる** — 上の機械的な条件を全部満たしても、
+  これが成り立たなければMVPは目的を果たしていない
+
+**上のE2E受入Flow 10手順が、探索そのものが通ることの確認にあたる。** 検索・一覧・Filter・
+Sort・Seller遷移・戻りは、条件として書き直さずFlowの成否で見る。
