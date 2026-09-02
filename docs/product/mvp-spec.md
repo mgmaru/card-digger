@@ -150,6 +150,7 @@ Versionでinstallし、`tsc --noEmit`・`vitest run`・`vite build`・既存Back
 | `@vitejs/plugin-react` | 6.1.1 | peerが`vite ^8.0.0` |
 | `@types/react` | 19.2.18 | |
 | `@types/react-dom` | 19.2.5 | |
+| `react-router` | 8.3.1 | peerが`react >=19.2.7`。実依存は`cookie-es`1つだけ。`react-router-dom`は7系で本体へ統合されたため**使わない** |
 
 #### Frontend Test
 
@@ -165,6 +166,54 @@ Frameworkの選定理由は[Test運用規約 §4.1](../development/test-policy.m
 
 設定の落とし穴を1つ実測した。**`defineConfig`は`vitest/config`から取る。** `vite`から取ると
 `test`キーが型に無く、`tsc --noEmit`だけが落ちる（Testとbuildは通るため気付きにくい）。
+
+#### Frontend Styling（2026-09-02決定）
+
+**CSS Modulesを使い、上のPackage表へ何も足さない。** ViteはCSS Modulesを追加のPluginも依存も
+無しで扱い、`*.module.css`という命名だけが条件である
+（[Vite Features](https://vite.dev/guide/features.html#css-modules)）。
+
+| 案 | 追加依存 | この表への影響 |
+|---|---:|---|
+| **CSS Modules** | **0個** | **無変更** ← 採用 |
+| Tailwind CSS | 2個以上 | Version固定と選定理由の追記が要る |
+| 素のCSS 1枚 + CSS変数 | 0個 | 無変更。ただしComponentが増えると命名衝突を人が管理する |
+
+**採用理由は「Data取得Libraryを入れない」「Cacheを入れない」「Databaseを使わない」と同じである。**
+利用者1人のLocal実行で、依存を1つ増やす見返りが無い。素のCSS 1枚と違うのは、CSS Modulesは
+scopeがComponent単位で閉じるため、命名衝突を人が管理しなくてよい点である。
+
+設定は2点だけ要る。**どちらも組んで確かめたのではなく、公式文書で確認した段階である。**
+
+- **`tsconfig.json`へ`"types": ["vite/client"]`を入れる。** 入れないと`*.module.css`のimportに
+  型が付かない（同上）
+- **Vitestは既定でCSSを処理しない。** CSS Modulesはproxyとして渡るため`styles.card`は解決され、
+  [§11](#11-testと完了条件)のComponent Testは追加設定なしで書ける。実際のclass名を検証したい
+  場合だけ`css.include`で明示的に有効化する（[Vitest CSS](https://vitest.dev/config/css.html)）
+
+**class名をTestの検証対象にしない。** Testing Libraryのrole / textで問い合わせる。class名へ
+依存させると、見た目を変えただけでTestが落ちる。
+
+#### Routing — `react-router`（2026-09-02決定）
+
+**Route は2つだけである。** 検索画面（`/`）とSeller画面（`/sellers/:sellerId`）。
+それでもLibraryを入れたのは、[§6.1](#61-取得開始)が「**Browser Refresh時は再取得する**」と
+定めているためである。Reloadできるということは**Seller画面がURLを持つ**ということで、
+`popstate`・戻る / 進む・URLからの復元を自前で持つと、この1行を支えるためだけに
+Testの要るコードが増える。
+
+| | `react-router` 8.3.1 | History APIで自前 |
+|---|---|---|
+| 追加package | **2**（本体 + `cookie-es`） | 0 |
+| `popstate`・戻る / 進む | Libraryが持つ | 自分で書いてTestする |
+| URLからの復元 | 同上 | 同上 |
+
+**「Data取得Libraryを入れない」と矛盾しない。** あちらで断ったのはCache・再検証・
+Window Focus再取得という**振る舞い**であり（[§5.2](#52-検索開始)がそれらを禁じている）、
+Routingはその振る舞いを持たない。
+
+`react-router-dom`は使わない。7系で本体へ統合されており、8系では`react-router`が
+DOM向けのexportを持つ。
 
 #### Backend
 

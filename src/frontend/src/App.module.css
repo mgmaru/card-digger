@@ -1,0 +1,10 @@
+/* Placeholder only.
+   The visual direction — palette, type scale, spacing, the warning colour the
+   MVP specification section 5.4 asks for — is not decided yet. Nothing here
+   should be read as that decision. */
+
+.shell {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
