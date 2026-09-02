@@ -12,9 +12,10 @@
 6. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
 7. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
 8. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
-9. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
-10. [Test運用規約](development/test-policy.md)
-11. [CIとMerge基準](development/ci-policy.md)
+9. [アーキテクチャと用語](development/architecture.md)
+10. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+11. [Test運用規約](development/test-policy.md)
+12. [CIとMerge基準](development/ci-policy.md)
 
 振り返りは実装に必要ではないが、同じ失敗を繰り返さないために残す。
 
@@ -31,6 +32,7 @@ docs/
 ├── planning/
 │   └── todo.md
 ├── development/
+│   ├── architecture.md
 │   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
 │   └── test-policy.md
@@ -62,6 +64,9 @@ Phase横断の作業順、進捗、未完了Taskを置く。
 
 Phaseをまたいで利用する開発・依存更新・Repository運用の手順を置く。
 
+- [architecture.md](development/architecture.md):
+  層とimportの向き、**状態の寿命（どこに置くかは何についての事実かで決まる）**、外部依存と
+  2秒間隔の出所、Card Digger固有語と一般名の対応、Marketplace追加時に触る場所
 - [mercapi-fork-operations.md](development/mercapi-fork-operations.md):
   Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
 - [test-policy.md](development/test-policy.md):
@@ -104,4 +109,5 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - `docs/`直下には、このIndex以外の文書を増やさない
 - 同じ決定を複数文書へ複製せず、正本へのLinkを置く
 - 「何をテストするか」は各仕様書、「どうテストするか」は`development/test-policy.md`
+- 「どんな構造で、どの語が何を指すか」は`development/architecture.md`
 - 「いつ自動実行し、何を満たしたらMergeするか」は`development/ci-policy.md`

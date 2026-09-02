@@ -3,7 +3,7 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-08-31**
+- 最終更新日: **2026-09-02**
 - ステータス: **Phase 1の実装基準として採用**
 - 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
 - Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)。**[実測結果](../../poc/mercapi/auction-result.md)で合格**
@@ -38,11 +38,12 @@ AIが購入可否を決めること、Mercari全体を完全に巡回するこ�
 
 ## 2. MVPの技術構成
 
-Phase 1の基準構成は次とする。Package Versionは実装開始時に互換性と脆弱性を確認して固定する。
+Phase 1の基準構成は次とする。Package Versionは[§2.2](#22-固定したpackage-version2026-09-02)で固定した。
 
 | 層 | 技術・方針 |
 |---|---|
 | Frontend | TypeScript + React + Vite |
+| Frontend Data取得 | 標準の`fetch`とReactのState。Data取得Library（TanStack Query / SWR等）を導入しない |
 | Backend API | Python 3.11以上 + FastAPI |
 | Domain / Use case | Python。Web Frameworkに依存させない |
 | Mercari取得 | `MarketplacePort`を実装するPython Mercari Adapter |
@@ -77,6 +78,7 @@ src/
 │   │   │   └── errors.py
 │   │   ├── application/
 │   │   │   ├── collection.py          # 収集Policyの共通部分
+│   │   │   ├── access.py              # Process全体で共有する外部アクセス制御
 │   │   │   ├── collect_search.py
 │   │   │   ├── analyze_seller.py
 │   │   │   └── seller_knowledge.py    # Phase 1
@@ -92,7 +94,7 @@ src/
 │   └── pyproject.toml
 └── frontend/
     ├── src/
-    │   ├── api/
+    │   ├── api/                       # Backend APIへのRequestはここだけ
     │   ├── components/
     │   ├── pages/
     │   └── types/
@@ -109,6 +111,11 @@ src/
 [Test運用規約 §7](../development/test-policy.md#7-テスト可能性のための設計制約)の設計制約
 （Fork Client・時計・待機の注入、例外変換の純粋関数化）を満たすために0-F-4で追加した。
 
+`frontend/src/api/`はBackend APIへのRequestを置く唯一の場所とし、ComponentやPageから`fetch`を
+直接呼ばない。**出口が1箇所なら、後からCache・再試行・計測を足すときに触るのもそこだけになる。**
+Backend側で同じ役割を果たしているのが`MarketplacePort`であり、Cacheを足す場合はそれを実装する
+Decoratorで包む（[TODO O-5](../planning/todo.md#オプション--判断済みで保留しているもの)）。
+
 Python依存は`uv`が生成する`uv.lock`、Frontend依存は`package-lock.json`で固定する。Mercari Adapterの
  import方向は`adapters → domain`だけとし、`domain`から`adapters`やFastAPIを参照しない。
 
@@ -124,6 +131,53 @@ dependencies = [
 
 指定形式はPEP 508の直接参照とし、`[tool.uv.sources]`のようなTool固有の書式へ依存させない。
 手順は[mercapi Fork運用手順 §5](../development/mercapi-fork-operations.md#5-card-diggerからforkを利用する)を正本とする。
+
+### 2.2 固定したPackage Version（2026-09-02）
+
+**Version表を読んで決めたのではなく、実際に組んで確かめてから固定した。** 使い捨てProjectへ同じ
+Versionでinstallし、`tsc --noEmit`・`vitest run`・`vite build`・既存Backend Test 240件が
+すべて通ることを確認している。検証の記録と脆弱性の結果は
+[TODO](../planning/todo.md#2026-09-02に決着した--package-versionとtest-framework)にある。
+
+#### Frontend
+
+| Package | Version | 決め手 |
+|---|---|---|
+| Node.js | 26 | `vite`が`^20.19.0 \|\| >=22.12.0`、`@testing-library/jest-dom`が`>=22`を要求する |
+| `react` / `react-dom` | 19.2.8 | |
+| `vite` | 8.2.2 | |
+| `typescript` | 7.0.2 | `latest`が7系。6系（6.0.3）も併存しており、7系で問題が出たら退避先になる |
+| `@vitejs/plugin-react` | 6.1.1 | peerが`vite ^8.0.0` |
+| `@types/react` | 19.2.18 | |
+| `@types/react-dom` | 19.2.5 | |
+
+#### Frontend Test
+
+Frameworkの選定理由は[Test運用規約 §4.1](../development/test-policy.md#41-framework)を正本とする。
+
+| Package | Version | 決め手 |
+|---|---|---|
+| `vitest` | 4.1.11 | peerが`vite ^6.0.0 \|\| ^7.0.0 \|\| ^8.0.0` |
+| `jsdom` | 30.0.1 | |
+| `@testing-library/react` | 16.3.3 | peerが`react ^18.0.0 \|\| ^19.0.0` |
+| `@testing-library/jest-dom` | 7.0.1 | peerが`vitest >= 0.32` |
+| `@testing-library/user-event` | 14.6.7 | |
+
+設定の落とし穴を1つ実測した。**`defineConfig`は`vitest/config`から取る。** `vite`から取ると
+`test`キーが型に無く、`tsc --noEmit`だけが落ちる（Testとbuildは通るため気付きにくい）。
+
+#### Backend
+
+| Package | 指定 | 決め手 |
+|---|---|---|
+| `fastapi` | `>=0.141.1,<0.142` | |
+| `uvicorn` | `>=0.52.4,<0.53` | **`[standard]`を付けない。** MVPはLoopback・単一利用者で、websocketsもuvloopも使わない |
+| `httpx` | 0.27.2 | **こちらでは選べない。** `mercapi`が`>=0.27.2,<0.28.0`で上限を決めている |
+| `pytest` | `>=9.1,<10` | 8系に脆弱性がある |
+| `pytest-asyncio` | `>=1.4,<2` | pytest 9系へ対応している系列 |
+| `watchfiles` | `>=1.2,<2` | devのみ。`uvicorn --reload`に要る |
+
+**実際のVersionは`uv.lock`と`package-lock.json`が正本**であり、上表は選定理由の記録である。
 
 ## 3. MVPに含める機能
 
@@ -169,6 +223,7 @@ dependencies = [
 - お気に入り、確認済みFlag、商品・Seller Memo
 - 検索条件保存、除外Keyword
 - 定期検索、通知、Background Crawl
+- 検索結果・Seller分析結果のCache（TTL、Backend Cache、Browser永続Storage）
 - Seller Knowledgeによる検索結果全体のFilter / Ranking
 - Search Card上へのSeller Knowledge表示
 - Card Digger内の商品詳細画面
@@ -217,8 +272,22 @@ dependencies = [
 - 同じ画面で同時に実行できる検索は1件だけ
 - 検索中は二重Submitを無効化する
 - 新しい検索を開始したら前の結果と混ぜない
+- **Seller画面から戻ったとき、直前の検索結果とSort / Filter状態を保持し、再検索しない**
+- 検索結果はRouterより上のApplication Stateへ置く。Route Component内のStateへ置かない
+- Mercariへの再取得は**検索Button押下とBrowser Reloadだけ**で起きる。Route遷移、Window Focus、
+  再接続、時間経過では起きない
 - MVPでは検索中止ButtonとJob管理を実装しない
 - Frontendの検索Timeoutは40秒とし、Timeout後は結果を成功扱いしない
+
+**これはCacheではない。** 取得済みの結果を画面が持ち続けるだけで、TTLも無効化も再検証も持たない。
+Cacheを持たない理由と、後から入れるときの継ぎ目は
+[TODO O-5](../planning/todo.md#オプション--判断済みで保留しているもの)にある。
+
+「戻っても再検索しない」を明記するのは、[MVP完了条件](#mvp完了条件)のFlowが
+**検索 → Seller → 戻る → 次のSeller**を繰り返すためである。1回の検索は実測で2〜6ページを要し
+（[ライブ受入検証 §13.4](../phase-0/phase-0-f-live-acceptance-result.md#134-検索の到達範囲は実行のたびに変わる)）、
+Request間隔2秒以上と合わせると往復のたびに数秒から十数秒を払う。無意味な再取得は429や
+Challengeを引く確率も上げ、3回連続で拒否されると安全停止に入る。
 
 ### 5.3 収集範囲
 
@@ -226,13 +295,19 @@ dependencies = [
 
 - 100ユニーク件、かつ365日以上前の商品1件を最低目標にする
 - 最大10ページ、1,000ユニーク件、30秒
-- すべてのMercari Requestは同時実行数1、開始間隔2秒以上
+- すべてのMercari Requestは同時実行数1、開始間隔2秒以上（**出所と根拠**は[アーキテクチャ §4.1](../development/architecture.md#41-外部アクセスの条件と2秒間隔の出所)）
+- この2つは**HTTP Requestをまたいで**成立させる。同時に走る収集は常に1件で、間隔は前の収集の最後のRequestから数える
+- **同じ収集を二重に走らせない。** 同一Keywordの検索、同一Sellerの分析が実行中なら、後から来たRequestは新しく取得せず**実行中の収集へ合流する**
 - 取得順は古い順とみなさない
 - 上限を超えたPage内の商品はResponse順で上限件数まで採用する
 - 掲載日と販売形式の指定によって、Backendの取得範囲や停止条件を変更しない
 
 掲載日Filterは取得済み商品の絞り込みであり、Mercari全体の指定期間を網羅する検索ではない。
 指定期間に一致する商品が0件でも、Mercari上に0件だとは表示しない。
+
+**合流はCacheではない。** 保存も有効期限も持たず、合流した側が受け取るのは**今まさに行われている収集**の
+結果である。したがって`collectedAt`は正しい。Cacheを持たない理由は
+[TODO O-5](../planning/todo.md#オプション--判断済みで保留しているもの)のままである。
 
 ### 5.4 検索結果Metadata
 
@@ -252,7 +327,7 @@ type CollectionMeta = {
   oldestCreatedAt: string | null;
   newestCreatedAt: string | null;
   collectedAt: string;
-  oldListingCount: number;
+  oldListingCount: number | null;
   stopReason:
     | "target_reached"
     | "end_of_results"
@@ -275,6 +350,8 @@ type CollectionMeta = {
 - `errors`: 個人情報や生Responseを含めず、分類Codeと操作だけを返す
 - `oldestCreatedAt` / `newestCreatedAt`: 取得済み商品の最小・最大日時。Mercari全体の範囲ではない
 - `collectedAt`: Backendが収集を完了した時刻。RFC 3339のTimezone付き日時
+- `oldListingCount`: 検索だけが埋める。Seller商品では**`null`**とする。出品の古さに
+  同じ意味の基準が無いため、0と書くと「古い出品が無かった」という別の主張になる
 
 画面には最低限、次の文言を出す。
 
@@ -282,6 +359,7 @@ type CollectionMeta = {
 Mercariから 825件 / 7ページを取得
 取得した商品の掲載日時: 2025-08-20〜2026-08-31
 指定した掲載日に一致: 42件 / 825件
+取得時刻: 2026-09-02 14:03（この時刻に取得した情報を表示しています）　[再取得]
 取得した範囲内で古い順に表示しています
 Mercari全体の最古順・指定期間の全件ではありません
 停止理由: 365日以上前の商品へ到達
@@ -289,6 +367,10 @@ Mercari全体の最古順・指定期間の全件ではありません
 
 件数は実測値へ置き換える。`partial=true`の場合は警告色を使用し、「一部の結果だけを表示中」と
 明記する。
+
+取得時刻には`collectedAt`をAsia/Tokyoで表示し、隣へ再取得Buttonを置く。**Auction価格を含む
+すべての値がこの時刻のSnapshotである**ため、表示中の結果がいつのものかを常に見えるようにする。
+再取得は明示操作だけで行い、時間経過やFocus復帰で自動的に走らせない。
 
 ### 5.5 SortとFilter
 
@@ -596,6 +678,17 @@ Filter後件数はFrontendが計算する。外部取得が
 ### `GET /api/sellers/{sellerId}/analysis`
 
 Seller Profile、販売中商品、売却済み商品、各状態の`CollectionMeta`、Seller Knowledgeを返す。
+Seller Knowledgeは販売中と売却済みを商品IDで重複排除して合算した結果で、状態ごとには返さない。
+
+**Profileを読めたなら200を返す。** 販売中・売却済みのどちらかが途中で失敗しても、画面に出す
+Sellerは存在するためで、短く終わったことは各状態の`partial`と`stopReason`が申告する。
+下のStatus規則が5xxを指すのは、**Profileを読めなかった場合だけ**である。
+
+Profileを読めなかったときの本体は分類Codeと操作だけを返す。
+
+```json
+{ "detail": { "code": "not_found_404", "operation": "seller_profile" } }
+```
 
 ### `GET /api/health`
 
@@ -621,7 +714,7 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 |---|---|
 | 初期 | 入力Formと検索例を表示 |
 | Loading | Spinnerと「最大取得範囲を確認中」の文言。途中件数は表示しない |
-| 成功 | Metadata、Filter、Gridを表示 |
+| 成功 | Metadata（取得時刻を含む）、再取得Button、Filter、Gridを表示 |
 | 0件 | 条件変更を促し、空Gridを表示 |
 | Filter後0件 | 取得総数を残し、「取得範囲内では一致なし」と表示 |
 | 部分成功 | 取得済み結果と警告、停止理由、再実行Button |
@@ -639,6 +732,7 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 - 商品・Seller情報をDatabaseへ保存しない
 - 画像はMercariのHTTPS URLをBrowserで表示し、Backendに保存しない
 - 検索・分析結果は画面を閉じた後の復元を保証しない
+- 検索・分析結果をBrowserの永続Storage（localStorage / sessionStorage / IndexedDB）へ保存しない
 - Application LogへSeller名、商品Title、生URLを標準では出さない
 - Error Logには操作種別、Error Code、HTTP Status、Field名を残し、個人情報を避ける
 
@@ -650,13 +744,14 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 
 ### Backend / Domain
 
-- [ ] KeywordのValidation Test
-- [ ] `SaleFormat`とAuction価格LabelのDomain / Schema Test
-- [ ] 検索・Seller収集の全停止理由のUnit Test
-- [ ] Seller Knowledgeの正規化、Keyword、境界、Score、信頼度のUnit Test
-- [ ] 0件、29件、30件、99件、100件の境界Test
-- [ ] Mock Adapterを使うAPI Test
-- [ ] 外部Error・部分成功・安全停止のAPI Test
+- [x] KeywordのValidation Test
+- [x] `SaleFormat`とAuction価格LabelのDomain / Schema Test
+- [x] 検索・Seller収集の全停止理由のUnit Test（7種類すべて。0-Fで実装済み）
+- [x] Seller Knowledgeの正規化、Keyword、境界、Score、信頼度のUnit Test
+- [x] 0件、29件、30件、99件、100件の境界Test
+- [x] Mock Adapterを使うAPI Test
+- [x] 外部Error・部分成功のAPI Test
+- [x] 安全停止のStatus規則のTest（**Endpoint経由では再現できない**。[TODO](../planning/todo.md#実装中に見つかった1件--2秒間隔と安全停止がrequestをまたがない)）
 
 ### Frontend
 
@@ -664,6 +759,7 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 - [ ] 入力、Loading、0件、成功、部分成功、Error表示のComponent Test
 - [ ] 価格・掲載日・販売形式Filterと6種類のSortのTest（`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`）
 - [ ] Asia/Tokyoの日付境界と開始日・終了日の片側指定Test
+- [ ] Seller画面へ遷移して戻ったとき、再検索せずSort / Filter状態が保持されるTest
 - [ ] 通常出品・Auction・不明のBadgeと価格LabelのTest
 - [ ] 画像PlaceholderのTest
 - [ ] Sellerの状態別Tabと取得範囲表示のTest
@@ -682,7 +778,9 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 6. 商品CardからSeller画面を開く
 7. 販売中・売却済みの件数と打ち切り理由を確認する
 8. Seller Knowledgeと標本信頼度を確認する
-9. 元Mercari商品Linkが正しいHTTPS URLであることを確認する
+9. 検索画面へ戻り、**Mock Adapterへの検索Requestが増えていないこと**と、件数・Sort・Filterが
+   手順5のままであることを確認する
+10. 元Mercari商品Linkが正しいHTTPS URLであることを確認する
 
 ### MVP完了条件
 
@@ -693,5 +791,5 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 - [ ] Seller Knowledgeがこの文書の同じ入力から決定的に同じ値を返す
 - [ ] 外部取得失敗を成功または0件として隠さない
 - [ ] 主要操作がKeyboardとMobile Layoutで利用できる
-- [ ] Playwright Fallback、Database、定期Crawlが実装へ混入していない
+- [ ] Playwright Fallback、Database、定期Crawl、Cacheが実装へ混入していない
 - [ ] 利用規約確認が必要な公開・商用・継続取得へ進んでいない
