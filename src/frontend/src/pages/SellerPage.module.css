@@ -1,0 +1,23 @@
+.back {
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  font-size: var(--text-note);
+}
+
+.loading {
+  margin: var(--space-6) 0;
+  color: var(--ink-quiet);
+}
+
+/* 取れなかったことの表明なので、断り書きと同じ朱の縦罫（視覚方針 §3.3）。 */
+.failure {
+  margin: var(--space-6) 0;
+  max-width: var(--measure);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.failureMessage {
+  margin: 0 0 var(--space-3);
+  line-height: var(--leading-dense);
+}

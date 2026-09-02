@@ -1,0 +1,65 @@
+.ranges {
+  max-width: var(--measure);
+  margin-bottom: var(--space-4);
+}
+
+.range {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.pages {
+  margin-left: var(--space-3);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* 選ばれているTabだけが墨の下線を持つ。塗り分けではなく線で示すのは、
+   Badgeの塗りと役割がぶつからないようにするため（視覚方針 §3.5）。 */
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--ink-quiet);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  background: none;
+  color: var(--ink);
+}
+
+.active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.count {
+  margin-left: var(--space-2);
+  font-size: var(--text-note);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  padding-top: var(--space-5);
+}
+
+.empty {
+  margin: 0;
+  color: var(--ink-quiet);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
+  gap: var(--space-6) var(--space-5);
+}
