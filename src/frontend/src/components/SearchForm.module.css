@@ -1,0 +1,62 @@
+/* 道具の声。ゴシックのまま（視覚方針 §3.4）。 */
+
+.form {
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.primary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+.keyword {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 入力Errorは対象Fieldの近くに置く（MVP仕様 §9）。
+   朱の文字は partial=true の見出しへ予約しているので、ここは縦罫だけを朱にする
+   （視覚方針 §3.3）。 */
+.error {
+  margin: var(--space-2) 0 0;
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+.fixed {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+.examples {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+.example {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--ink-quiet);
+  border-radius: 0;
+  color: var(--ink);
+  font-size: var(--text-note);
+  padding: 0;
+  margin-right: var(--space-3);
+}
+
+.example:hover {
+  background: none;
+  border-bottom-width: 2px;
+}

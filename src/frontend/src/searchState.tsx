@@ -23,6 +23,12 @@ import {
 } from "react";
 
 import { ApiError, search as requestSearch } from "./api/client";
+import {
+  EMPTY_FILTER_FORM,
+  validateFilters,
+  type FilterErrors,
+  type FilterFormValues,
+} from "./validation";
 import type { SaleFormat, SearchResponse } from "./types/api";
 
 /**
@@ -70,14 +76,28 @@ export type SearchState = {
   result: SearchResponse | null;
   error: ApiError | null;
   sort: SortKey;
+  /**
+   * What is typed in the narrowing fields.
+   *
+   * Held here rather than in the route because it is a fact about the result
+   * being looked at, not about the page that happens to be mounted
+   * ([アーキテクチャ §2.2](../../../docs/development/architecture.md)). Kept
+   * in the route it would survive as far as the seller screen and no
+   * further, and the reader would come back to empty boxes above a list that
+   * was still narrowed — the screen would be describing a filter it was not
+   * applying.
+   */
+  filterForm: FilterFormValues;
+  /** Derived from `filterForm`. The fields that do not parse simply do not narrow. */
   filters: Filters;
+  filterErrors: FilterErrors;
   /**
    * Collect one search. The only thing in the frontend that reaches the
    * backend for items. Navigation, focus and time never call it.
    */
   runSearch: (keyword: string) => Promise<void>;
   setSort: (sort: SortKey) => void;
-  setFilters: (filters: Filters) => void;
+  setFilterForm: (values: FilterFormValues) => void;
 };
 
 const SearchContext = createContext<SearchState | null>(null);
@@ -88,7 +108,17 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [sort, setSort] = useState<SortKey>(INITIAL_SORT);
-  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+  const [filterForm, setFilterForm] = useState<FilterFormValues>(
+    EMPTY_FILTER_FORM,
+  );
+
+  // One source of truth. Storing the parsed filter beside the text it came
+  // from would let the two disagree, and the list would be narrowed by
+  // something the fields no longer say.
+  const { filters, errors: filterErrors } = useMemo(
+    () => validateFilters(filterForm),
+    [filterForm],
+  );
 
   // A ref rather than `status`, because two presses in the same tick would
   // both read the state from before either of them. Section 5.2 allows one
@@ -128,12 +158,14 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       result,
       error,
       sort,
+      filterForm,
       filters,
+      filterErrors,
       runSearch,
       setSort,
-      setFilters,
+      setFilterForm,
     }),
-    [status, keyword, result, error, sort, filters, runSearch],
+    [status, keyword, result, error, sort, filterForm, filters, filterErrors, runSearch],
   );
 
   return (

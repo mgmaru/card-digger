@@ -1,55 +1,181 @@
 /**
  * The search screen.
  *
- * Scaffolding. The inputs, the metadata block, the filters and the image grid
- * are Phase 1-1 and 1-2. What is here is the part 1-0 needs: the search runs
- * from the button, the result is read from the state above the router, and
- * nothing on this page calls the API directly.
+ * Holds the six states in MVP specification section 9 and nothing else. The
+ * result, the sort and the filter live above the router (section 5.2), so
+ * coming back from a seller lands here with everything still in place and
+ * collects nothing.
+ *
+ * The item list at the bottom is scaffolding. The image grid, the sale format
+ * badges and the untouched-for bar are 1-2; what is here renders enough of
+ * each item to show that the sort and the filter above it did their work.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
+import { CollectionRecord } from "../components/CollectionRecord";
+import { FilterControls } from "../components/FilterControls";
+import { SearchForm } from "../components/SearchForm";
+import { hasActiveFilter, visibleItems } from "../searchQuery";
 import { useSearchState } from "../searchState";
+import type { ApiFailureKind } from "../api/client";
+import { validateKeyword } from "../validation";
+
+import styles from "./SearchPage.module.css";
+
+/**
+ * What to say about a failure, and whether trying again is the next move.
+ *
+ * Section 9 forbids asking for a login or a proxy on 401, 403, 429 and a
+ * challenge — those are Mercari declining, not something the reader can
+ * configure their way out of. The safety stop is this application deciding to
+ * stop, so it says to wait rather than offering a button that would undo the
+ * decision.
+ */
+const FAILURES: Record<ApiFailureKind, { message: string; retryable: boolean }> = {
+  invalid_input: {
+    message: "入力内容を見直してください",
+    retryable: false,
+  },
+  not_found: {
+    message: "対象が見つかりませんでした",
+    retryable: false,
+  },
+  rate_limited: {
+    message: "Mercariが一時的に応答を制限しています。時間を置いてください",
+    retryable: true,
+  },
+  safety_stop: {
+    message:
+      "続けて拒否されたため取得を止めました。自動では再試行しません。時間を置いてからお試しください",
+    retryable: false,
+  },
+  timeout: {
+    message: "取得が時間内に終わりませんでした",
+    retryable: true,
+  },
+  upstream: {
+    message: "Mercari側から応答を受け取れませんでした",
+    retryable: true,
+  },
+  network: {
+    message: "Backendへ接続できませんでした。起動しているか確認してください",
+    retryable: true,
+  },
+  unexpected: {
+    message: "取得できませんでした",
+    retryable: true,
+  },
+};
 
 export function SearchPage() {
-  const { status, result, error, sort, runSearch } = useSearchState();
-  const [draft, setDraft] = useState("");
+  const {
+    status,
+    keyword,
+    result,
+    error,
+    sort,
+    filterForm,
+    filters,
+    filterErrors,
+    runSearch,
+    setSort,
+    setFilterForm,
+  } = useSearchState();
+
+  const [draft, setDraft] = useState(keyword);
+  const [keywordError, setKeywordError] = useState<string | null>(null);
+
+  const busy = status === "loading";
+
+  const submit = () => {
+    const checked = validateKeyword(draft);
+    if (!checked.ok) {
+      setKeywordError(checked.error);
+      return;
+    }
+    setKeywordError(null);
+    void runSearch(checked.keyword);
+  };
+
+  const shown = useMemo(
+    () => (result ? visibleItems(result.items, filters, sort) : []),
+    [result, filters, sort],
+  );
+
+  const narrowed = hasActiveFilter(filters);
+  const failure = error ? FAILURES[error.kind] : null;
 
   return (
     <section>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void runSearch(draft.trim());
-        }}
-      >
-        <label htmlFor="keyword">キーワード</label>
-        <input
-          id="keyword"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-        {/* Section 5.2 disables the second submit. The backend does not rely
-            on it: single-flight there is what actually holds the promise. */}
-        <button type="submit" disabled={status === "loading"}>
-          検索
-        </button>
-      </form>
+      <SearchForm
+        keyword={draft}
+        error={keywordError}
+        busy={busy}
+        showExamples={status === "idle"}
+        onChange={setDraft}
+        onSubmit={submit}
+      />
 
-      {status === "loading" && <p>最大取得範囲を確認中</p>}
-      {status === "error" && <p role="alert">取得できませんでした（{error?.kind}）</p>}
+      {status === "loading" && (
+        // Section 9: no running count. A number climbing during collection
+        // reads as progress toward a total nobody knows.
+        <p className={styles.loading} role="status">
+          最大取得範囲を確認中
+        </p>
+      )}
 
-      {result && (
+      {status === "error" && failure && (
+        <div className={styles.failure} role="alert">
+          <p className={styles.failureMessage}>{failure.message}</p>
+          {failure.retryable && (
+            <button type="button" onClick={submit}>
+              もう一度実行
+            </button>
+          )}
+        </div>
+      )}
+
+      {status === "success" && result && (
         <>
-          <p>
-            取得 {result.meta.uniqueItemCount}件 / {result.meta.pageCount}ページ
-          </p>
-          <p>並び: {sort}</p>
-          <ul>
-            {result.items.map((item) => (
-              <li key={item.id}>
-                <span>{item.title}</span>
+          <CollectionRecord
+            meta={result.meta}
+            sort={sort}
+            visibleCount={shown.length}
+            filtered={narrowed}
+            onRefetch={() => void runSearch(keyword)}
+            busy={busy}
+          />
+
+          <FilterControls
+            values={filterForm}
+            errors={filterErrors}
+            sort={sort}
+            onChange={setFilterForm}
+            onSortChange={setSort}
+          />
+
+          {result.items.length === 0 && (
+            <p className={styles.empty}>
+              条件を変えて、もう一度お試しください
+            </p>
+          )}
+
+          {result.items.length > 0 && shown.length === 0 && (
+            <p className={styles.empty}>
+              取得範囲内では一致なし（取得した{result.meta.uniqueItemCount.toLocaleString("ja-JP")}件のうち0件）
+            </p>
+          )}
+
+          {/* Scaffolding for 1-2. */}
+          <ul className={styles.items}>
+            {shown.map((item) => (
+              <li key={item.id} className={styles.item}>
+                <span className={styles.title}>{item.title}</span>
+                <span className={styles.price}>
+                  ¥{item.priceYen.toLocaleString("ja-JP")}
+                </span>
                 <Link to={`/sellers/${item.sellerId}`}>Sellerを分析</Link>
               </li>
             ))}

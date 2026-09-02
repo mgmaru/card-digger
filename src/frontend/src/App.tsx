@@ -34,7 +34,7 @@ export function App() {
 export function AppRoutes() {
   return (
     <main className={styles.shell}>
-      <h1>Card Digger</h1>
+      <h1 className={styles.wordmark}>Card Digger</h1>
       <Routes>
         <Route path="/" element={<SearchPage />} />
         <Route path="/sellers/:sellerId" element={<SellerPage />} />

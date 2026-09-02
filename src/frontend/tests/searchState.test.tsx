@@ -57,6 +57,15 @@ const RESULT: SearchResponse = {
 };
 
 /** The provider stays outside the router, exactly as `App` arranges it. */
+/** The first item's seller link, as an element rather than a maybe-element. */
+function firstSellerLink(): HTMLElement {
+  const [link] = screen.getAllByRole("link", { name: "Sellerを分析" });
+  if (!link) {
+    throw new Error("the result list rendered no seller link");
+  }
+  return link;
+}
+
 function mount() {
   return render(
     <SearchProvider>
@@ -83,32 +92,63 @@ describe("returning from a seller", () => {
     await user.type(screen.getByLabelText("キーワード"), "ポケカ 引退品");
     await user.click(screen.getByRole("button", { name: "検索" }));
 
-    await screen.findByText("取得 825件 / 7ページ");
+    await screen.findByLabelText("取得範囲");
     expect(searchMock).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole("link", { name: "Sellerを分析" }));
+    await user.click(firstSellerLink());
     expect(await screen.findByText("Seller s1")).toBeInTheDocument();
 
     await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
 
-    expect(await screen.findByText("取得 825件 / 7ページ")).toBeInTheDocument();
+    expect(await screen.findByLabelText("取得範囲")).toBeInTheDocument();
     // The whole point. One press of the button, one collection.
     expect(searchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the sort that was applied", async () => {
+  it("keeps a sort that was changed away from the default", async () => {
     const user = userEvent.setup();
     mount();
 
     await user.type(screen.getByLabelText("キーワード"), "ポケカ");
     await user.click(screen.getByRole("button", { name: "検索" }));
-    await screen.findByText("並び: created_asc");
+    await screen.findByLabelText("取得範囲");
 
-    await user.click(screen.getByRole("link", { name: "Sellerを分析" }));
+    // Changing it first is the point: landing back on the initial value
+    // would pass even if the state had been thrown away and rebuilt.
+    await user.selectOptions(screen.getByLabelText("並び"), "更新が古い順");
+    expect(screen.getByLabelText("並び")).toHaveValue("updated_asc");
+
+    await user.click(firstSellerLink());
     await screen.findByText("Seller s1");
     await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
 
-    expect(await screen.findByText("並び: created_asc")).toBeInTheDocument();
+    expect(await screen.findByLabelText("並び")).toHaveValue("updated_asc");
+    expect(searchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the filter that was applied", async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    await screen.findByLabelText("取得範囲");
+
+    await user.type(screen.getByLabelText("最低価格"), "5000");
+    await user.selectOptions(screen.getByLabelText("販売形式"), "通常出品");
+    await waitFor(() =>
+      expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+        "指定した条件に一致",
+      ),
+    );
+
+    await user.click(firstSellerLink());
+    await screen.findByText("Seller s1");
+    await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
+
+    expect(await screen.findByLabelText("最低価格")).toHaveValue("5000");
+    expect(screen.getByLabelText("販売形式")).toHaveValue("fixed_price");
+    expect(searchMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -130,7 +170,7 @@ describe("starting a search", () => {
     await user.click(button);
 
     release(RESULT);
-    await screen.findByText("取得 825件 / 7ページ");
+    await screen.findByLabelText("取得範囲");
 
     expect(searchMock).toHaveBeenCalledTimes(1);
   });
@@ -141,7 +181,7 @@ describe("starting a search", () => {
 
     await user.type(screen.getByLabelText("キーワード"), "ポケカ");
     await user.click(screen.getByRole("button", { name: "検索" }));
-    await screen.findByText("取得 825件 / 7ページ");
+    await screen.findByLabelText("取得範囲");
 
     searchMock.mockRejectedValueOnce(new Error("boom"));
     await user.click(screen.getByRole("button", { name: "検索" }));
@@ -149,6 +189,6 @@ describe("starting a search", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
-    expect(screen.queryByText("取得 825件 / 7ページ")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("取得範囲")).not.toBeInTheDocument();
   });
 });
