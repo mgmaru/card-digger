@@ -13,7 +13,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 from card_digger.application.seller_knowledge import KnowledgeLevel, SellerKnowledge
@@ -40,7 +46,19 @@ class CamelModel(BaseModel):
 
 
 class SearchRequest(CamelModel):
+    """What to ask Mercari for.
+
+    The price band is part of the question, not a view of the answer. Mercari
+    applies it before ordering and paging, so a narrower band spends the same
+    collection budget on a smaller population — which is the only way to reach
+    listings nobody has touched, since they sit at the far end of an order that
+    cannot be reversed. Filtering after collecting can only ever remove
+    listings already in hand.
+    """
+
     keyword: str
+    min_price_yen: int | None = Field(default=None, ge=0)
+    max_price_yen: int | None = Field(default=None, ge=0)
 
     @field_validator("keyword")
     @classmethod
@@ -54,6 +72,16 @@ class SearchRequest(CamelModel):
                 "characters once surrounding whitespace is removed"
             )
         return keyword
+
+    @model_validator(mode="after")
+    def _band_is_the_right_way_round(self) -> "SearchRequest":
+        if (
+            self.min_price_yen is not None
+            and self.max_price_yen is not None
+            and self.min_price_yen > self.max_price_yen
+        ):
+            raise ValueError("minPriceYen must not exceed maxPriceYen")
+        return self
 
 
 class CollectionErrorResponse(CamelModel):

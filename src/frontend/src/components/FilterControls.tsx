@@ -1,11 +1,14 @@
 /**
  * Narrowing and ordering what was already collected.
  *
- * Separate from the search form on purpose. Nothing in here sends a request:
- * section 5.5 applies price, listing date, sale format and every sort over
- * the set already in hand. Putting these beside the results rather than
- * beside the button is what makes that visible — you change them and the
- * screen answers immediately, because there is nothing to wait for.
+ * Separate from the search form on purpose. **Nothing in here sends a
+ * request.** These narrow and reorder the set already in hand, so the screen
+ * answers the moment they change — there is nothing to wait for.
+ *
+ * The price band is deliberately not among them. It moved to the search form
+ * once it started going to Mercari, because it decides what gets collected
+ * rather than what gets shown, and leaving it here would have suggested it
+ * was free.
  */
 
 import { useId } from "react";
@@ -65,38 +68,6 @@ export function FilterControls({
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor={field("min")}>
-            最低価格
-          </label>
-          <input
-            id={field("min")}
-            className={styles.number}
-            inputMode="numeric"
-            value={values.minPriceYen}
-            aria-invalid={errors.minPriceYen ? true : undefined}
-            aria-describedby={errors.minPriceYen ? errorId("min") : undefined}
-            onChange={(event) => set("minPriceYen", event.target.value)}
-          />
-          <span className={styles.unit}>円</span>
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={field("max")}>
-            最高価格
-          </label>
-          <input
-            id={field("max")}
-            className={styles.number}
-            inputMode="numeric"
-            value={values.maxPriceYen}
-            aria-invalid={errors.maxPriceYen ? true : undefined}
-            aria-describedby={errors.maxPriceYen ? errorId("max") : undefined}
-            onChange={(event) => set("maxPriceYen", event.target.value)}
-          />
-          <span className={styles.unit}>円</span>
-        </div>
-
-        <div className={styles.field}>
           <label className={styles.label} htmlFor={field("from")}>
             掲載開始日
           </label>
@@ -148,8 +119,6 @@ export function FilterControls({
 
       {(
         [
-          ["minPriceYen", "min"],
-          ["maxPriceYen", "max"],
           ["createdFrom", "from"],
           ["createdTo", "to"],
         ] as const

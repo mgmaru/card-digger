@@ -23,19 +23,9 @@
   white-space: nowrap;
 }
 
-.number {
-  width: 7rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .date {
   width: 9rem;
   font-variant-numeric: tabular-nums;
-}
-
-.unit {
-  font-size: var(--text-note);
-  color: var(--ink-quiet);
 }
 
 /* 朱の縦罫だけ。文字は墨のまま（視覚方針 §3.3）。 */

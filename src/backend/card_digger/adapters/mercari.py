@@ -93,6 +93,8 @@ class MercapiClient(Protocol):
         sort_by: Any = ...,
         sort_order: Any = ...,
         status: Sequence[Any] = ...,
+        price_min: int | None = ...,
+        price_max: int | None = ...,
         page_token: str | None = ...,
     ) -> SearchResults: ...
 
@@ -353,6 +355,9 @@ class MercariAdapter:
         self,
         keyword: str,
         cursor: str | None = None,
+        *,
+        price_min: int | None = None,
+        price_max: int | None = None,
     ) -> SearchPage:
         operation = Operation.SEARCH
         query = keyword.strip()
@@ -363,12 +368,25 @@ class MercariAdapter:
             operation,
             self._client.search(
                 query,
-                # Sent to keep the conditions of the validation protocol. The
-                # order that comes back is not trusted: the marketplace does not
-                # guarantee it, so the application sorts what it collected.
+                # `SORT_CREATED_TIME` with `ORDER_DESC` is Mercari's 新しい順,
+                # and it is the only time order the search accepts — the
+                # ascending pair is not among the combinations the official
+                # app uses, and asking for it was measured to change nothing.
+                #
+                # Despite the name, what comes back is ordered by `updated`
+                # rather than `created`: adjacent pairs break a descending
+                # `updated` order 21% of the time against 40% for `created`
+                # (`poc/mercapi/timestamp-result.md`). So this is the axis this
+                # product cares about, handed to us in the one direction that
+                # is no use, with no way to reverse it. Depth and a narrower
+                # population are the only levers left.
                 sort_by=SearchRequestData.SortBy.SORT_CREATED_TIME,
-                sort_order=SearchRequestData.SortOrder.ORDER_ASC,
+                sort_order=SearchRequestData.SortOrder.ORDER_DESC,
                 status=[SearchRequestData.Status.STATUS_ON_SALE],
+                # `None` becomes 0 in the fork, which is how the API spells
+                # "no bound".
+                price_min=price_min,
+                price_max=price_max,
                 page_token=cursor,
             ),
         )

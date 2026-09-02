@@ -49,6 +49,14 @@
   margin-left: var(--space-3);
 }
 
+/* 取りこぼしが無いと言い切れる唯一の状態。朱の罫は引かない ―― 限界の印なので、
+   限界が無いときに出すと印の意味が消える（視覚方針 §3.3）。 */
+.complete {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
 /* 朱の縦罫は1つの意味しか持たない —— Card Diggerが自分の限界を書き足した行。
    文字は墨のまま。段落単位で赤くするとError画面に見える（視覚方針 §3.3）。 */
 .limits {

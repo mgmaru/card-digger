@@ -306,8 +306,9 @@ DOM向けのexportを持つ。
 | 販売形式 | `all`、`fixed_price`、`auction`。初期値は`all` |
 | Sort | `created_asc`、`created_desc`、`updated_asc`、`updated_desc`、`price_asc`、`price_desc` |
 
-価格、掲載日、販売形式のFilterとSortはFrontendが取得済み範囲へ適用し、BackendやMercariへ
-再Requestしない。初期Sortは`created_asc`とする。
+**価格はMercariへ送る検索条件である**（[§5.3](#価格帯だけが到達範囲を変える2026-09-03)）。
+掲載日・販売形式のFilterとSortだけがFrontendの計算で、取得済み範囲へ適用し再Requestしない。
+初期Sortは`created_asc`とする。
 
 掲載開始日だけなら指定日以降、掲載終了日だけなら指定日以前、両方なら指定期間内を表す。
 時刻指定はMVPへ含めず、日付境界を必ずAsia/Tokyoで計算する。
@@ -349,7 +350,34 @@ Challengeを引く確率も上げ、3回連続で拒否されると安全停止�
 - **同じ収集を二重に走らせない。** 同一Keywordの検索、同一Sellerの分析が実行中なら、後から来たRequestは新しく取得せず**実行中の収集へ合流する**
 - 取得順は古い順とみなさない
 - 上限を超えたPage内の商品はResponse順で上限件数まで採用する
+- **価格帯（`minPriceYen` / `maxPriceYen`）はMercariへ送り、取得範囲を変える**（[下記](#価格帯だけが到達範囲を変える2026-09-03)）
 - 掲載日と販売形式の指定によって、Backendの取得範囲や停止条件を変更しない
+
+#### 価格帯だけが到達範囲を変える（2026-09-03）
+
+**Mercariは`updated`の降順でしか返さず、逆順にできない**（[§5.5](#55-sortとfilter)）。
+そのため**触られていない出品は、母集団の長さぶんだけ後ろにいる。** 予算は1,000件なので、
+母集団がそれを超える限り、後ろには永久に届かない。
+
+**`priceMin` / `priceMax`はMercariが並べ替えとページングの前に適用する。**
+だから帯を狭めると、同じ予算がより小さな母集団の上に落ち、そのぶん奥まで届く。
+**帯が十分に狭ければ結果を撃ち尽くし、`end_of_results`になる。**
+
+| 帯の該当件数 | 取れるもの | 最も更新が古い出品 |
+|---:|---|---|
+| 30,000件 | 最新1,000件 | **届かない** |
+| 3,000件 | 最新1,000件 | 届かないが、より奥まで遡れる |
+| 800件 | **全部** | **必ず含まれる** |
+
+**`reachedEnd`だけが「取りこぼしが無い」を意味する。** 7つの停止理由のうち他の6つは、
+すべて「まだ続きがありうる」である。画面はこの区別を出す（[§9](#9-ui状態とerror表示)）。
+
+**Frontendで価格を絞っても、この効果は得られない。** 取得済みの1,000件から取り除ける
+だけで、**取ってこなかったものを足すことはできない。** 同じ「価格で絞る」でも、
+送り先がMercariかFrontendかで結果が変わる。
+
+掲載日と販売形式を同じようにMercariへ送らないのは、**送る先が無い**ためである。
+検索条件に日付のFieldは存在せず、販売形式もAuctionを名指しで絞る手段が無い。
 
 #### 最低目標を外した（2026-09-03）
 
@@ -507,14 +535,15 @@ Sortの値は`<軸>_<方向>`で揃える。**軸を省略しない。**
 | `updated_desc` | `updatedAt`降順 | 更新が新しい順 |
 | `price_asc` | `priceYen`昇順。同額は`createdAt`昇順 | 価格の安い順 |
 | `price_desc` | `priceYen`降順。同額は`createdAt`昇順 | 価格の高い順 |
-- 最低価格: 以上を残す
-- 最高価格: 以下を残す
 - 掲載開始日: `createdAt >= 開始日の00:00:00 Asia/Tokyo`を残す
 - 掲載終了日: `createdAt < 終了日の翌日00:00:00 Asia/Tokyo`を残す
 - `all`: `SaleFormat.UNKNOWN`を含む全形式を残す
 - `fixed_price`: `SaleFormat.FIXED_PRICE`だけを残す
 - `auction`: `SaleFormat.AUCTION`だけを残す
 - Filter後件数と取得総数を分けて表示する
+
+**価格はここに無い。** Mercariが並べ替えの前に適用しているため、
+取得済みの集合はすでに帯の中にある（[§5.3](#価格帯だけが到達範囲を変える2026-09-03)）。
 
 `createdAt`は必須Fieldであり、欠落Itemを末尾へ回して成功扱いにはしない。
 販売形式の判定に必要なFieldが未知形状なら`SaleFormat.UNKNOWN`とし、通常出品へ含めない。
@@ -773,11 +802,18 @@ Request:
 
 ```json
 {
-  "keyword": "ポケカ 引退品"
+  "keyword": "ポケカ 引退品",
+  "minPriceYen": 3000,
+  "maxPriceYen": 5000
 }
 ```
 
-Responseは取得した全`items`と`CollectionMeta`を返す。価格・掲載日・販売形式Filter、Sort、
+`minPriceYen` / `maxPriceYen`は省略可。指定する場合は0以上の整数で、
+`minPriceYen <= maxPriceYen`を満たさないとHTTP 422とする。
+**この2つはMercariへ渡り、取得範囲を変える**（[§5.3](#価格帯だけが到達範囲を変える2026-09-03)）。
+同じKeywordでも帯が違えば別の収集として扱い、合流させない。
+
+Responseは取得した全`items`と`CollectionMeta`を返す。掲載日・販売形式Filter、Sort、
 Filter後件数はFrontendが計算する。外部取得が
 部分失敗した場合はHTTP 200で取得済み結果を返すが、`partial=true`と`errors`を必須にする。
 
@@ -823,6 +859,7 @@ Processの稼働確認だけを返す。Mercariへ外部Requestを送らない�
 | 成功 | Metadata（取得時刻を含む）、再取得Button、Filter、Gridを表示 |
 | 0件 | 条件変更を促し、空Gridを表示 |
 | Filter後0件 | 取得総数を残し、「取得範囲内では一致なし」と表示 |
+| 取りこぼし無し（`reachedEnd`） | **取得範囲の警告を出さない。** その条件では全件を見ているため |
 | 部分成功 | 取得済み結果と警告、停止理由、再実行Button |
 | 入力Error | 対象Fieldの近くに修正方法を表示 |
 | 外部Error | Error分類に応じた説明と手動再実行Button |

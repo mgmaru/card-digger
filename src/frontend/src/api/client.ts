@@ -176,16 +176,32 @@ async function request<T>(
 /**
  * Collect one search.
  *
- * Returns everything collected, unsorted and unfiltered: sorting and
- * filtering happen over this set and never send another request.
+ * The price band goes to Mercari, which applies it before ordering and
+ * paging. That is what makes it worth sending: the same collection budget
+ * then falls on a smaller population and reaches further back into it.
+ * Narrowing here, after the fact, could only ever remove listings already in
+ * hand.
+ *
+ * Returns everything collected, unsorted. Ordering happens over this set and
+ * never sends another request.
  */
-export function search(keyword: string): Promise<SearchResponse> {
+export function search(
+  keyword: string,
+  band: { minPriceYen: number | null; maxPriceYen: number | null } = {
+    minPriceYen: null,
+    maxPriceYen: null,
+  },
+): Promise<SearchResponse> {
   return request<SearchResponse>(
     "/api/search",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keyword }),
+      body: JSON.stringify({
+        keyword,
+        minPriceYen: band.minPriceYen,
+        maxPriceYen: band.maxPriceYen,
+      }),
     },
     SEARCH_TIMEOUT_MS,
   );

@@ -38,9 +38,16 @@ from card_digger.domain.ports import Clock, Sleeper
 T = TypeVar("T")
 
 
-def search_key(keyword: str) -> str:
-    """What makes two searches the same collection."""
-    return f"search:{keyword}"
+def search_key(
+    keyword: str, price_min: int | None = None, price_max: int | None = None
+) -> str:
+    """What makes two searches the same collection.
+
+    The price band belongs in the key. It is part of the question asked of
+    Mercari, so two bands are two different collections — joining one to the
+    other would hand back a set narrowed by somebody else's bounds.
+    """
+    return f"search:{keyword}:{price_min}:{price_max}"
 
 
 def seller_key(seller_id: str) -> str:

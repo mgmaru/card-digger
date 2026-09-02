@@ -79,18 +79,6 @@ describe("sortItems", () => {
 });
 
 describe("filterItems", () => {
-  it("keeps prices at the bounds", () => {
-    expect(ids(filterItems(ITEMS, withFilter({ minPriceYen: 12800 })))).toEqual([
-      "a",
-      "b",
-      "d",
-    ]);
-    expect(ids(filterItems(ITEMS, withFilter({ maxPriceYen: 12800 })))).toEqual([
-      "b",
-      "c",
-    ]);
-  });
-
   it("keeps `unknown` under `all` and never under `fixed_price`", () => {
     expect(ids(filterItems(ITEMS, withFilter({ saleFormat: "all" })))).toContain(
       "c",
@@ -162,13 +150,19 @@ describe("filterItems", () => {
 describe("visibleItems", () => {
   it("filters before ordering", () => {
     expect(
-      ids(
-        visibleItems(
-          ITEMS,
-          withFilter({ minPriceYen: 10000 }),
-          "price_asc",
-        ),
-      ),
-    ).toEqual(["b", "d", "a"]);
+      ids(visibleItems(ITEMS, withFilter({ saleFormat: "fixed_price" }), "price_asc")),
+    ).toEqual(["b", "a"]);
+  });
+
+  it("does not narrow by price", () => {
+    // The band went to Mercari, which applied it before paging. Everything
+    // here is already inside it, and re-testing would suggest it could be
+    // widened without collecting again.
+    expect(ids(visibleItems(ITEMS, INITIAL_FILTERS, "price_asc"))).toEqual([
+      "c",
+      "b",
+      "d",
+      "a",
+    ]);
   });
 });

@@ -20,6 +20,13 @@ Spending the whole budget costs twenty to thirty seconds a search. That is the
 honest price of digging, and section 5.2 already keeps the result on screen so
 the trip is paid once.
 
+**The price band is the one lever that changes what can be reached.** Mercari
+orders by `updated` descending and will not reverse it, so listings nobody has
+touched sit behind a tail as long as the population is. Narrowing the band
+narrows that population, and the same budget then reaches further back into it
+— far enough, if the band is small enough, to run out of results altogether.
+`END_OF_RESULTS` is the only stop reason that means nothing was missed.
+
 What comes back is never "the oldest listings on Mercari". It is the range this
 run happened to reach, and the metadata says so.
 """
@@ -60,6 +67,8 @@ async def collect_search(
     clock: Clock,
     sleeper: Sleeper,
     gate: RequestGate | None = None,
+    price_min: int | None = None,
+    price_max: int | None = None,
     limits: CollectionLimits = SEARCH_LIMITS,
     old_listing_days: int = OLD_LISTING_DAYS,
 ) -> SearchCollection:
@@ -67,7 +76,9 @@ async def collect_search(
     started_at = clock.now()
 
     async def fetch(cursor: str | None):
-        page = await port.search_items_page(keyword, cursor)
+        page = await port.search_items_page(
+            keyword, cursor, price_min=price_min, price_max=price_max
+        )
         return page.items, page.page_info
 
     collected: Collected = await collect_pages(

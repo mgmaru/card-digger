@@ -79,8 +79,6 @@ export function sortItems(items: readonly Item[], sort: SortKey): Item[] {
 /** Whether the reader has narrowed anything, so the screen can say so. */
 export function hasActiveFilter(filters: Filters): boolean {
   return (
-    filters.minPriceYen !== null ||
-    filters.maxPriceYen !== null ||
     filters.createdFrom !== null ||
     filters.createdTo !== null ||
     filters.saleFormat !== "all"
@@ -94,6 +92,10 @@ export function hasActiveFilter(filters: Filters): boolean {
  * up to but not including the start of the day after the last. `all` keeps
  * `unknown` — folding an unreadable sale format into `fixed_price` would put
  * a bid in progress next to a price someone can just pay.
+ *
+ * Price is absent by design. Mercari applies the band before ordering and
+ * paging, so everything here is already inside it; repeating the test would
+ * only invite the belief that it could be widened without collecting again.
  */
 export function filterItems(
   items: readonly Item[],
@@ -105,12 +107,6 @@ export function filterItems(
     filters.createdTo === null ? null : startOfNextDay(filters.createdTo);
 
   return items.filter((item) => {
-    if (filters.minPriceYen !== null && item.priceYen < filters.minPriceYen) {
-      return false;
-    }
-    if (filters.maxPriceYen !== null && item.priceYen > filters.maxPriceYen) {
-      return false;
-    }
     if (filters.saleFormat !== "all" && item.saleFormat !== filters.saleFormat) {
       return false;
     }

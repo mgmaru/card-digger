@@ -50,17 +50,25 @@ class MockAdapter:
         self,
         keyword: str,
         cursor: str | None = None,
+        *,
+        price_min: int | None = None,
+        price_max: int | None = None,
     ) -> SearchPage:
         operation = Operation.SEARCH
         needle = keyword.strip()
         if not needle:
             raise MarketplaceError(ErrorCode.INVALID_INPUT, operation, "empty keyword")
 
+        # The band narrows before paging, as it does on the real marketplace.
+        # Applying it afterwards would let the mock agree with an
+        # implementation that can never reach past the tail.
         matches = tuple(
             item
             for item in self._items
             if item.listing_status is ListingStatus.ON_SALE
             and needle.casefold() in item.title.casefold()
+            and (price_min is None or item.price_yen >= price_min)
+            and (price_max is None or item.price_yen <= price_max)
         )
         page, next_cursor = self._slice(matches, cursor, operation)
         return SearchPage(

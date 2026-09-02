@@ -11,6 +11,7 @@
 import { toDateString, toDateTimeString } from "../jst";
 import { SORT_LABELS } from "../searchQuery";
 import type { SortKey } from "../searchState";
+import type { PriceBand } from "../validation";
 import type { CollectionMeta, CollectionStopReason } from "../types/api";
 
 import styles from "./CollectionRecord.module.css";
@@ -32,6 +33,20 @@ const STOP_REASONS: Record<CollectionStopReason, string> = {
   safety_stop: "安全停止",
 };
 
+const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
+
+/** The band the collection ran under, or nothing if it ran unbounded. */
+function bandLabel(band: PriceBand): string | null {
+  const { minPriceYen: min, maxPriceYen: max } = band;
+  if (min === null && max === null) {
+    return null;
+  }
+  if (min !== null && max !== null) {
+    return `${yen(min)}〜${yen(max)}`;
+  }
+  return min !== null ? `${yen(min)}以上` : `${yen(max as number)}以下`;
+}
+
 function dateRange(meta: CollectionMeta): string | null {
   if (meta.oldestCreatedAt === null || meta.newestCreatedAt === null) {
     return null;
@@ -46,6 +61,7 @@ export function CollectionRecord({
   sort,
   visibleCount,
   filtered,
+  band,
   onRefetch,
   busy,
 }: {
@@ -54,10 +70,13 @@ export function CollectionRecord({
   visibleCount: number;
   /** Whether anything was narrowed, so the matched count means something. */
   filtered: boolean;
+  /** The band this collection ran under. Part of what was asked, so it is shown. */
+  band: PriceBand;
   onRefetch: () => void;
   busy: boolean;
 }) {
   const range = dateRange(meta);
+  const priceBand = bandLabel(band);
 
   return (
     <section
@@ -72,6 +91,10 @@ export function CollectionRecord({
         Mercariから <b>{meta.uniqueItemCount.toLocaleString("ja-JP")}</b>件 /{" "}
         <b>{meta.pageCount.toLocaleString("ja-JP")}</b>ページ を取得
       </p>
+
+      {priceBand && (
+        <p className={styles.extent}>指定した価格帯: {priceBand}</p>
+      )}
 
       {range && <p className={styles.extent}>取得した商品の掲載日時: {range}</p>}
 
@@ -103,12 +126,28 @@ export function CollectionRecord({
 
       <p className={styles.extent}>停止理由: {STOP_REASONS[meta.stopReason]}</p>
 
-      {/* Section 5.4's limits, and section 6.3's note about which timestamp
-          the listing date comes from. The 朱 rule beside them means one
-          thing throughout: Card Digger stating what it cannot see. */}
+      {/*
+        The 朱 rule means one thing throughout: Card Digger stating what it
+        cannot see. So when it *can* see everything — `reachedEnd`, the only
+        stop reason that promises nothing was missed — the rule is not drawn
+        and the sentence beside it is a plain one. A mark that appeared either
+        way would stop meaning anything.
+      */}
+      {meta.reachedEnd ? (
+        <p className={styles.complete}>
+          この条件に一致する商品は、すべて取得しました。
+          {SORT_LABELS[sort]}の先頭が、この条件での本当の先頭です。
+        </p>
+      ) : (
+        <div className={styles.limits}>
+          <p>取得した範囲内で{SORT_LABELS[sort]}に表示しています</p>
+          <p>
+            この条件にはまだ続きがあります。価格帯を狭めると、より古い出品まで遡れます。
+          </p>
+        </div>
+      )}
+
       <div className={styles.limits}>
-        <p>取得した範囲内で{SORT_LABELS[sort]}に表示しています</p>
-        <p>Mercari全体の最古順・指定期間の全件ではありません</p>
         <p>
           掲載日はMercariの出品データ（created）に基づきます。
           商品ページに表示される「◯時間前」は最終更新日時であり、掲載日とは異なります。

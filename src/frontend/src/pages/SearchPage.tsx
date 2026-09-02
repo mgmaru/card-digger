@@ -17,7 +17,12 @@ import { SearchForm } from "../components/SearchForm";
 import { hasActiveFilter, visibleItems } from "../searchQuery";
 import { useSearchState } from "../searchState";
 import type { ApiFailureKind } from "../api/client";
-import { validateKeyword } from "../validation";
+import {
+  EMPTY_SEARCH_FORM,
+  validateSearch,
+  type SearchErrors,
+  type SearchFormValues,
+} from "../validation";
 
 import styles from "./SearchPage.module.css";
 
@@ -73,6 +78,7 @@ export function SearchPage() {
     result,
     error,
     sort,
+    band,
     filterForm,
     filters,
     filterErrors,
@@ -81,19 +87,25 @@ export function SearchPage() {
     setFilterForm,
   } = useSearchState();
 
-  const [draft, setDraft] = useState(keyword);
-  const [keywordError, setKeywordError] = useState<string | null>(null);
+  // The form holds what is about to be asked. The provider holds what was
+  // asked, so the record beside the results keeps describing the collection
+  // on screen while these are being edited.
+  const [draft, setDraft] = useState<SearchFormValues>({
+    ...EMPTY_SEARCH_FORM,
+    keyword,
+  });
+  const [searchErrors, setSearchErrors] = useState<SearchErrors>({});
 
   const busy = status === "loading";
 
   const submit = () => {
-    const checked = validateKeyword(draft);
+    const checked = validateSearch(draft);
     if (!checked.ok) {
-      setKeywordError(checked.error);
+      setSearchErrors(checked.errors);
       return;
     }
-    setKeywordError(null);
-    void runSearch(checked.keyword);
+    setSearchErrors({});
+    void runSearch(checked.keyword, checked.band);
   };
 
   const shown = useMemo(
@@ -107,8 +119,8 @@ export function SearchPage() {
   return (
     <section>
       <SearchForm
-        keyword={draft}
-        error={keywordError}
+        values={draft}
+        errors={searchErrors}
         busy={busy}
         showExamples={status === "idle"}
         onChange={setDraft}
@@ -141,7 +153,10 @@ export function SearchPage() {
             sort={sort}
             visibleCount={shown.length}
             filtered={narrowed}
-            onRefetch={() => void runSearch(keyword)}
+            band={band}
+            // Collects the same question again — the band the result came
+            // from, not whatever is currently typed above.
+            onRefetch={() => void runSearch(keyword, band)}
             busy={busy}
           />
 
