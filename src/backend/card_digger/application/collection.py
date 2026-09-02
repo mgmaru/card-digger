@@ -14,6 +14,7 @@ Two of them matter more than the rest:
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Awaitable, Callable, Iterable, Sequence
@@ -37,6 +38,12 @@ from card_digger.domain.ports import Clock, Sleeper
 CONSECUTIVE_REFUSALS_BEFORE_STOP = 3
 
 #: Minimum gap between the start of one outside request and the next.
+#:
+#: A figure this project chose, not one Mercari published. Nothing has measured
+#: where the real limit is, and finding out would mean load testing somebody
+#: else's service. Two seconds is known to be safe and there is no reason to
+#: move off a value that is known to be safe. The provenance and the five
+#: reasons for staying conservative are in docs/development/architecture.md.
 MIN_REQUEST_INTERVAL_SECONDS = 2.0
 
 #: Further attempts allowed after a transient failure. Live acceptance
@@ -64,13 +71,59 @@ SELLER_ITEMS_LIMITS = CollectionLimits(
 PageFetch = Callable[[str | None], Awaitable[tuple[Sequence[MarketplaceItem], PageInfo]]]
 
 
+class RequestPacer:
+    """Remembers when the marketplace was last reached, on behalf of everyone.
+
+    The interval is a promise about **the marketplace**, not about one
+    collection: "every request, two seconds apart" is a statement about a
+    shared thing, and a shared thing can only be paced by shared state. A
+    pacer per collection lets two collections leave no gap between them at
+    all, which was measured at 0.06 seconds where two were required.
+
+    Which is why this holds the timestamp and the lock, and not the value:
+    `2.0` is a constant that may be copied anywhere without harm, and "when
+    did we last reach out" is the part that must exist exactly once.
+
+    The lock covers the whole decision. Two callers that both read "the last
+    request was two seconds ago" would both go, so the reading, the waiting
+    and the recording happen without letting anyone in between.
+    """
+
+    def __init__(
+        self,
+        clock: Clock,
+        sleeper: Sleeper,
+        *,
+        min_interval_seconds: float = MIN_REQUEST_INTERVAL_SECONDS,
+    ) -> None:
+        self._clock = clock
+        self._sleeper = sleeper
+        self._min_interval = min_interval_seconds
+        self._last_started_at: datetime | None = None
+        self._lock = asyncio.Lock()
+
+    async def claim_slot(self) -> None:
+        """Wait until the next request may start, then claim that moment."""
+        async with self._lock:
+            if self._last_started_at is not None:
+                elapsed = (self._clock.now() - self._last_started_at).total_seconds()
+                remaining = self._min_interval - elapsed
+                if remaining > 0:
+                    await self._sleeper.sleep(remaining)
+            self._last_started_at = self._clock.now()
+
+
 class RequestGate:
-    """Paces outside requests, retries once, and stops when refused.
+    """Retries once, and stops when refused. Paces through a `RequestPacer`.
 
     One gate per run. It is shared by every operation of that run, because
     "three refusals in a row" counts refusals from the run, not from one
     operation: a seller page that is rate limited after a search that was
     already rate limited twice is the third refusal, not the first.
+
+    Pacing is the one part that must outlive the run, so it is delegated. A
+    gate given no pacer makes a private one and behaves exactly as it did
+    before, which is what a test of a single collection wants.
     """
 
     def __init__(
@@ -80,14 +133,16 @@ class RequestGate:
         *,
         min_interval_seconds: float = MIN_REQUEST_INTERVAL_SECONDS,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        pacer: RequestPacer | None = None,
     ) -> None:
         if max_retries < 0:
             raise ValueError("max_retries cannot be negative")
         self._clock = clock
         self._sleeper = sleeper
-        self._min_interval = min_interval_seconds
+        self._pacer = pacer or RequestPacer(
+            clock, sleeper, min_interval_seconds=min_interval_seconds
+        )
         self._max_retries = max_retries
-        self._last_started_at: datetime | None = None
         self.retry_count = 0
         self.consecutive_refusals = 0
         self.stopped = False
@@ -121,17 +176,8 @@ class RequestGate:
         return result
 
     async def _attempt(self, call: Callable[[], Awaitable]):
-        await self._wait_for_slot()
-        self._last_started_at = self._clock.now()
+        await self._pacer.claim_slot()
         return await call()
-
-    async def _wait_for_slot(self) -> None:
-        if self._last_started_at is None:
-            return
-        elapsed = (self._clock.now() - self._last_started_at).total_seconds()
-        remaining = self._min_interval - elapsed
-        if remaining > 0:
-            await self._sleeper.sleep(remaining)
 
     def _record_refusal(self, error: MarketplaceError) -> None:
         if not error.triggers_safety_stop:
