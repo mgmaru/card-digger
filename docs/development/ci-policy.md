@@ -185,6 +185,14 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 必須Statusは`Docs links`、`PoC unit tests`、`Frontend unit and component tests`、
 `Backend unit and contract tests`の4つとする（2026-09-02に`Frontend`を追加）。
 
+> **この文書を直しただけでは、GitHubの設定は変わらなかった。** `Frontend`をこの表へ書いた時点では
+> 必須Statusは3つのままで、**Frontendが赤でもMergeできる状態が残っていた。** 気付いたのは、
+> `main`へのdocs直接pushでGitHubが`3 of 3 required status checks`と返したときである。
+> 同日中に設定を4つへ揃えた。
+>
+> **設定値を書いた文書は、設定そのものではない。** 変えたら`gh api .../branches/main/protection`で
+> 実際の値を確認する。
+
 Linear historyを要求するため、Pull RequestはSquashまたはRebaseでMergeする。
 Merge commitは`main`へ作らない。
 

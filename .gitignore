@@ -40,6 +40,10 @@ src/backend/artifacts/
 tmp/
 .cache/
 
+# Claude Code local overrides. Personal permissions, not project policy, and
+# this repository is public.
+.claude/settings.local.json
+
 # Editors and operating systems
 .idea/
 .vscode/
