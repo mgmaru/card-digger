@@ -5,7 +5,8 @@
 > 最初の目標だったMercari取得方式の選定はPhase 0-Eで完了した。選定した`kynacio/mercapi`方式の
 > Auction情報を追加検証し、Mercari Adapterとして分離するPhase 0-Fも、2026-09-01の
 > [ライブ受入検証（L4）](../phase-0/phase-0-f-live-acceptance-result.md)合格をもって完了した。
-> 現在は**Phase 1のSearch MVP**が次の目標。
+> 現在は**Phase 1のSearch MVP**が次の目標。Backendと`api/`、Frontendの骨組みまでを扱う
+> [1-0](#1-0-application基盤)は2026-09-02に完了し、次は[1-V 視覚方針](#1-v-視覚方針)である。
 
 ---
 
@@ -1248,7 +1249,44 @@ Processを再起動するまで一切取得できなくなる。
 
 ---
 
+## 1-V. 視覚方針
+
+**1-1の前に置く。1-2と1-3も同じ色と書体を使うため、画面ごとに決め直さない。**
+
+決めることの一覧と、決めるときの制約は[視覚方針](../product/design-tokens.md)を正本とする。
+
+### 着手前に決めること
+
+- [ ] 基本の4〜6色。**`partial=true`の警告色を含む**（[MVP仕様 §5.4](../product/mvp-spec.md#54-検索結果metadata)が「警告色」としか書いていない）
+- [ ] 書体とType scale。**日本語で成立すること**
+- [ ] 余白の段階と、Grid列数のMobile / Desktopでの変わり方
+- [ ] 販売形式Badge3種の見え方。**`形式不明`を`通常出品`に見せない**
+
+### 実装
+
+- [ ] 値をCSS変数として1か所へ置く
+- [ ] Keyboard focusを見えるようにする
+- [ ] `prefers-reduced-motion`を尊重する
+- [ ] Contrast比を確認する
+
+### Test
+
+- [ ] Mobile / Desktopの主要Flow確認
+
+> **文言は決め直さない。** 画面に出す日本語はMVP仕様が確定させている。
+> `.claude/skills/frontend-design`を使う境界も
+> [そのREADME](../../.claude/skills/frontend-design/README.md)にある。
+
+---
+
 ## 1-1. 検索UI
+
+### 着手前に決めること
+
+**[1-V](#1-v-視覚方針)以外に無い。** 入力規則・Sortの値と表示名・表示する文言は
+[MVP仕様 §5](../product/mvp-spec.md#5-検索画面)が確定させている。
+
+### 実装
 
 - [ ] キーワード入力
 - [ ] 検索ボタン
@@ -1270,9 +1308,26 @@ Processを再起動するまで一切取得できなくなる。
 - [ ] 価格の高い順
 - [ ] 取得ページ数・件数・最古・最新日時・取得時刻・打ち切り理由の表示
 - [ ] 掲載日FilterがMercari全体を網羅しないことの表示
-- [ ] **Seller画面から戻っても再検索しない**（結果とSort / Filter状態を保持する）
 - [ ] 明示操作の再取得Button。時間経過・Focus復帰では再取得しない
 - [ ] 表示中の結果が`collectedAt`時点のSnapshotであることの表示
+
+**「戻っても再検索しない」はここに無い。** [1-0](#1-0-application基盤)で実装しTestも書いた。
+同じ項目を2か所で追わない。
+
+### Test
+
+[MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)から、この画面の分を引く。
+
+> **§11とこの一覧の関係。** §11は**何をTestするか**の定義と[MVP完了条件](../product/mvp-spec.md#mvp完了条件)を
+> 引き受け、こちらは**どの節でやるか**を引き受ける。§11の10件はすべて
+> 1-V / 1-1 / 1-2 / 1-3 / 1-4 のどれかに現れる。**両方に`[ ]`があるので、
+> 消化するときは2か所を直す。** 片方へ寄せるかは未決。
+
+- [ ] 価格・掲載日期間のValidation Test
+- [ ] 入力・Loading・0件・成功・部分成功・Error表示のComponent Test
+- [ ] 価格・掲載日・販売形式Filterと6種類のSortのTest
+- [ ] Asia/Tokyoの日付境界と、開始日だけ・終了日だけのTest
+- [ ] 戻ったときに**Filter状態**が保持されるTest（**Sortの保持は1-0で実装済み**）
 
 ---
 
@@ -1295,7 +1350,13 @@ Processを再起動するまで一切取得できなくなる。
 └───────────────┘
 ```
 
-### TODO
+### 着手前に決めること
+
+**[1-V](#1-v-視覚方針)以外に無い。** Cardに載せる項目と添える文言は
+[MVP仕様 §5.6](../product/mvp-spec.md#56-商品card)が確定させている。
+Badgeの見え方とGrid列数は1-Vで決まる。
+
+### 実装
 
 - [ ] 商品画像表示
 - [ ] タイトル表示
@@ -1309,11 +1370,21 @@ Processを再起動するまで一切取得できなくなる。
 - [ ] 画像取得失敗時のPlaceholder
 - [ ] Responsive Grid
 
+### Test
+
+- [ ] 通常出品・Auction・形式不明のBadgeと価格LabelのTest
+- [ ] 画像PlaceholderのTest
+
 ---
 
 ## 1-3. Seller画面
 
-### TODO
+### 着手前に決めること
+
+**[1-V](#1-v-視覚方針)以外に無い。** 表示項目と取得上限の表記は
+[MVP仕様 §6](../product/mvp-spec.md#6-seller画面)が確定させている。
+
+### 実装
 
 - [ ] Seller名表示
 - [ ] 評価表示
@@ -1328,6 +1399,10 @@ Processを再起動するまで一切取得できなくなる。
 - [ ] 商品タイトル表示
 - [ ] 商品価格表示
 - [ ] 商品ページリンク
+
+### Test
+
+- [ ] Sellerの状態別Tabと取得範囲表示のTest
 
 ---
 
@@ -1412,6 +1487,10 @@ TCG比率             64.1%
 
 - [ ] 取得範囲と打ち切り有無を表示する
 - [ ] UIに表示する
+
+Testは[MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)から引く。
+
+- [ ] Seller KnowledgeのScoreと注意書き表示のTest
 
 > Seller Knowledgeは購入判断ではなく、あくまで探索時の補助指標とする。
 
