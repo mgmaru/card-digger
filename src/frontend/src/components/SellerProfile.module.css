@@ -1,0 +1,59 @@
+.profile {
+  max-width: var(--measure);
+  padding: var(--space-5) 0;
+}
+
+/* 記録の声（視覚方針 §3.4）。 */
+.name {
+  font-family: var(--font-record);
+  font-weight: 400;
+  font-size: var(--text-head);
+  margin: 0 0 var(--space-4);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  margin: 0 0 var(--space-4);
+}
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.fact dt {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+.fact dd {
+  margin: 0;
+  font-family: var(--font-record);
+  font-size: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 朱の縦罫は1つの意味しか持たない —— 見えていない範囲の注記（視覚方針 §3.3）。 */
+.limits {
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.limits p {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+.link {
+  margin: 0;
+  font-size: var(--text-note);
+}
+
+.external {
+  text-decoration-style: dashed;
+}

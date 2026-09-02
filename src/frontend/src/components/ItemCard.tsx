@@ -14,7 +14,7 @@ import { Link } from "react-router";
 
 import { dormancy, elapsedDays, elapsedLabel } from "../elapsed";
 import { toDateString } from "../jst";
-import type { Item, SaleFormat } from "../types/api";
+import type { Item, ListingStatus, SaleFormat } from "../types/api";
 
 import styles from "./ItemCard.module.css";
 
@@ -48,12 +48,29 @@ const FORMATS: Record<
   },
 };
 
+/**
+ * What each screen's card carries beyond the shared parts.
+ *
+ * `search` is hunting: it needs the untouched-for bar and a way into the
+ * seller. `seller` is already there, so it drops both and shows the listing
+ * status instead, which is what tells the two tabs apart
+ * (section 6.2).
+ */
+const STATUSES: Record<ListingStatus, string> = {
+  on_sale: "販売中",
+  trading: "取引中",
+  sold_out: "売却済み",
+  unknown: "状態不明",
+};
+
 export function ItemCard({
   item,
   collectedAt,
+  variant = "search",
 }: {
   item: Item;
   collectedAt: string;
+  variant?: "search" | "seller";
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const format = FORMATS[item.saleFormat];
@@ -122,7 +139,13 @@ export function ItemCard({
         </dd>
       </dl>
 
-      <p className={styles.links}>
+      {variant === "seller" && (
+        <p className={styles.status}>{STATUSES[item.listingStatus]}</p>
+      )}
+
+      {/* Search cards are pinned to the bottom by the bar. Seller cards have
+          no bar, so the links take that job and the row still lines up. */}
+      <p className={`${styles.links} ${variant === "seller" ? styles.linksBottom : ""}`}>
         <a
           href={item.url}
           target="_blank"
@@ -131,7 +154,9 @@ export function ItemCard({
         >
           Mercariで商品を見る
         </a>
-        <Link to={`/sellers/${item.sellerId}`}>Sellerを分析</Link>
+        {variant === "search" && (
+          <Link to={`/sellers/${item.sellerId}`}>Sellerを分析</Link>
+        )}
       </p>
 
       {/*
@@ -141,7 +166,12 @@ export function ItemCard({
 
         `aria-hidden` because the same fact is already read out one line up.
         The bar adds a length, not a value.
+
+        Search only. On a seller's own page you are reading one person's
+        inventory rather than hunting a grid for the dormant one, and section
+        6.2 does not ask for it.
       */}
+      {variant === "search" && (
       <p
         className={styles.bar}
         aria-hidden="true"
@@ -152,6 +182,7 @@ export function ItemCard({
           style={{ width: `${untouched.ratio * 100}%` }}
         />
       </p>
+      )}
     </article>
   );
 }

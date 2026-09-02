@@ -17,10 +17,12 @@ import { SearchProvider } from "../src/searchState";
 import type { SearchResponse } from "../src/types/api";
 
 const searchMock = vi.hoisted(() => vi.fn());
+const sellerMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/api/client")>()),
   search: searchMock,
+  sellerAnalysis: sellerMock,
 }));
 
 const RESULT: SearchResponse = {
@@ -57,6 +59,38 @@ const RESULT: SearchResponse = {
 };
 
 /** The provider stays outside the router, exactly as `App` arranges it. */
+/** Enough of a seller for the trip there and back; 1-3 tests the screen itself. */
+const EMPTY_COLLECTION = {
+  items: [],
+  meta: { ...RESULT.meta, uniqueItemCount: 0, pageCount: 1, oldListingCount: null },
+};
+
+const ANALYSIS = {
+  seller: {
+    id: "s1",
+    name: "テスト出品者",
+    rating: 5,
+    ratingCount: 128,
+    listedItemCount: 29,
+    url: "https://jp.mercari.com/user/profile/s1",
+  },
+  onSale: EMPTY_COLLECTION,
+  soldOut: EMPTY_COLLECTION,
+  knowledge: {
+    analyzedItemCount: 0,
+    pokemonItemCount: 0,
+    tcgItemCount: 0,
+    specializedItemCount: 0,
+    distinctSpecializedTermCount: 0,
+    pokemonRatio: 0,
+    tcgRatio: 0,
+    specializedItemRatio: 0,
+    score: null,
+    level: "unknown" as const,
+    sampleConfidence: "unknown" as const,
+  },
+};
+
 /** The first item's seller link, as an element rather than a maybe-element. */
 function firstSellerLink(): HTMLElement {
   const [link] = screen.getAllByRole("link", { name: "Sellerを分析" });
@@ -78,10 +112,12 @@ function mount() {
 
 beforeEach(() => {
   searchMock.mockResolvedValue(RESULT);
+  sellerMock.mockResolvedValue(ANALYSIS);
 });
 
 afterEach(() => {
   searchMock.mockReset();
+  sellerMock.mockReset();
 });
 
 describe("returning from a seller", () => {
@@ -96,7 +132,7 @@ describe("returning from a seller", () => {
     expect(searchMock).toHaveBeenCalledTimes(1);
 
     await user.click(firstSellerLink());
-    expect(await screen.findByText("Seller s1")).toBeInTheDocument();
+    expect(await screen.findByText("テスト出品者")).toBeInTheDocument();
 
     await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
 
@@ -119,7 +155,7 @@ describe("returning from a seller", () => {
     expect(screen.getByLabelText("並び")).toHaveValue("updated_asc");
 
     await user.click(firstSellerLink());
-    await screen.findByText("Seller s1");
+    await screen.findByText("テスト出品者");
     await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
 
     expect(await screen.findByLabelText("並び")).toHaveValue("updated_asc");
@@ -143,7 +179,7 @@ describe("returning from a seller", () => {
     );
 
     await user.click(firstSellerLink());
-    await screen.findByText("Seller s1");
+    await screen.findByText("テスト出品者");
     await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
 
     expect(await screen.findByLabelText("最低価格")).toHaveValue("5000");

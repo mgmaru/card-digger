@@ -157,3 +157,15 @@
 .barCapped {
   border-radius: 0;
 }
+
+/* Seller画面だけ。2つのTabのどちらの商品かを、Card自身にも書いておく
+   （MVP仕様 §6.2）。 */
+.status {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+.linksBottom {
+  margin-top: auto;
+}
