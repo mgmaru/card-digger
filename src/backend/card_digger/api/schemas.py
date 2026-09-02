@@ -1,0 +1,247 @@
+"""The JSON the frontend sees.
+
+Deliberately narrower than the domain. A cookie, a DPoP proof, a request
+header and a raw Mercari response have no field here, so there is no way for
+one to reach a browser by being added to a domain type later.
+
+Names are camelCase because the frontend reads them, and the shapes follow the
+MVP specification rather than the Python field names. Converting here, once,
+is what lets the domain keep its own vocabulary.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic.alias_generators import to_camel
+
+from card_digger.application.seller_knowledge import KnowledgeLevel, SellerKnowledge
+from card_digger.domain.errors import ErrorCode, Operation
+from card_digger.domain.models import (
+    CollectionError,
+    CollectionMeta,
+    CollectionStopReason,
+    ListingStatus,
+    MarketplaceItem,
+    SaleFormat,
+    Seller,
+)
+
+
+#: Length limits for a keyword, from the MVP specification. Measured after the
+#: surrounding whitespace is removed.
+KEYWORD_MIN_LENGTH = 1
+KEYWORD_MAX_LENGTH = 100
+
+
+class CamelModel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class SearchRequest(CamelModel):
+    keyword: str
+
+    @field_validator("keyword")
+    @classmethod
+    def _trimmed_and_within_length(cls, value: str) -> str:
+        # Trimmed first, then measured: a hundred spaces is not a keyword, and
+        # neither is one space around a valid one.
+        keyword = value.strip()
+        if not KEYWORD_MIN_LENGTH <= len(keyword) <= KEYWORD_MAX_LENGTH:
+            raise ValueError(
+                f"keyword must be {KEYWORD_MIN_LENGTH} to {KEYWORD_MAX_LENGTH} "
+                "characters once surrounding whitespace is removed"
+            )
+        return keyword
+
+
+class CollectionErrorResponse(CamelModel):
+    """What failed, in terms a screen may show.
+
+    A classified code and the operation, and nothing else. No message from
+    Mercari, no field value, no URL.
+    """
+
+    code: ErrorCode
+    operation: Operation
+
+    @classmethod
+    def of(cls, error: CollectionError) -> "CollectionErrorResponse":
+        return cls(code=error.code, operation=error.operation)
+
+
+class CollectionMetaResponse(CamelModel):
+    """How far a collection actually got.
+
+    Travels with every result so that a partial answer cannot be read as a
+    complete one.
+    """
+
+    page_count: int
+    unique_item_count: int
+    duplicate_count: int
+    discarded_by_limit_count: int
+    #: The range of what was collected. Never the range available on Mercari.
+    oldest_created_at: datetime | None
+    newest_created_at: datetime | None
+    collected_at: datetime
+    stop_reason: CollectionStopReason
+    reached_end: bool
+    truncated: bool
+    partial: bool
+    retry_count: int
+    errors: list[CollectionErrorResponse]
+    #: Searches only. `null` for a seller's listings, where the age of a
+    #: listing carries no comparable meaning.
+    old_listing_count: int | None = None
+
+    @classmethod
+    def of(cls, meta: CollectionMeta) -> "CollectionMetaResponse":
+        return cls(
+            page_count=meta.page_count,
+            unique_item_count=meta.unique_item_count,
+            duplicate_count=meta.duplicate_count,
+            discarded_by_limit_count=meta.discarded_by_limit_count,
+            oldest_created_at=meta.oldest_created_at,
+            newest_created_at=meta.newest_created_at,
+            collected_at=meta.collected_at,
+            stop_reason=meta.stop_reason,
+            reached_end=meta.reached_end,
+            truncated=meta.truncated,
+            partial=meta.partial,
+            retry_count=meta.retry_count,
+            errors=[CollectionErrorResponse.of(error) for error in meta.errors],
+            old_listing_count=meta.old_listing_count,
+        )
+
+
+class ItemResponse(CamelModel):
+    """One listing, as a card on a screen needs it.
+
+    Condition and like count are domain fields but not response fields: the
+    MVP does not fetch item details for search results, so returning them
+    would mean returning `null` for almost every listing.
+    """
+
+    id: str
+    title: str
+    #: An asking price for a fixed price listing. For an auction, the current
+    #: price at `collectedAt`, which is neither a starting price nor a settled
+    #: winning bid.
+    price_yen: int
+    url: str
+    image_urls: list[str]
+    #: Not shown anywhere on the Mercari item page. The screen says so.
+    created_at: datetime
+    #: The timestamp the item page does show, as an elapsed time.
+    updated_at: datetime
+    listing_status: ListingStatus
+    sale_format: SaleFormat
+    seller_id: str
+
+    @classmethod
+    def of(cls, item: MarketplaceItem) -> "ItemResponse":
+        return cls(
+            id=item.id,
+            title=item.title,
+            price_yen=item.price_yen,
+            url=item.url,
+            image_urls=list(item.image_urls),
+            created_at=item.created_at,
+            updated_at=item.updated_at,
+            listing_status=item.listing_status,
+            sale_format=item.sale_format,
+            seller_id=item.seller_id,
+        )
+
+
+class SearchResponse(CamelModel):
+    """Everything collected, unsorted and unfiltered.
+
+    Sorting and filtering happen in the frontend over this set, so this
+    response is the whole range a search reached and is not narrowed by any
+    display choice.
+    """
+
+    items: list[ItemResponse]
+    meta: CollectionMetaResponse
+
+
+class SellerResponse(CamelModel):
+    id: str
+    name: str
+    rating: float | None
+    rating_count: int | None
+    #: Mercari's count of this seller's listings across every state. **Not** a
+    #: count of sales, and never presented as one.
+    listed_item_count: int | None
+    url: str
+
+    @classmethod
+    def of(cls, seller: Seller) -> "SellerResponse":
+        return cls(
+            id=seller.id,
+            name=seller.name,
+            rating=seller.rating,
+            rating_count=seller.rating_count,
+            listed_item_count=seller.listed_item_count,
+            url=seller.url,
+        )
+
+
+class SellerKnowledgeResponse(CamelModel):
+    """A hypothesis, with the counts it came from.
+
+    The thresholds behind `level` are working figures from the specification,
+    not values whose accuracy has been measured. The counts are returned
+    alongside so a screen can show what the band was computed over.
+    """
+
+    analyzed_item_count: int
+    pokemon_item_count: int
+    tcg_item_count: int
+    specialized_item_count: int
+    distinct_specialized_term_count: int
+    pokemon_ratio: float
+    tcg_ratio: float
+    specialized_item_ratio: float
+    #: `null` when nothing was analysed. No score is invented for an empty
+    #: sample; `level` is `unknown` in that case.
+    score: int | None
+    level: KnowledgeLevel
+    #: How many listings the bands were computed over. Read separately from
+    #: `level`: high specialisation on low confidence is a valid result.
+    sample_confidence: KnowledgeLevel
+
+    @classmethod
+    def of(cls, knowledge: SellerKnowledge) -> "SellerKnowledgeResponse":
+        return cls(
+            analyzed_item_count=knowledge.analyzed_item_count,
+            pokemon_item_count=knowledge.pokemon_item_count,
+            tcg_item_count=knowledge.tcg_item_count,
+            specialized_item_count=knowledge.specialized_item_count,
+            distinct_specialized_term_count=knowledge.distinct_specialized_term_count,
+            pokemon_ratio=knowledge.pokemon_ratio,
+            tcg_ratio=knowledge.tcg_ratio,
+            specialized_item_ratio=knowledge.specialized_item_ratio,
+            score=knowledge.score,
+            level=knowledge.level,
+            sample_confidence=knowledge.sample_confidence,
+        )
+
+
+class SellerItemsResponse(CamelModel):
+    items: list[ItemResponse]
+    meta: CollectionMetaResponse
+
+
+class SellerAnalysisResponse(CamelModel):
+    seller: SellerResponse
+    on_sale: SellerItemsResponse
+    sold_out: SellerItemsResponse
+    knowledge: SellerKnowledgeResponse
+
+
+class HealthResponse(CamelModel):
+    status: str = Field(default="ok")
