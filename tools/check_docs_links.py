@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SEARCH_PATHS = ("README.md", "docs", "poc", "src")
+SEARCH_PATHS = ("README.md", "CLAUDE.md", "docs", "poc", "src")
 #: Directory names whose Markdown is not ours. A dependency's README breaks
 #: its own relative links all the time, and reporting that would bury the one
 #: broken cross reference this check exists to find.

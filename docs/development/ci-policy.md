@@ -114,7 +114,7 @@ upstream由来の`.github/workflows/check.yaml`をそのまま使う。**新規�
 | 変更対象 | 運用 |
 |---|---|
 | `src/`、`poc/`、`tools/`、`.github/` | **Pull Requestを経由する** |
-| `docs/`、`README.md` | `main`への直接pushを許容する |
+| `docs/`、`README.md`、`CLAUDE.md` | `main`への直接pushを許容する |
 | Fork（`mgmaru/mercapi`） | 目的ごとにBranchを分け、`--no-ff`で`main`へMergeする |
 
 Branchは目的ごとに分ける。実装と無関係な修正を同じBranchへ混ぜない。
