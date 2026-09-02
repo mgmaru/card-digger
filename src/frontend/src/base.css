@@ -1,0 +1,71 @@
+/* 全画面に効く土台。値は tokens.css の変数だけを使い、ここで色や寸法を作らない。
+   決めた理由は docs/product/design-tokens.md が正本。 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focusは二重の環にする。墨の環だけだと、塗り潰した
+   `オークション`Badgeやリンクの上で環が背景に溶けて見えなくなる。
+   外に墨、内に面を置けば、明るい面の上でも暗い面の上でも輪郭が残る。 */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--sheet);
+}
+
+a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--ink);
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+}
+
+button {
+  white-space: nowrap;
+  background: var(--ink);
+  color: var(--sheet);
+  border-color: var(--ink);
+  cursor: pointer;
+}
+
+/* MVP仕様 §3.3 の品質下限。動きを足していなくても、後から足したときに
+   ここを通るようにしておく。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

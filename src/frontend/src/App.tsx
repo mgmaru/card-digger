@@ -12,9 +12,6 @@ import { SearchProvider } from "./searchState";
  * point: the search result and its sort and filter outlive a navigation, so
  * coming back from a seller shows what was already collected instead of
  * collecting again (MVP specification section 5.2).
- *
- * The visual direction — palette, type scale, spacing, the warning colour
- * section 5.4 asks for — is not decided yet.
  */
 export function App() {
   return (

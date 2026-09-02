@@ -56,7 +56,7 @@ docs/
 - [concept.md](product/concept.md): Productの目的、背景、将来像
 - [mvp-spec.md](product/mvp-spec.md): MVP実装時の機能範囲と受入条件の正本
 - [design-tokens.md](product/design-tokens.md):
-  色・書体・余白・Badgeの見え方を決めるときの制約と、決めた値。**未決**
+  色・書体・余白・Badgeの見え方を決めるときの制約と、決めた値。**2026-09-02決定**
 
 ### `planning/`
 

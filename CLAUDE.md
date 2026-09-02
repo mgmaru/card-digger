@@ -12,7 +12,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 |---|---|
 | 今やること・進捗 | [docs/planning/todo.md](docs/planning/todo.md) |
 | 機能・画面・API・完了条件 | [docs/product/mvp-spec.md](docs/product/mvp-spec.md) |
-| 色・書体・余白（**未決**） | [docs/product/design-tokens.md](docs/product/design-tokens.md) |
+| 色・書体・余白 | [docs/product/design-tokens.md](docs/product/design-tokens.md) |
 | 層・依存の向き・固有語 | [docs/development/architecture.md](docs/development/architecture.md) |
 | CI・PR・Merge・Branch | [docs/development/ci-policy.md](docs/development/ci-policy.md) |
 | Testの層と運用 | [docs/development/test-policy.md](docs/development/test-policy.md) |
