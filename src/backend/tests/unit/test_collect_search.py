@@ -11,11 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from conftest import ScriptedPort, make_items, make_search_page
 
-from card_digger.application.collect_search import (
-    OLD_LISTING_DAYS,
-    TARGET_UNIQUE_ITEMS,
-    collect_search,
-)
+from card_digger.application.collect_search import OLD_LISTING_DAYS, collect_search
 from card_digger.domain.models import CollectionStopReason
 
 
@@ -30,26 +26,18 @@ def full_page(*, start: int, count: int, created_at, cursor: str | None):
     )
 
 
-class TestGoal:
-    async def test_stops_once_it_has_enough_and_reached_far_enough_back(
-        self, clock, sleeper
-    ):
-        clock.moment = NOW
-        port = ScriptedPort(
-            search=[
-                full_page(start=1, count=100, created_at=RECENT, cursor="p2"),
-                full_page(start=101, count=10, created_at=OLD, cursor="p3"),
-            ]
-        )
+class TestNoEarlyGoal:
+    """Searching spends its budget.
 
-        result = await collect_search(port, "sample", clock=clock, sleeper=sleeper)
+    The goal that used to end a search early was measured on ``created`` while
+    the product hunts on ``updated``. Because results arrive roughly
+    newest-updated first, a single long-listed-but-freshly-touched item met the
+    goal two or three pages in, and collecting stopped holding nothing the
+    reader was looking for. These tests pin the absence of that goal, which is
+    the only thing standing between the reader and the dormant listings.
+    """
 
-        assert result.meta.stop_reason is CollectionStopReason.TARGET_REACHED
-        assert result.meta.page_count == 2
-        assert result.meta.unique_item_count == 110
-
-    async def test_a_hundred_recent_listings_is_not_enough(self, clock, sleeper):
-        """Nothing old enough was reached, so the search keeps going."""
+    async def test_keeps_going_past_a_hundred_listings(self, clock, sleeper):
         clock.moment = NOW
         port = ScriptedPort(
             search=[full_page(start=1, count=100, created_at=RECENT, cursor="p2")]
@@ -60,16 +48,40 @@ class TestGoal:
         assert result.meta.stop_reason is CollectionStopReason.MAX_PAGES
         assert result.meta.page_count == 10
 
-    async def test_one_old_listing_on_its_own_is_not_enough(self, clock, sleeper):
+    async def test_an_old_listing_does_not_end_the_search(self, clock, sleeper):
+        """The case that used to stop everything two pages in.
+
+        A hundred recent listings and one listed over a year ago satisfied the
+        old goal. It says nothing about whether anyone has touched that listing
+        since, so it no longer ends anything.
+        """
         clock.moment = NOW
         port = ScriptedPort(
-            search=[full_page(start=1, count=5, created_at=OLD, cursor="p2")]
+            search=[
+                full_page(start=1, count=100, created_at=RECENT, cursor="p2"),
+                full_page(start=101, count=10, created_at=OLD, cursor="p3"),
+            ]
         )
 
         result = await collect_search(port, "sample", clock=clock, sleeper=sleeper)
 
+        assert result.meta.stop_reason is not CollectionStopReason.TARGET_REACHED
         assert result.meta.stop_reason is CollectionStopReason.MAX_PAGES
-        assert result.meta.unique_item_count < TARGET_UNIQUE_ITEMS
+        assert result.meta.page_count == 10
+
+    async def test_still_stops_when_mercari_runs_out(self, clock, sleeper):
+        """The budget is a ceiling, not a quota. An end is still an end."""
+        clock.moment = NOW
+        port = ScriptedPort(
+            search=[full_page(start=1, count=30, created_at=RECENT, cursor=None)]
+        )
+
+        result = await collect_search(port, "sample", clock=clock, sleeper=sleeper)
+
+        assert result.meta.stop_reason is CollectionStopReason.END_OF_RESULTS
+        assert result.meta.reached_end is True
+        assert result.meta.truncated is False
+        assert result.meta.page_count == 1
 
 
 class TestMetadata:

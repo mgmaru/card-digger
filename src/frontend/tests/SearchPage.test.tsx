@@ -52,7 +52,7 @@ const META: CollectionMeta = {
   oldestCreatedAt: "2025-08-20T00:00:00+09:00",
   newestCreatedAt: "2026-08-31T00:00:00+09:00",
   collectedAt: "2026-09-02T14:03:00+09:00",
-  stopReason: "target_reached",
+  stopReason: "max_pages",
   reachedEnd: false,
   truncated: true,
   partial: false,
@@ -170,7 +170,7 @@ describe("success", () => {
     expect(record).toHaveTextContent("7");
     expect(record).toHaveTextContent("2025-08-20〜2026-08-31");
     expect(record).toHaveTextContent("取得時刻: 2026-09-02 14:03");
-    expect(record).toHaveTextContent("停止理由: 365日以上前の商品へ到達");
+    expect(record).toHaveTextContent("停止理由: ページ数の上限に到達");
   });
 
   it("always says the range is not all of Mercari", async () => {

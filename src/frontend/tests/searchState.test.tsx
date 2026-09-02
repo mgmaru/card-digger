@@ -48,7 +48,7 @@ const RESULT: SearchResponse = {
     oldestCreatedAt: "2025-08-20T00:00:00+09:00",
     newestCreatedAt: "2026-08-31T00:00:00+09:00",
     collectedAt: "2026-09-02T14:03:00+09:00",
-    stopReason: "target_reached",
+    stopReason: "max_pages",
     reachedEnd: false,
     truncated: true,
     partial: false,
