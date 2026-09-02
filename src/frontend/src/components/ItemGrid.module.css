@@ -1,0 +1,32 @@
+.legend {
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+/* 棒の目盛。Gridの上に1つだけ置く（MVP仕様 §5.6）。 */
+.scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-2);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+/* 取得範囲と限界の断り書きと同じ印を使う。朱の縦罫だけで、文字は墨
+   （視覚方針 §3.3）。 */
+.note {
+  margin: 0 0 var(--space-1);
+  max-width: var(--measure);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
+  gap: var(--space-6) var(--space-5);
+}

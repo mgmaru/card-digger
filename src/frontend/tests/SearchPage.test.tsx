@@ -86,9 +86,10 @@ async function searchFor(user: ReturnType<typeof userEvent.setup>, keyword: stri
   await screen.findByLabelText("取得範囲");
 }
 
+/** The card titles, in the order the grid renders them. */
 const titles = () =>
   screen
-    .getAllByRole("listitem")
+    .getAllByRole("heading", { level: 3 })
     .map((node) => node.textContent?.match(/商品 (\w)/)?.[1]);
 
 beforeEach(() => {
@@ -224,7 +225,7 @@ describe("partial", () => {
     const record = screen.getByLabelText("取得範囲");
     expect(record).toHaveTextContent("一部の結果だけを表示中");
     expect(record).toHaveTextContent("停止理由: 安全停止");
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(titles()).toEqual(["a", "b", "c"]);
   });
 });
 

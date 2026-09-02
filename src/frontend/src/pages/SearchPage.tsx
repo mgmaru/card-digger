@@ -6,16 +6,13 @@
  * coming back from a seller lands here with everything still in place and
  * collects nothing.
  *
- * The item list at the bottom is scaffolding. The image grid, the sale format
- * badges and the untouched-for bar are 1-2; what is here renders enough of
- * each item to show that the sort and the filter above it did their work.
  */
 
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
 
 import { CollectionRecord } from "../components/CollectionRecord";
 import { FilterControls } from "../components/FilterControls";
+import { ItemGrid } from "../components/ItemGrid";
 import { SearchForm } from "../components/SearchForm";
 import { hasActiveFilter, visibleItems } from "../searchQuery";
 import { useSearchState } from "../searchState";
@@ -168,18 +165,9 @@ export function SearchPage() {
             </p>
           )}
 
-          {/* Scaffolding for 1-2. */}
-          <ul className={styles.items}>
-            {shown.map((item) => (
-              <li key={item.id} className={styles.item}>
-                <span className={styles.title}>{item.title}</span>
-                <span className={styles.price}>
-                  ¥{item.priceYen.toLocaleString("ja-JP")}
-                </span>
-                <Link to={`/sellers/${item.sellerId}`}>Sellerを分析</Link>
-              </li>
-            ))}
-          </ul>
+          {shown.length > 0 && (
+            <ItemGrid items={shown} collectedAt={result.meta.collectedAt} />
+          )}
         </>
       )}
     </section>
