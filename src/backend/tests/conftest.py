@@ -267,8 +267,17 @@ class ScriptedPort:
         }
         self.calls: list[Call] = []
 
-    async def search_items_page(self, keyword: str, cursor: str | None = None):
-        return self._next("search", (keyword, cursor), self._search)
+    async def search_items_page(
+        self,
+        keyword: str,
+        cursor: str | None = None,
+        *,
+        price_min: int | None = None,
+        price_max: int | None = None,
+    ):
+        return self._next(
+            "search", (keyword, cursor, price_min, price_max), self._search
+        )
 
     async def get_item(self, item_id: str):
         return self._next("item", (item_id,), self._item)

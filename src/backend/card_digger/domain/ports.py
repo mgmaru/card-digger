@@ -56,11 +56,20 @@ class MarketplacePort(Protocol):
         self,
         keyword: str,
         cursor: str | None = None,
+        *,
+        price_min: int | None = None,
+        price_max: int | None = None,
     ) -> SearchPage:
-        """One page of listings for sale matching `keyword`.
+        """One page of listings for sale matching `keyword` and the price band.
 
-        The order is whatever the marketplace returned. It is not guaranteed to
-        be oldest first, even though that is what is requested.
+        The order is whatever the marketplace returned: newest-updated first,
+        roughly. It is never oldest first, and asking does not change it.
+
+        **The price band narrows the population, not the page.** The
+        marketplace applies it before ordering and paging, so a narrower band
+        spends the same collection budget on a smaller set — which is the only
+        way to reach listings that have gone untouched, since those sit at the
+        far end of an order that cannot be reversed.
         """
         ...
 

@@ -116,6 +116,52 @@ class TestKeywordValidation:
         assert port.calls_to("search")[0].args[0] == "ポケカ 引退品"
 
 
+class TestPriceBand:
+    """The band narrows what Mercari collects, not what the answer shows.
+
+    That distinction is the whole reason it moved out of the frontend:
+    filtering after collecting can only remove listings already fetched, and
+    the ones worth digging for are the ones behind the tail.
+    """
+
+    def test_the_band_reaches_the_marketplace(self):
+        port = ScriptedPort(search=make_search_page(()))
+        client(port).post(
+            "/api/search",
+            json={"keyword": "ポケカ", "minPriceYen": 3000, "maxPriceYen": 5000},
+        )
+        assert port.calls_to("search")[0].args[2:] == (3000, 5000)
+
+    def test_an_omitted_band_is_no_band(self):
+        port = ScriptedPort(search=make_search_page(()))
+        client(port).post("/api/search", json={"keyword": "ポケカ"})
+        assert port.calls_to("search")[0].args[2:] == (None, None)
+
+    @pytest.mark.parametrize("body", [
+        {"minPriceYen": -1},
+        {"maxPriceYen": -1},
+        {"minPriceYen": 5000, "maxPriceYen": 3000},
+    ])
+    def test_a_band_that_cannot_hold_anything_is_rejected(self, body):
+        port = ScriptedPort(search=make_search_page(()))
+        response = client(port).post("/api/search", json={"keyword": "ポケカ", **body})
+        assert response.status_code == 422
+        assert port.calls == []
+
+    def test_the_two_bounds_may_be_equal(self):
+        port = ScriptedPort(search=make_search_page(()))
+        response = client(port).post(
+            "/api/search",
+            json={"keyword": "ポケカ", "minPriceYen": 3000, "maxPriceYen": 3000},
+        )
+        assert response.status_code == 200
+
+    def test_zero_is_a_bound_and_not_an_absence(self):
+        port = ScriptedPort(search=make_search_page(()))
+        client(port).post("/api/search", json={"keyword": "ポケカ", "minPriceYen": 0})
+        assert port.calls_to("search")[0].args[2] == 0
+
+
 class TestSearchResponse:
     def test_it_returns_what_the_mock_marketplace_holds(self):
         items = make_items(3)
@@ -455,6 +501,33 @@ class TestConcurrentRequests:
         await self.searches(port, "ポケカ", "遊戯王")
         assert port.highest_overlap == 1
 
+    async def test_the_same_keyword_in_two_bands_is_two_collections(self):
+        """The band is part of the question, so it is part of the key.
+
+        Joining these would hand one caller a set the other narrowed, and the
+        answer would silently be missing everything outside somebody else's
+        bounds.
+        """
+        port = CountingMarketplace()
+        clock = FrozenClock()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=self.app_for(port, clock)),
+            base_url="http://test",
+        ) as http:
+            await asyncio.gather(
+                http.post(
+                    "/api/search",
+                    json={"keyword": "ポケカ", "minPriceYen": 0, "maxPriceYen": 3000},
+                ),
+                http.post(
+                    "/api/search",
+                    json={"keyword": "ポケカ", "minPriceYen": 3000, "maxPriceYen": 5000},
+                ),
+            )
+
+        assert port.searches == 2
+        assert port.highest_overlap == 1
+
     async def test_the_same_seller_twice_at_once_is_analysed_once(self):
         port = CountingMarketplace()
         async with httpx.AsyncClient(
@@ -523,7 +596,7 @@ class CountingMarketplace:
         await asyncio.sleep(0)
         self.running -= 1
 
-    async def search_items_page(self, keyword, cursor=None):
+    async def search_items_page(self, keyword, cursor=None, *, price_min=None, price_max=None):
         self.searches += 1
         await self._one()
         return make_search_page(make_items(2))

@@ -131,7 +131,10 @@ describe("input errors", () => {
     const user = userEvent.setup();
     mount();
     await searchFor(user, "  ポケカ 引退  ");
-    expect(searchMock).toHaveBeenCalledWith("ポケカ 引退");
+    expect(searchMock).toHaveBeenCalledWith("ポケカ 引退", {
+      minPriceYen: null,
+      maxPriceYen: null,
+    });
   });
 });
 
@@ -173,13 +176,29 @@ describe("success", () => {
     expect(record).toHaveTextContent("停止理由: ページ数の上限に到達");
   });
 
-  it("always says the range is not all of Mercari", async () => {
+  it("says there is more when the collection was cut short", async () => {
     const user = userEvent.setup();
     mount();
     await searchFor(user, "ポケカ");
     expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
-      "Mercari全体の最古順・指定期間の全件ではありません",
+      "この条件にはまだ続きがあります",
     );
+  });
+
+  it("says nothing was missed only when the results actually ran out", async () => {
+    searchMock.mockResolvedValue({
+      ...RESULT,
+      meta: { ...META, reachedEnd: true, truncated: false, stopReason: "end_of_results" },
+    });
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+
+    const record = screen.getByLabelText("取得範囲");
+    expect(record).toHaveTextContent("すべて取得しました");
+    // The warning and its 朱 rule belong to incompleteness. Drawn either way
+    // the mark would stop meaning anything.
+    expect(record).not.toHaveTextContent("まだ続きがあります");
   });
 
   it("says which timestamp the listing date comes from", async () => {
@@ -208,7 +227,10 @@ describe("success", () => {
 
     await user.click(screen.getByRole("button", { name: "再取得" }));
     await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
-    expect(searchMock).toHaveBeenLastCalledWith("ポケカ");
+    expect(searchMock).toHaveBeenLastCalledWith("ポケカ", {
+      minPriceYen: null,
+      maxPriceYen: null,
+    });
   });
 });
 
@@ -243,16 +265,6 @@ describe("nothing collected", () => {
 });
 
 describe("narrowing", () => {
-  it("filters by price without collecting again", async () => {
-    const user = userEvent.setup();
-    mount();
-    await searchFor(user, "ポケカ");
-
-    await user.type(screen.getByLabelText("最低価格"), "10000");
-    await waitFor(() => expect(titles()).toEqual(["a", "b"]));
-    expect(searchMock).toHaveBeenCalledTimes(1);
-  });
-
   it("filters by sale format and keeps the counts apart", async () => {
     const user = userEvent.setup();
     mount();
@@ -302,7 +314,7 @@ describe("narrowing", () => {
     mount();
     await searchFor(user, "ポケカ");
 
-    await user.type(screen.getByLabelText("最低価格"), "999999");
+    await user.type(screen.getByLabelText("掲載開始日"), "2030-01-01");
     expect(await screen.findByText(/取得範囲内では一致なし/)).toHaveTextContent(
       "825",
     );
@@ -317,6 +329,54 @@ describe("narrowing", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("YYYY-MM-DD");
     // The unreadable date does not narrow, so the screen still shows a result.
     expect(titles()).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("the price band", () => {
+  it("goes to Mercari, and only when the button is pressed", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+    expect(searchMock).toHaveBeenCalledTimes(1);
+
+    await user.type(screen.getByLabelText("最低価格"), "3000");
+    await user.type(screen.getByLabelText("最高価格"), "5000");
+    // Typing a band collects nothing: it changes the question, and the
+    // question is only asked from the button.
+    expect(searchMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
+    expect(searchMock).toHaveBeenLastCalledWith("ポケカ", {
+      minPriceYen: 3000,
+      maxPriceYen: 5000,
+    });
+  });
+
+  it("is shown beside the result it produced", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ");
+    await user.type(screen.getByLabelText("最低価格"), "3000");
+    await user.type(screen.getByLabelText("最高価格"), "5000");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    await screen.findByLabelText("取得範囲");
+
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した価格帯: ¥3,000〜¥5,000",
+    );
+  });
+
+  it("does not collect when the band cannot hold anything", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ");
+    await user.type(screen.getByLabelText("最低価格"), "5000");
+    await user.type(screen.getByLabelText("最高価格"), "3000");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("最低価格以上");
+    expect(searchMock).not.toHaveBeenCalled();
   });
 });
 

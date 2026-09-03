@@ -25,9 +25,11 @@ import {
 import { ApiError, search as requestSearch } from "./api/client";
 import {
   EMPTY_FILTER_FORM,
+  NO_BAND,
   validateFilters,
   type FilterErrors,
   type FilterFormValues,
+  type PriceBand,
 } from "./validation";
 import type { SaleFormat, SearchResponse } from "./types/api";
 
@@ -50,9 +52,15 @@ export const INITIAL_SORT: SortKey = "created_asc";
 
 export type SaleFormatFilter = "all" | SaleFormat;
 
+/**
+ * What narrows the collected set once it is here.
+ *
+ * The price band is **not** one of these. It goes to Mercari as part of the
+ * search, because narrowing after collecting can only remove listings already
+ * fetched — and the ones worth digging for are the ones that were never
+ * reached.
+ */
 export type Filters = {
-  minPriceYen: number | null;
-  maxPriceYen: number | null;
   /** `YYYY-MM-DD`, resolved against Asia/Tokyo when applied. */
   createdFrom: string | null;
   createdTo: string | null;
@@ -60,8 +68,6 @@ export type Filters = {
 };
 
 export const INITIAL_FILTERS: Filters = {
-  minPriceYen: null,
-  maxPriceYen: null,
   createdFrom: null,
   createdTo: null,
   saleFormat: "all",
@@ -95,7 +101,9 @@ export type SearchState = {
    * Collect one search. The only thing in the frontend that reaches the
    * backend for items. Navigation, focus and time never call it.
    */
-  runSearch: (keyword: string) => Promise<void>;
+  /** The band the current result was collected under, for the record to show. */
+  band: PriceBand;
+  runSearch: (keyword: string, band: PriceBand) => Promise<void>;
   setSort: (sort: SortKey) => void;
   setFilterForm: (values: FilterFormValues) => void;
 };
@@ -107,6 +115,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [keyword, setKeyword] = useState("");
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [band, setBand] = useState<PriceBand>(NO_BAND);
   const [sort, setSort] = useState<SortKey>(INITIAL_SORT);
   const [filterForm, setFilterForm] = useState<FilterFormValues>(
     EMPTY_FILTER_FORM,
@@ -125,7 +134,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   // search at a time; the backend does not rely on this holding.
   const inFlight = useRef(false);
 
-  const runSearch = useCallback(async (next: string) => {
+  const runSearch = useCallback(async (next: string, nextBand: PriceBand) => {
     if (inFlight.current) {
       return;
     }
@@ -133,12 +142,13 @@ export function SearchProvider({ children }: { children: ReactNode }) {
 
     setStatus("loading");
     setKeyword(next);
+    setBand(nextBand);
     // Section 5.2: a new search does not mix with the previous result.
     setResult(null);
     setError(null);
 
     try {
-      const response = await requestSearch(next);
+      const response = await requestSearch(next, nextBand);
       setResult(response);
       setStatus("success");
     } catch (cause) {
@@ -158,6 +168,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       result,
       error,
       sort,
+      band,
       filterForm,
       filters,
       filterErrors,
@@ -165,7 +176,18 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       setSort,
       setFilterForm,
     }),
-    [status, keyword, result, error, sort, filterForm, filters, filterErrors, runSearch],
+    [
+      status,
+      keyword,
+      result,
+      error,
+      sort,
+      band,
+      filterForm,
+      filters,
+      filterErrors,
+      runSearch,
+    ],
   );
 
   return (

@@ -84,6 +84,50 @@ class TestNoEarlyGoal:
         assert result.meta.page_count == 1
 
 
+class TestPriceBand:
+    """The band is part of the question, so every page carries it.
+
+    Dropping it after the first page would page through a population the
+    caller never asked for, and the count in the metadata would describe
+    something else entirely.
+    """
+
+    async def test_every_page_carries_the_band(self, clock, sleeper):
+        clock.moment = NOW
+        port = ScriptedPort(
+            search=[
+                make_search_page(make_items(1, start=1), next_cursor="p2"),
+                make_search_page(make_items(1, start=2)),
+            ]
+        )
+
+        await collect_search(
+            port,
+            "sample",
+            clock=clock,
+            sleeper=sleeper,
+            price_min=3000,
+            price_max=5000,
+        )
+
+        assert [call.args for call in port.calls_to("search")] == [
+            ("sample", None, 3000, 5000),
+            ("sample", "p2", 3000, 5000),
+        ]
+
+    async def test_one_sided_bands_are_passed_through_as_they_are(
+        self, clock, sleeper
+    ):
+        clock.moment = NOW
+        port = ScriptedPort(search=[make_search_page(make_items(1))])
+
+        await collect_search(
+            port, "sample", clock=clock, sleeper=sleeper, price_min=3000
+        )
+
+        assert port.calls_to("search")[0].args == ("sample", None, 3000, None)
+
+
 class TestMetadata:
     async def test_counts_the_listings_that_reached_far_enough_back(
         self, clock, sleeper
@@ -132,8 +176,8 @@ class TestPaging:
         await collect_search(port, "sample", clock=clock, sleeper=sleeper)
 
         assert [call.args for call in port.calls_to("search")] == [
-            ("sample", None),
-            ("sample", "p2"),
+            ("sample", None, None, None),
+            ("sample", "p2", None, None),
         ]
 
     async def test_asks_for_one_page_at_a_time(self, clock, sleeper):

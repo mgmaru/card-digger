@@ -170,7 +170,7 @@ describe("returning from a seller", () => {
     await user.click(screen.getByRole("button", { name: "検索" }));
     await screen.findByLabelText("取得範囲");
 
-    await user.type(screen.getByLabelText("最低価格"), "5000");
+    await user.type(screen.getByLabelText("掲載開始日"), "2024-01-01");
     await user.selectOptions(screen.getByLabelText("販売形式"), "通常出品");
     await waitFor(() =>
       expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
@@ -182,7 +182,7 @@ describe("returning from a seller", () => {
     await screen.findByText("テスト出品者");
     await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
 
-    expect(await screen.findByLabelText("最低価格")).toHaveValue("5000");
+    expect(await screen.findByLabelText("掲載開始日")).toHaveValue("2024-01-01");
     expect(screen.getByLabelText("販売形式")).toHaveValue("fixed_price");
     expect(searchMock).toHaveBeenCalledTimes(1);
   });

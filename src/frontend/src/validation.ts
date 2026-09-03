@@ -2,11 +2,16 @@
  * What section 5.1 will accept, and what to tell someone who typed something
  * else.
  *
- * Split in two because the two halves happen at different moments. The
- * keyword is judged when the button is pressed, since that is the only thing
- * that collects (section 5.2). The narrowing fields are judged as they
- * change, because they only ever reorder and hide what is already on screen
- * and must not wait for a round trip that never comes.
+ * Split in two because the two halves do different jobs.
+ *
+ * The keyword **and the price band** are the question put to Mercari, judged
+ * when the button is pressed, because that is the only thing that collects
+ * (section 5.2). The band belongs on this side: Mercari applies it before
+ * ordering and paging, so it decides what can be reached at all.
+ *
+ * The listing date and the sale format only reorder and hide what is already
+ * on screen, so they are judged as they change and a half-typed one simply
+ * does not narrow.
  *
  * The rules are the specification's. The messages are not: section 9 asks for
  * "対象Fieldの近くに修正方法を表示" without fixing the words, and the sections
@@ -19,26 +24,43 @@ import type { Filters, SaleFormatFilter } from "./searchState";
 
 export const KEYWORD_MAX_LENGTH = 100;
 
-export type FilterFieldName =
-  | "minPriceYen"
-  | "maxPriceYen"
-  | "createdFrom"
-  | "createdTo";
+export type FilterFieldName = "createdFrom" | "createdTo";
+
+/** The fields that make up the question asked of Mercari. */
+export type SearchFieldName = "keyword" | "minPriceYen" | "maxPriceYen";
+
+export type SearchErrors = Partial<Record<SearchFieldName, string>>;
+
+/** What the search form holds. Text until it passes. */
+export type SearchFormValues = {
+  keyword: string;
+  minPriceYen: string;
+  maxPriceYen: string;
+};
+
+export const EMPTY_SEARCH_FORM: SearchFormValues = {
+  keyword: "",
+  minPriceYen: "",
+  maxPriceYen: "",
+};
+
+export type PriceBand = {
+  minPriceYen: number | null;
+  maxPriceYen: number | null;
+};
+
+export const NO_BAND: PriceBand = { minPriceYen: null, maxPriceYen: null };
 
 export type FilterErrors = Partial<Record<FilterFieldName, string>>;
 
 /** The narrowing fields, held as text until each one passes. */
 export type FilterFormValues = {
-  minPriceYen: string;
-  maxPriceYen: string;
   createdFrom: string;
   createdTo: string;
   saleFormat: SaleFormatFilter;
 };
 
 export const EMPTY_FILTER_FORM: FilterFormValues = {
-  minPriceYen: "",
-  maxPriceYen: "",
   createdFrom: "",
   createdTo: "",
   saleFormat: "all",
@@ -71,21 +93,47 @@ function parseDate(raw: string): string | null | "invalid" {
   return isCalendarDate(trimmed) ? trimmed : "invalid";
 }
 
-/** The keyword, trimmed, or the one thing to fix. */
-export function validateKeyword(
-  raw: string,
-): { ok: true; keyword: string } | { ok: false; error: string } {
-  const keyword = raw.trim();
+export type SearchValidation =
+  | { ok: true; keyword: string; band: PriceBand }
+  | { ok: false; errors: SearchErrors };
+
+/**
+ * The whole question, judged when the button is pressed.
+ *
+ * Everything here goes to Mercari, so a bad value must not be sent at all —
+ * unlike the narrowing fields below, which only hide what is already on
+ * screen and can shrug off a half-typed date.
+ */
+export function validateSearch(values: SearchFormValues): SearchValidation {
+  const errors: SearchErrors = {};
+
+  const keyword = values.keyword.trim();
   if (keyword === "") {
-    return { ok: false, error: "検索するキーワードを入力してください" };
+    errors.keyword = "検索するキーワードを入力してください";
+  } else if (keyword.length > KEYWORD_MAX_LENGTH) {
+    errors.keyword = `キーワードは${KEYWORD_MAX_LENGTH}文字までです（現在${keyword.length}文字）`;
   }
-  if (keyword.length > KEYWORD_MAX_LENGTH) {
-    return {
-      ok: false,
-      error: `キーワードは${KEYWORD_MAX_LENGTH}文字までです（現在${keyword.length}文字）`,
-    };
+
+  const min = parsePrice(values.minPriceYen);
+  const max = parsePrice(values.maxPriceYen);
+  if (min === "invalid") {
+    errors.minPriceYen = "0以上の整数で入力してください";
   }
-  return { ok: true, keyword };
+  if (max === "invalid") {
+    errors.maxPriceYen = "0以上の整数で入力してください";
+  }
+  if (typeof min === "number" && typeof max === "number" && min > max) {
+    errors.maxPriceYen = "最高価格は最低価格以上にしてください";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, errors };
+  }
+  return {
+    ok: true,
+    keyword,
+    band: { minPriceYen: min as number | null, maxPriceYen: max as number | null },
+  };
 }
 
 export type FilterValidation = {
@@ -104,15 +152,6 @@ export type FilterValidation = {
 export function validateFilters(values: FilterFormValues): FilterValidation {
   const errors: FilterErrors = {};
 
-  const min = parsePrice(values.minPriceYen);
-  const max = parsePrice(values.maxPriceYen);
-  if (min === "invalid") {
-    errors.minPriceYen = "0以上の整数で入力してください";
-  }
-  if (max === "invalid") {
-    errors.maxPriceYen = "0以上の整数で入力してください";
-  }
-
   const from = parseDate(values.createdFrom);
   const to = parseDate(values.createdTo);
   if (from === "invalid") {
@@ -120,17 +159,6 @@ export function validateFilters(values: FilterFormValues): FilterValidation {
   }
   if (to === "invalid") {
     errors.createdTo = "YYYY-MM-DD の形式で入力してください";
-  }
-
-  let minPriceYen = min === "invalid" ? null : min;
-  let maxPriceYen = max === "invalid" ? null : max;
-  if (
-    typeof minPriceYen === "number" &&
-    typeof maxPriceYen === "number" &&
-    minPriceYen > maxPriceYen
-  ) {
-    errors.maxPriceYen = "最高価格は最低価格以上にしてください";
-    maxPriceYen = null;
   }
 
   let createdFrom = from === "invalid" ? null : from;
@@ -145,13 +173,7 @@ export function validateFilters(values: FilterFormValues): FilterValidation {
   }
 
   return {
-    filters: {
-      minPriceYen,
-      maxPriceYen,
-      createdFrom,
-      createdTo,
-      saleFormat: values.saleFormat,
-    },
+    filters: { createdFrom, createdTo, saleFormat: values.saleFormat },
     errors,
   };
 }

@@ -545,6 +545,8 @@ class MarketplacePort(Protocol):
 | 項目 | MVP値 |
 |---|---:|
 | 販売状態 | `on_sale`固定 |
+| 並び | `SORT_CREATED_TIME` + `ORDER_DESC`（**検索が受け付ける唯一の時間順**） |
+| 価格帯 | `price_min` / `price_max`をMercariへ渡す。**取得範囲を変える** |
 | 古い商品の暫定基準 | 365日以上（**件数の報告にだけ使う**） |
 | 最低目標 | **置かない**（[MVP仕様 §5.3](../product/mvp-spec.md#最低目標を外した2026-09-03)） |
 | 最大ページ | 10ページ |
@@ -563,6 +565,26 @@ class MarketplacePort(Protocol):
 **2026-09-03に「最低目標を満たした」を外した。** `created`で測っていたため、
 `updated`を探すというProductの目的と軸が食い違っていた。理由は
 [MVP仕様 §5.3](../product/mvp-spec.md#最低目標を外した2026-09-03)。
+
+#### 並びは`ORDER_DESC`しか送らない（2026-09-03）
+
+以前は`ORDER_ASC`を送っていたが、**`mercapi`の`_allowed_sorting`に無い組み合わせ**であり、
+公式アプリも送らない。Mercariは`order`を無視して既定の並びを返すため、
+**要求している並びと実際に得ている並びが食い違っていた。** 実態に合わせた。
+
+なお`SORT_CREATED_TIME`という名前に反し、返る並びは`updated`の降順に傾いている
+（隣接ペアの降順破れが`updated` 21%、`created` 40%。
+[観測結果](../../poc/mercapi/timestamp-result.md)）。
+**Mercariの「新しい順」は`updated`で並んでいる。**
+
+#### 価格帯はMercariへ渡す（2026-09-03）
+
+`price_min` / `price_max`は**並べ替えとページングの前に**適用されるため、
+帯を狭めると同じ予算がより小さな母集団の上に落ちる。
+**`updated`の降順を逆にできない以上、奥へ届く手段はこれだけである。**
+理由は[MVP仕様 §5.3](../product/mvp-spec.md#価格帯だけが到達範囲を変える2026-09-03)。
+
+`None`はForkが0へ畳み、APIでは「下限なし」を意味する。
 
 検索結果には必ず、取得ページ数、取得ユニーク件数、重複件数、最古・最新日時、取得時刻、
 365日以上の商品数、停止理由、Server側の完全な古い順ではないことを付与する。

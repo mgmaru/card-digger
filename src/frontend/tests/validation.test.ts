@@ -9,9 +9,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_FILTER_FORM,
+  EMPTY_SEARCH_FORM,
   validateFilters,
-  validateKeyword,
+  validateSearch,
   type FilterFormValues,
+  type SearchFormValues,
 } from "../src/validation";
 
 const form = (patch: Partial<FilterFormValues>): FilterFormValues => ({
@@ -19,57 +21,77 @@ const form = (patch: Partial<FilterFormValues>): FilterFormValues => ({
   ...patch,
 });
 
-describe("validateKeyword", () => {
-  it("is required", () => {
-    expect(validateKeyword("   ").ok).toBe(false);
+const query = (patch: Partial<SearchFormValues>): SearchFormValues => ({
+  ...EMPTY_SEARCH_FORM,
+  keyword: "ポケモンカード 引退",
+  ...patch,
+});
+
+describe("the question put to Mercari", () => {
+  it("requires a keyword", () => {
+    expect(validateSearch(query({ keyword: "   " })).ok).toBe(false);
   });
 
   it("trims before measuring and before sending", () => {
-    const result = validateKeyword(`  ${"あ".repeat(100)}  `);
+    const result = validateSearch(query({ keyword: `  ${"あ".repeat(100)}  ` }));
     expect(result.ok).toBe(true);
     expect(result.ok === true && result.keyword).toBe("あ".repeat(100));
   });
 
   it("stops at 100 characters", () => {
-    expect(validateKeyword("あ".repeat(101)).ok).toBe(false);
-    expect(validateKeyword("あ".repeat(100)).ok).toBe(true);
+    expect(validateSearch(query({ keyword: "あ".repeat(101) })).ok).toBe(false);
+    expect(validateSearch(query({ keyword: "あ".repeat(100) })).ok).toBe(true);
   });
-});
 
-describe("price", () => {
-  it("treats a blank field as no bound", () => {
-    const { filters, errors } = validateFilters(form({}));
-    expect(filters.minPriceYen).toBeNull();
-    expect(filters.maxPriceYen).toBeNull();
-    expect(errors).toEqual({});
+  it("treats a blank price field as no bound", () => {
+    const result = validateSearch(query({}));
+    expect(result.ok === true && result.band).toEqual({
+      minPriceYen: null,
+      maxPriceYen: null,
+    });
   });
 
   it("accepts zero as a bound", () => {
-    expect(validateFilters(form({ minPriceYen: "0" })).filters.minPriceYen).toBe(0);
+    const result = validateSearch(query({ minPriceYen: "0" }));
+    expect(result.ok === true && result.band.minPriceYen).toBe(0);
   });
 
   it("rejects anything that is not a whole number of yen", () => {
     for (const bad of ["-1", "12.5", "1e3", "１２３", "abc", "1 2"]) {
-      expect(validateFilters(form({ minPriceYen: bad })).errors.minPriceYen)
-        .toBeTruthy();
+      const result = validateSearch(query({ minPriceYen: bad }));
+      expect(result.ok === false && result.errors.minPriceYen).toBeTruthy();
     }
   });
 
-  it("requires the maximum to be at least the minimum", () => {
-    const { errors, filters } = validateFilters(
-      form({ minPriceYen: "5000", maxPriceYen: "1000" }),
+  it("refuses a band that cannot hold anything", () => {
+    const result = validateSearch(
+      query({ minPriceYen: "5000", maxPriceYen: "1000" }),
     );
-    expect(errors.maxPriceYen).toBeTruthy();
-    // The bad bound is dropped rather than applied, so the screen keeps
-    // showing something while it is being corrected.
-    expect(filters.maxPriceYen).toBeNull();
-    expect(filters.minPriceYen).toBe(5000);
+    // Unlike a filter, a bad band is never partly applied: it is going to
+    // Mercari, and half a band is a different question.
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.errors.maxPriceYen).toBeTruthy();
   });
 
   it("allows the two bounds to be equal", () => {
     expect(
-      validateFilters(form({ minPriceYen: "1000", maxPriceYen: "1000" })).errors,
-    ).toEqual({});
+      validateSearch(query({ minPriceYen: "1000", maxPriceYen: "1000" })).ok,
+    ).toBe(true);
+  });
+
+  it("reports every bad field at once", () => {
+    const result = validateSearch({
+      keyword: "",
+      minPriceYen: "x",
+      maxPriceYen: "y",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(Object.keys(result.errors).sort()).toEqual([
+      "keyword",
+      "maxPriceYen",
+      "minPriceYen",
+    ]);
   });
 });
 
@@ -104,18 +126,11 @@ describe("listing date", () => {
 describe("reporting", () => {
   it("reports every bad field at once, not just the first", () => {
     const { errors } = validateFilters({
-      minPriceYen: "x",
-      maxPriceYen: "y",
       createdFrom: "nope",
       createdTo: "also nope",
       saleFormat: "all",
     });
-    expect(Object.keys(errors).sort()).toEqual([
-      "createdFrom",
-      "createdTo",
-      "maxPriceYen",
-      "minPriceYen",
-    ]);
+    expect(Object.keys(errors).sort()).toEqual(["createdFrom", "createdTo"]);
   });
 
   it("keeps the sale format, which cannot be typed wrong", () => {

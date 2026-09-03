@@ -154,20 +154,25 @@ def create_app(
     @app.post("/api/search", response_model=SearchResponse)
     async def search(request: SearchRequest, response: Response) -> SearchResponse:
         collection = await reaching_out.collect(
-            search_key(request.keyword),
+            # The band is part of the key. Two bands are two questions, and
+            # joining one to the other would hand back a set somebody else
+            # narrowed.
+            search_key(request.keyword, request.min_price_yen, request.max_price_yen),
             lambda: collect_search(
                 port,
                 request.keyword,
                 clock=now,
                 sleeper=wait,
                 gate=reaching_out.gate(),
+                price_min=request.min_price_yen,
+                price_max=request.max_price_yen,
             ),
         )
         response.status_code = http_status_for(len(collection.items), collection.meta)
-        # Returned unsorted and unfiltered. The frontend sorts and filters over
-        # this set, and never asks for a different order: Mercari has no oldest
-        # first option, and changing `order` was measured not to change what
-        # comes back.
+        # Returned unsorted. The frontend orders this set and never asks for a
+        # different one: Mercari offers no oldest-first, and the ascending pair
+        # it does not offer was measured to change nothing. What narrows the
+        # set is the price band above, which was applied by Mercari.
         return SearchResponse(
             items=[ItemResponse.of(item) for item in collection.items],
             meta=CollectionMetaResponse.of(collection.meta),

@@ -42,7 +42,14 @@ def status_error(status_code: int) -> httpx.HTTPStatusError:
 
 
 class TestSearchRequest:
-    async def test_asks_for_listings_on_sale_oldest_first(self):
+    async def test_asks_for_listings_on_sale_in_the_only_time_order_there_is(self):
+        """Mercari's 新しい順, which is the sole ordering the search accepts.
+
+        The ascending pair is not one of the combinations the official app
+        sends, and asking for it was measured to change nothing that came
+        back. Requesting an order we do not get would leave the code claiming
+        one thing while the data said another.
+        """
         port, client = adapter(search=search_results("search/page_1_has_next.json"))
 
         await port.search_items_page("sample")
@@ -51,7 +58,31 @@ class TestSearchRequest:
         assert sent.args == ("sample",)
         assert sent.kwargs["status"] == [SearchRequestData.Status.STATUS_ON_SALE]
         assert sent.kwargs["sort_by"] is SearchRequestData.SortBy.SORT_CREATED_TIME
-        assert sent.kwargs["sort_order"] is SearchRequestData.SortOrder.ORDER_ASC
+        assert sent.kwargs["sort_order"] is SearchRequestData.SortOrder.ORDER_DESC
+
+    async def test_sends_the_price_band_to_the_marketplace(self):
+        """The band has to narrow the population, not the page.
+
+        Filtering after collecting can only remove listings already fetched. It
+        can never reach the ones behind the tail, which are the only ones worth
+        collecting deeply for.
+        """
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_items_page("sample", price_min=3000, price_max=5000)
+
+        sent = client.calls_to("search")[0]
+        assert sent.kwargs["price_min"] == 3000
+        assert sent.kwargs["price_max"] == 5000
+
+    async def test_an_absent_bound_is_sent_as_no_bound(self):
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_items_page("sample")
+
+        sent = client.calls_to("search")[0]
+        assert sent.kwargs["price_min"] is None
+        assert sent.kwargs["price_max"] is None
 
     async def test_trims_the_keyword(self):
         port, client = adapter(search=search_results("search/page_1_has_next.json"))
