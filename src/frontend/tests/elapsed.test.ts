@@ -13,6 +13,7 @@ import {
   durationLabel,
   elapsedDays,
   elapsedLabel,
+  latestMoment,
   longestWithoutUpdate,
 } from "../src/elapsed";
 
@@ -111,5 +112,26 @@ describe("longestWithoutUpdate", () => {
     expect(longestWithoutUpdate([at(1), at(3), at(7)], AT)).toBe(7);
     // One narrow enough to exhaust comes back like this.
     expect(longestWithoutUpdate([at(1), at(1890)], AT)).toBe(1890);
+  });
+});
+
+describe("latestMoment", () => {
+  it("picks the most recent of several timestamps", () => {
+    expect(latestMoment([daysBefore(30), daysBefore(2), daysBefore(400)])).toBe(
+      daysBefore(2),
+    );
+  });
+
+  it("has no answer when there are no timestamps", () => {
+    expect(latestMoment([])).toBeNull();
+  });
+
+  it("compares moments rather than strings", () => {
+    // Same instant, two spellings. Sorted as text "2026-09-02T..." loses to
+    // "2026-09-02T05:03:00Z" only by accident of the digits.
+    const jst = "2026-09-02T14:03:00+09:00";
+    const utc = "2026-09-02T04:03:00Z";
+    expect(latestMoment([jst, utc])).toBe(jst);
+    expect(latestMoment([utc, jst])).toBe(jst);
   });
 });

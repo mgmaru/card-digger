@@ -13,6 +13,7 @@
  * shown as the three counts instead: a count carries no scale to get wrong.
  */
 
+import { elapsedLabel } from "../elapsed";
 import type { RatingBreakdown, Seller } from "../types/api";
 
 import styles from "./SellerProfile.module.css";
@@ -39,12 +40,38 @@ function Ratings({ breakdown }: { breakdown: RatingBreakdown | null }) {
   );
 }
 
-export function SellerProfile({ seller }: { seller: Seller }) {
+export function SellerProfile({
+  seller,
+  lastUpdatedAt,
+  collectedAt,
+}: {
+  seller: Seller;
+  /**
+   * The newest `updatedAt` among every listing collected for this seller, or
+   * `null` when nothing was collected.
+   *
+   * A listing dormant for five years is only worth finding if the person who
+   * posted it is still reachable, and nothing else on this screen answers
+   * that. It cannot be shown on a search card: that would mean analysing every
+   * seller in the result, at up to seventy seconds each.
+   */
+  lastUpdatedAt: string | null;
+  /** The snapshot both statuses were collected by. Durations count to this. */
+  collectedAt: string;
+}) {
   return (
     <section className={styles.profile} aria-label="Seller">
       <h2 className={styles.name}>{seller.name || MISSING}</h2>
 
       <dl className={styles.facts}>
+        <div className={styles.fact}>
+          <dt>最も新しい更新</dt>
+          <dd>
+            {lastUpdatedAt === null
+              ? MISSING
+              : elapsedLabel(lastUpdatedAt, collectedAt)}
+          </dd>
+        </div>
         <div className={styles.fact}>
           <dt>評価</dt>
           <dd>
@@ -68,6 +95,11 @@ export function SellerProfile({ seller }: { seller: Seller }) {
       </dl>
 
       <div className={styles.limits}>
+        <p>
+          「最も新しい更新」は取得した商品の更新日時のうち最も新しいものです。
+          この出品者が今も動いているかの手掛かりであり、
+          取得できていない出品の更新は含みません。
+        </p>
         <p>出品件数は現在の出品数であり、累計販売件数ではありません。</p>
         <p>
           評価は件数の内訳で表示しています。
