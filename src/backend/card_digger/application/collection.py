@@ -278,6 +278,17 @@ async def collect_pages(
             break
         cursor = page_info.next_cursor
 
+    # A page can end the results and cross the item ceiling at the same time.
+    # The marketplace then has nothing more to give, yet this collection threw
+    # away listings it had already been handed, so "we have everything" is
+    # false — and that is the only thing `reached_end` is read for. A seller
+    # with 104 listings would otherwise be shown as `100件取得（終端まで取得）`,
+    # which is the misreading the completion criteria exist to prevent.
+    if reached_end and discarded_by_limit_count:
+        reached_end = False
+        if stop_reason is CollectionStopReason.END_OF_RESULTS:
+            stop_reason = CollectionStopReason.MAX_ITEMS
+
     collected = tuple(items)
     created = [item.created_at for item in collected]
     truncated = (

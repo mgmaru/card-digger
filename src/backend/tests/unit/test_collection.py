@@ -304,6 +304,53 @@ class TestStopReasons:
         ]
         assert collected.meta.discarded_by_limit_count == 2
 
+    async def test_a_last_page_that_crosses_the_ceiling_is_not_the_end(
+        self, clock, sleeper
+    ):
+        """Ending the results and hitting the ceiling can both be true.
+
+        A seller with 104 listings hands over a final page of 14 with no next
+        cursor. Four of them are dropped at the hundredth. `reached_end` is
+        what every screen reads for "nothing is missing", so it cannot stay
+        true here: `100件取得（終端まで取得）` would present a seller with 104
+        listings as one with exactly 100.
+        """
+        collected = await self._collect(
+            clock,
+            sleeper,
+            pages(
+                make_search_page(make_items(3, start=1), next_cursor="p2"),
+                make_search_page(make_items(3, start=4)),
+            ),
+            limits=CollectionLimits(
+                max_pages=10, max_items=4, max_duration_seconds=300.0
+            ),
+        )
+
+        assert collected.meta.discarded_by_limit_count == 2
+        assert collected.meta.reached_end is False
+        assert collected.meta.stop_reason is CollectionStopReason.MAX_ITEMS
+        assert collected.meta.truncated is True
+
+    async def test_a_last_page_that_fits_is_still_the_end(self, clock, sleeper):
+        """The other side of it. Nothing dropped, so nothing is missing."""
+        collected = await self._collect(
+            clock,
+            sleeper,
+            pages(
+                make_search_page(make_items(3, start=1), next_cursor="p2"),
+                make_search_page(make_items(1, start=4)),
+            ),
+            limits=CollectionLimits(
+                max_pages=10, max_items=4, max_duration_seconds=300.0
+            ),
+        )
+
+        assert collected.meta.discarded_by_limit_count == 0
+        assert collected.meta.reached_end is True
+        assert collected.meta.stop_reason is CollectionStopReason.END_OF_RESULTS
+        assert collected.meta.truncated is False
+
     async def test_the_time_budget_is_reported(self, clock, sleeper):
         collected = await self._collect(
             clock,

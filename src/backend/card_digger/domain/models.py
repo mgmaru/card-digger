@@ -159,7 +159,10 @@ class CollectionMeta:
     newest_created_at: datetime | None
     collected_at: datetime
     stop_reason: CollectionStopReason
-    #: True only when the marketplace reported no further page.
+    #: True when nothing is missing: the marketplace reported no further page
+    #: **and** nothing was dropped at the item ceiling. A last page that ends
+    #: the results can still cross the ceiling, and the listings dropped there
+    #: are as missing as the ones never fetched.
     reached_end: bool
     #: True when more may exist: a target, page, item or time limit was hit.
     truncated: bool

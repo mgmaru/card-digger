@@ -74,7 +74,11 @@ export type CollectionMeta = {
   /** When the backend finished collecting. Everything shown is this snapshot. */
   collectedAt: IsoDateTime;
   stopReason: CollectionStopReason;
-  /** True only when `has_next=false` was reached. */
+  /**
+   * True when nothing is missing: the marketplace reported no further page
+   * **and** nothing was dropped at the item ceiling. A final page can do both
+   * at once, and listings dropped there are as missing as ones never fetched.
+   */
   reachedEnd: boolean;
   /** True when a limit stopped the collection and more may exist. */
   truncated: boolean;
