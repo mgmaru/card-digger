@@ -6,9 +6,9 @@
 > Auction情報を追加検証し、Mercari Adapterとして分離するPhase 0-Fも、2026-09-01の
 > [ライブ受入検証（L4）](../phase-0/phase-0-f-live-acceptance-result.md)合格をもって完了した。
 > 現在は**Phase 1のSearch MVP**が次の目標。[1-0](#1-0-application基盤)から
-> [1-4](#phase-1-4--seller-knowledge-indicator)までの実装は**2026-09-03に完了した。**
-> 残るのは[1-5](#phase-1-5--e2e受入flowとlayout確認)、
-> **E2E受入FlowとLayout確認**である。
+> [1-5](#phase-1-5--e2e受入flowとlayout確認)までの実装は**2026-09-03に完了した。**
+> [MVP完了条件](../product/mvp-spec.md#mvp完了条件)は**E2E受入Flowが自動で通っている。**
+> 次は[MVP後 — 探索補助](#mvp後--探索補助)のA（売却済み商品の価格分布）が最初の候補。
 > **1-0には安全停止の回復条件が未決で2件残っている。**
 
 ---
@@ -2057,7 +2057,7 @@ CIでも毎回その時間を払う。**同じことを2か所で測って、遅
 - [x] `ci.yml`へ`e2e` Jobを足した（Chromiumのinstallと、失敗時のtrace回収を含む）
 - [x] ci-policy §3.1のJob表を更新し、「まだ足していない」を消した
 - [x] **文書の必須Statusを5つにした**
-- [ ] **GitHubの設定を5つへ揃える。** 文書を直しただけでは変わらない（[下記](#必須statusは文書を直しただけでは変わらない)）
+- [x] **GitHubの設定を5つへ揃えた（2026-09-03）。** 文書を直しただけでは変わらない（[下記](#必須statusは文書を直しただけでは変わらない)）
 
 #### 必須Statusは文書を直しただけでは変わらない
 
@@ -2068,6 +2068,14 @@ CIでも毎回その時間を払う。**同じことを2か所で測って、遅
 ```bash
 gh api repos/mgmaru/card-digger/branches/main/protection \
   --jq '.required_status_checks.contexts'
+```
+
+**2026-09-03に確認して揃えた。** `required_status_checks`だけを触るendpointを使い、
+Linear history・force push禁止・deletions禁止が動いていないことを前後で確認した。
+
+```text
+["Docs links","PoC unit tests","Backend unit and contract tests",
+ "Frontend unit and component tests","E2E acceptance flow"]
 ```
 
 > **文書を直しただけでは、GitHubの設定は変わらない。** 2026-09-02に`Frontend`を
