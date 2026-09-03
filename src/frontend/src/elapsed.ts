@@ -121,6 +121,22 @@ export function longestWithoutUpdate(
   );
 }
 
+/**
+ * The most recent of some timestamps, or `null` if there are none.
+ *
+ * Compared as moments rather than as strings: the backend serialises an offset,
+ * and `+09:00` sorts before `Z` while meaning nine hours later.
+ */
+export function latestMoment(moments: readonly string[]): string | null {
+  let latest: string | null = null;
+  for (const moment of moments) {
+    if (latest === null || new Date(moment) > new Date(latest)) {
+      latest = moment;
+    }
+  }
+  return latest;
+}
+
 export function dormancy(updatedAt: string, collectedAt: string): Dormancy {
   const days = elapsedDays(updatedAt, collectedAt);
   const capped = days >= DORMANCY_AXIS_DAYS;

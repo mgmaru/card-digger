@@ -47,7 +47,11 @@ function meta(patch: Partial<CollectionMeta> = {}): CollectionMeta {
   };
 }
 
-function item(id: string, status: Item["listingStatus"]): Item {
+function item(
+  id: string,
+  status: Item["listingStatus"],
+  updatedAt = "2026-08-01T00:00:00+09:00",
+): Item {
   return {
     id,
     title: `商品 ${id}`,
@@ -55,7 +59,7 @@ function item(id: string, status: Item["listingStatus"]): Item {
     url: `https://jp.mercari.com/item/${id}`,
     imageUrls: [],
     createdAt: "2025-09-01T00:00:00+09:00",
-    updatedAt: "2026-08-01T00:00:00+09:00",
+    updatedAt,
     listingStatus: status,
     saleFormat: "fixed_price",
     sellerId: "s1",
@@ -216,6 +220,44 @@ describe("profile", () => {
     mount();
     const profile = await screen.findByLabelText("Seller");
     expect(within(profile).getAllByText("-")).toHaveLength(3);
+    expect(within(profile).getByText("1か月前")).toBeInTheDocument();
+  });
+
+  it("reads the newest update across both statuses, not just what is on sale", async () => {
+    // A seller who never edits a listing but sold something two days ago is
+    // active. On-sale alone would report them as a month gone.
+    sellerMock.mockResolvedValue(
+      analysis({
+        soldOut: {
+          items: [item("c", "sold_out", "2026-08-31T14:03:00+09:00")],
+          meta: meta({ uniqueItemCount: 42, pageCount: 2 }),
+        },
+      }),
+    );
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    expect(within(profile).getByText("最も新しい更新")).toBeInTheDocument();
+    expect(within(profile).getByText("2日前")).toBeInTheDocument();
+    expect(within(profile).queryByText("1か月前")).not.toBeInTheDocument();
+  });
+
+  it("says the newest update is only over what was collected", async () => {
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    expect(profile).toHaveTextContent("取得できていない出品の更新は含みません");
+  });
+
+  it("shows a dash for the newest update when nothing was collected", async () => {
+    sellerMock.mockResolvedValue(
+      analysis({
+        onSale: { items: [], meta: meta({ uniqueItemCount: 0, pageCount: 1 }) },
+        soldOut: { items: [], meta: meta({ uniqueItemCount: 0, pageCount: 1 }) },
+      }),
+    );
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    const row = within(profile).getByText("最も新しい更新").parentElement;
+    expect(row).toHaveTextContent("-");
   });
 
   it("links out to the seller on Mercari", async () => {
