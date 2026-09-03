@@ -7,8 +7,8 @@
 > [ライブ受入検証（L4）](../phase-0/phase-0-f-live-acceptance-result.md)合格をもって完了した。
 > 現在は**Phase 1のSearch MVP**が次の目標。[1-0](#1-0-application基盤)から
 > [1-4](#phase-1-4--seller-knowledge-indicator)までの実装は**2026-09-03に完了した。**
-> 残るのは[MVP完了条件](../product/mvp-spec.md#mvp完了条件)の確認、とりわけ
-> **E2E受入Flowの自動化**である。
+> 残るのは[1-5](#phase-1-5--e2e受入flowとlayout確認)、
+> **E2E受入FlowとLayout確認**である。
 > **1-0には安全停止の回復条件が未決で2件残っている。**
 
 ---
@@ -1416,8 +1416,10 @@ Processを再起動するまで一切取得できなくなる。
 
 ### Test
 
-- [ ] Mobile / Desktopの主要Flow確認。**1-1〜1-4が揃った2026-09-03から着手できる**
-  （tokenの見え方は390 / 768 / 1280 / 1440pxで確認済み。**画面の確認はまだ**）
+**Mobile / Desktopの主要Flow確認は[1-5](#phase-1-5--e2e受入flowとlayout確認)へ移した。**
+1-1〜1-4が揃うまで着手できず、E2Eと同じ道具で確かめるものなので、
+**進捗を2か所に置かない。** tokenの見え方は390 / 768 / 1280 / 1440pxで確認済みで、
+**画面そのものの確認はまだである。**
 
 > **文言は決め直さない。** 画面に出す日本語はMVP仕様が確定させている。
 > `.claude/skills/frontend-design`を使う境界も
@@ -1874,6 +1876,120 @@ Testは[MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)から引�
 
 ---
 
+# Phase 1-5 — E2E受入FlowとLayout確認
+
+## 目的
+
+**画面を1枚ずつ確かめるのをやめ、探索そのものが通ることを1本で確かめる。**
+1-1〜1-4は部品ごとに緑だが、**部品をつないだ経路は一度も自動で通っていない。**
+
+## なぜこの節が今まで無かったのか（2026-09-03に判明）
+
+**2026-09-02の`84f3bab`が、todoの完了チェックから2件のcheckboxを消したときに落ちた。**
+
+```text
+- [ ] MobileとKeyboardで主要Flowを操作できる
+- [ ] Mock Adapterを使うE2E受入Flowが成功する
+```
+
+**消したこと自体は正しい。** どちらも[MVP仕様](../product/mvp-spec.md#mvp完了条件)が
+持つべき**受入条件**であり、[配置ルール](../README.md#checkboxは3種類ある)のとおり
+仕様側が正本である。
+
+**落ちたのは、その受入条件を満たすための作業のほうである。**
+「E2E受入Flowが成功する」は完了の定義だが、「Playwrightを入れて10手順を書く」は進捗であり、
+**todoが持たなければならない。** 移すときに後者を作り直さなかった。
+
+> **受入条件を仕様へ寄せるときは、それを満たす作業がtodoに残るかを確かめる。**
+> 二重管理を消す操作は、作業そのものも一緒に消しうる。
+
+なお**Mobile / Desktop確認は消えていない。** [1-V](#1-v-視覚方針)のTestに残っていたが、
+1-1〜1-4が揃うまで着手できなかったため、**この節へ集めて1か所にする。**
+
+## 着手前に決めること
+
+**コードを書く前に決着させる。** 3件とも、後から変えるとTestを書き直すことになる。
+
+| # | 決めること | 効いてくるところ |
+|---|---|---|
+| 1 | Layout確認を自動化するか、目視にするか | 10手順を2幅で流すか、手順書を書くか |
+| 2 | どのBrowserで走らせるか | Playwrightのinstall対象とCI時間 |
+| 3 | E2Eで2秒間隔を効かせるか | 1 runが数秒か、数十秒か |
+
+## やること
+
+### A. Backendへ受入用の起動口を作る
+
+**Mock Adapterはあるが、それでApplicationを起動する手段が無い。** `create_app()`は
+`marketplace`をParameterに取る設計になっているので（実Mercariを既定にするのは
+`_mercari_marketplace()`）、**渡すだけの薄い入口を足せばよい。**
+
+- [ ] Mock Adapterを渡す受入用のentry pointを作る
+- [ ] 10手順が必要とする種Dataを1か所へ置く（通常出品とAuctionの混在、掲載日の幅、
+  販売中と売却済みで**打ち切り理由が違う**Seller、Seller Knowledgeが計算できるTitle）
+- [ ] **この入口から実Mercariへ絶対に出ない**ことをTestで担保する
+- [ ] `CLAUDE.md`の「動かす」へ起動コマンドを追記する
+
+> **`MockデータでMercari停止時も開発できるようにする`はこの作業と同じものである。**
+> 非機能TODOに残っていた1行を、ここへ統合した。
+
+### B. Playwrightを入れてVersionを固定する
+
+[Test運用規約 §4.1](../development/test-policy.md#41-framework)が
+「**Versionは着手時に固定する**」としたまま空欄になっている。
+
+- [ ] Playwrightを`src/frontend`へ入れ、`e2e/`へ置く（`vitest`の探索から外す）
+- [ ] [MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)のPackage表へ追記する
+- [ ] Test運用規約 §4.1のVersion欄を埋め、§4.2の配置図へ`e2e/`を足す
+
+### C. 10手順を実装する
+
+[MVP仕様のE2E受入Flow](../product/mvp-spec.md#e2e受入flow)を正本とする。**ここに複製しない。**
+
+- [ ] 10手順を1本のFlowとして書く（**順序に意味がある**ので手順ごとに分けない）
+- [ ] 手順9「**Mock Adapterへの検索Requestが増えていない**」の観測方法を決めて書く
+
+> **手順9だけ、観測する場所が仕様と違う。** 仕様はMock Adapterへの到達を言うが、
+> Browserから見えるのは`POST /api/search`である。**Browser側で数えるなら仕様の文を直す。**
+> Backend側で数えるなら、受入用の入口が呼び出し回数を申告する必要がある。
+
+### D. Mobile / Desktopの主要Flowを確認する
+
+**[1-V](#1-v-視覚方針)から移した。** tokenの見え方は390 / 768 / 1280 / 1440pxで確認済みだが、
+**画面そのものは未確認である。**
+
+- [ ] 決めた方針（着手前に決めること #1）に沿って確認する
+- [ ] Keyboardで主要操作へ到達できることを確認する
+  （[MVP仕様 §3.3](../product/mvp-spec.md#33-共通ui)）
+
+> **既知の罠。** headless Chromeは幅を500px未満へ狭められない。Playwrightは
+> `viewport`で390pxを指定できるが、**素のheadless Chromeへ落ちる経路を使うと
+> 切れた画像をBugと読み違える。**
+
+### E. CIへJobを足す
+
+[CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)が
+「**E2E受入Flow（Playwright）のJobはまだ足していない**」と書いたまま残っている。
+
+- [ ] `ci.yml`へ`e2e` Jobを足す（Browserのinstallを含む）
+- [ ] ci-policy §3.1のJob表を更新し、末尾の「まだ足していない」を消す
+- [ ] **必須Statusへ加えるかを決め、加えるならGitHubの設定も変える**
+
+> **文書を直しただけでは、GitHubの設定は変わらない。** 2026-09-02に`Frontend`を
+> 表へ書いた時点では必須Statusが3つのままで、**Frontendが赤でもMergeできる状態が残っていた**
+> （[ci-policy §6](../development/ci-policy.md#6-branch保護)）。`gh api`で実際の値を確認する。
+
+## この節が満たす受入条件
+
+**正本は[MVP仕様のMVP完了条件](../product/mvp-spec.md#mvp完了条件)。** ここでは追わない。
+
+| 受入条件 | この節のどれが満たすか |
+|---|---|
+| E2E受入Flowがすべて成功する | A・B・C |
+| 主要操作がKeyboardとMobile Layoutで利用できる | D |
+
+---
+
 # MVP後 — 探索補助
 
 次はMVPへ含めない。MVPの利用結果から優先度を決める。
@@ -2257,11 +2373,13 @@ Marketplace
 
 実施方法は[Test運用規約](../development/test-policy.md)を正本とする。
 
-- [ ] DomainロジックのUnit Test
-- [ ] Seller KnowledgeのUnit Test
-- [ ] AdapterのIntegration Test
-- [ ] 検索画面のE2E Test
-- [ ] MockデータでMercari停止時も開発できるようにする
+- [x] DomainロジックのUnit Test（0-Fで実装済み。`tests/unit/`）
+- [x] Seller KnowledgeのUnit Test（1-0で実装済み。`tests/unit/test_seller_knowledge.py`）
+- [x] AdapterのIntegration Test（0-Fで実装済み。`tests/contract/`）
+
+**E2E TestとMockでの開発は[1-5](#phase-1-5--e2e受入flowとlayout確認)が持つ。**
+ここには「検索画面のE2E Test」と「MockデータでMercari停止時も開発できるようにする」の
+2行があったが、**どちらも1-5のA・Cと同じ作業**である。1-5へ統合した。
 
 ## エラー処理
 
