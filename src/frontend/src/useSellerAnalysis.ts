@@ -33,21 +33,32 @@ export function useSellerAnalysis(sellerId: string): SellerAnalysisState {
   // Section 6.1: never two collections for the same seller at once. React
   // mounts effects twice in development, and each Mercari request costs two
   // seconds of interval — the guard keeps that from being paid twice.
-  const inFlight = useRef<string | null>(null);
+  //
+  // The request itself is held, not merely the fact that one was sent. A guard
+  // that only remembered "already asked" would return early from the second
+  // mount, leaving the answer to arrive at a closure the first mount had
+  // already retired: one request out, nobody left to receive it, and a screen
+  // reading 取得中 for ever. Holding the promise lets the second mount listen
+  // to the first mount's request instead of skipping or repeating it.
+  const inFlight = useRef<{
+    key: string;
+    request: Promise<SellerAnalysisResponse>;
+  } | null>(null);
 
   useEffect(() => {
     const key = `${sellerId}#${attempt}`;
-    if (inFlight.current === key) {
-      return;
-    }
-    inFlight.current = key;
-
     let current = true;
-    setStatus("loading");
-    setAnalysis(null);
-    setError(null);
 
-    sellerAnalysis(sellerId)
+    let pending = inFlight.current;
+    if (pending?.key !== key) {
+      setStatus("loading");
+      setAnalysis(null);
+      setError(null);
+      pending = { key, request: sellerAnalysis(sellerId) };
+      inFlight.current = pending;
+    }
+
+    pending.request
       .then((response) => {
         if (!current) return;
         setAnalysis(response);

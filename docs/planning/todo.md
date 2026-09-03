@@ -1729,9 +1729,27 @@ Routerより上へ上げると、頼まれていないCacheになる。
 **「42件」がこのSellerの全売却実績に見える。** 上限はこちらの都合であって
 Sellerの実績ではないので、両方を常に出す。
 
+### 使ってみて見つけた1件 — 画面が`取得中`から戻らない（2026-09-03）
+
+**Sellerを分析した画面が、永久に「Sellerの商品を取得中」のままだった。**
+`npm run dev`（StrictMode）でだけ起きる。**Testは全部緑だった。**
+
+StrictModeは開発時に効果をmount → cleanup → mountし直す。`useSellerAnalysis`の
+二重取得防止は「もう頼んだ」という事実だけを覚えていたため、2回目のmountが**早期returnし**、
+答えは1回目のmountが既に破棄したclosureへ届いていた。**Requestは1本出て、受け取る者がいない。**
+
+- [x] **事実ではなくRequestそのものを持つようにした** — 2回目のmountは、
+  1回目のRequestを**聞きに行く**。飛ばしも、やり直しもしない
+- [x] **StrictModeで包んだRegression Testを足した** — 既存のTestは`render()`が
+  StrictModeを使わないため、**この壊れ方を1つも踏めなかった**
+
+> **Component Testが「本番と同じ木」で描いていなかった。** `main.tsx`はStrictModeで包むのに、
+> Testは包んでいない。**同じ理由の失敗は、他の効果を足したときにまた起きうる。**
+
 ### Test
 
 - [x] Sellerの状態別Tabと取得範囲表示のTest
+- [x] StrictModeで二重mountしても画面が埋まるTest
 - [x] Profileの出品件数を「累計販売件数」と書かないTest
 - [x] 評価スコアを出していないTest
 - [x] 評価を件数の内訳で出すTest
