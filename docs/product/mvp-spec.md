@@ -236,7 +236,7 @@ DOM向けのexportを持つ。
 - 販売中商品の取得
 - 検索中のLoading表示
 - 商品IDによる重複排除
-- 最低価格・最高価格Filter
+- 最低価格・最高価格の指定（**Mercariへ送る検索条件。取得範囲が変わる**）
 - 掲載開始日・終了日Filter（Asia/Tokyoの日単位）
 - 販売形式（通常出品・オークション・不明）の保持とBadge表示
 - 販売形式Filter（Auction追加検証に合格したため有効）
@@ -919,10 +919,14 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 
 ### Frontend
 
-- 価格・掲載日期間のValidation Test
+- キーワード・価格帯のValidation Test（**検索条件のほう**）
+- 掲載日期間のValidation Test（**Filterのほう**）
 - 入力、Loading、0件、成功、部分成功、Error表示のComponent Test
-- 価格・掲載日・販売形式Filterと6種類のSortのTest（`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`）
+- **価格帯がMercariへ渡り、Frontendでは絞られないTest**
+- 掲載日・販売形式Filterと6種類のSortのTest（`created_asc` / `created_desc` / `updated_asc` / `updated_desc` / `price_asc` / `price_desc`）
 - Asia/Tokyoの日付境界と開始日・終了日の片側指定Test
+- **`reachedEnd`のときだけ取得範囲の警告を出さないTest**
+- **「最も更新されていない出品」が取得済み全件から計算されるTest**
 - Seller画面へ遷移して戻ったとき、再検索せずSort / Filter状態が保持されるTest
 - 通常出品・Auction・不明のBadgeと価格LabelのTest
 - 画像PlaceholderのTest
@@ -938,7 +942,7 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 2. 取得範囲と古い順の注意書きを確認する
 3. 掲載開始日だけ、終了日だけ、期間指定でFilterする
 4. 通常出品・Auctionを切り替え、Badgeと価格Labelを確認する
-5. 価格FilterとSortを変更する
+5. Sortを変更する（**価格帯は検索条件なので、変えると再収集になる**）
 6. 商品CardからSeller画面を開く
 7. 販売中・売却済みの件数と打ち切り理由を確認する
 8. Seller Knowledgeと標本信頼度を確認する

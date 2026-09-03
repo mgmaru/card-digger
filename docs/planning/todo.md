@@ -1482,9 +1482,11 @@ Keywordは`SearchForm`、絞り込みは`FilterControls`、取得範囲は`Colle
 [MVP仕様 §11](../product/mvp-spec.md#11-testと完了条件)から、この画面の分を引く。
 
 > **§11とこの一覧の関係。** §11は**何をTestするか**の定義と[MVP完了条件](../product/mvp-spec.md#mvp完了条件)を
-> 引き受け、こちらは**どの節でやるか**を引き受ける。§11の10件はすべて
-> 1-V / 1-1 / 1-2 / 1-3 / 1-4 のどれかに現れる。**両方に`[ ]`があるので、
-> 消化するときは2か所を直す。** 片方へ寄せるかは未決。
+> 引き受け、こちらは**どの節でやるか**を引き受ける。§11の項目はすべて
+> 1-V / 1-1 / 1-2 / 1-3 / 1-4 のどれかに現れる。
+>
+> **§11はcheckboxを持たない。** 進捗を追うのはこちらだけである
+> （[配置ルール](../README.md#checkboxは3種類ある)）。**消すのは1か所でよい。**
 
 - [x] 価格・掲載日期間のValidation Test
 - [x] 入力・Loading・0件・成功・部分成功・Error表示のComponent Test
@@ -1616,6 +1618,23 @@ Frontendは103件。**棒の位置ずれはTestでは捕まらなかった**（�
 ほぼ満点の内訳に対してスコアが`5`なら5段階、`98`なら100点満点だと分かる。
 **1件の観測で決着する。**
 
+##### 触る場所
+
+**Domainまで通す変更になる。** 表示だけでは終わらない。
+
+| File | すること |
+|---|---|
+| `src/backend/card_digger/domain/models.py` | `Seller`へ`good` / `normal` / `bad`件数を足す |
+| `src/backend/card_digger/adapters/mercari.py` | `seller_from_profile()`（328行付近）で`raw.ratings`を読む |
+| `src/backend/card_digger/adapters/mock.py` | Mockの`Seller`を揃える |
+| `src/backend/tests/fixtures/seller/profile.json` | `ratings`を持つFixtureにする |
+| `src/backend/card_digger/api/schemas.py` | `SellerResponse`へ足す |
+| `src/frontend/src/types/api.ts` | `Seller`型へ足す |
+| `src/frontend/src/components/SellerProfile.tsx` | 表示する |
+
+Testは`tests/unit/test_normalization.py`、`tests/contract/test_marketplace_port.py`、
+`tests/api/test_api.py`が`Seller`の形を見ている。**3つとも直る。**
+
 これ以外は[1-V](#1-v-視覚方針)だけである。表示項目と取得上限の表記は
 [MVP仕様 §6](../product/mvp-spec.md#6-seller画面)が確定させている。
 
@@ -1671,6 +1690,12 @@ Routerより上へ上げると、頼まれていないCacheになる。
 **取得範囲の言い方に注意する。** 出すのは「取得した100件の中での最終更新」であって、
 その人の全出品ではない。[§6.3](../product/mvp-spec.md#63-取得上限の表記)と同じ性質の
 限界なので、同じように画面へ書く。
+
+##### 触る場所
+
+**Frontendだけで閉じる。** `analysis.onSale.items`の`updatedAt`の最大値を
+`src/frontend/src/elapsed.ts`の`longestWithoutUpdate()`の逆（最小の経過）で求め、
+`SellerProfile.tsx`へ出す。**Backendの変更もRequestの追加も要らない。**
 - [x] 評価件数表示
 - [x] Profileの出品件数表示（**`num_sell_items`は累計販売件数ではない**。[追加観測結果](../../poc/mercapi/open-questions-result.md)）
 - [x] SellerのMercariページへのリンク
