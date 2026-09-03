@@ -2003,31 +2003,47 @@ CIでも毎回その時間を払う。**同じことを2か所で測って、遅
 [Test運用規約 §4.1](../development/test-policy.md#41-framework)が
 「**Versionは着手時に固定する**」としたまま空欄になっている。
 
-- [ ] Playwrightを`src/frontend`へ入れ、`e2e/`へ置く（`vitest`の探索から外す）
-- [ ] `playwright.config`をChromiumだけにする
-- [ ] [MVP仕様 §2.2](../product/mvp-spec.md#22-固定したpackage-version2026-09-02)のPackage表へ追記する
-- [ ] Test運用規約 §4.1のVersion欄を埋め、§4.2の配置図へ`e2e/`を足す
+- [x] Playwrightを`src/frontend`へ入れ、`e2e/`へ置いた —
+  `vitest`は`tests/**`だけを見るので**探索範囲が最初から重ならない**
+- [x] `playwright.config.ts`をChromiumだけにした
+- [x] Package表へ`@playwright/test` **1.62.1**を追記した
+- [x] Test運用規約 §4.1のVersion欄を埋め、§4.2へ2つのRunnerの配置を足した
+- [x] **`@types/node`を入れずに済ませた** — 設定が読むNodeのglobalは環境変数`CI`の1つだけ。
+  `e2e/node-env.d.ts`で**読んでいる1つだけを宣言する**
 
 ### C. 10手順を実装する
 
 [MVP仕様のE2E受入Flow](../product/mvp-spec.md#e2e受入flow)を正本とする。**ここに複製しない。**
 
-- [ ] 10手順を1本のFlowとして書く（**順序に意味がある**ので手順ごとに分けない）
-- [ ] 手順9「**Mock Adapterへの検索Requestが増えていない**」の観測方法を決めて書く
+- [x] 10手順を1本のFlowとして書いた（**順序に意味がある**ので手順ごとに分けない）
+- [x] 手順9の観測方法を決めた — **Browser側で`POST /api/search`を数える。**
+  仕様の文も直した（[MVP仕様 §11](../product/mvp-spec.md#e2e受入flow)）
 
-> **手順9だけ、観測する場所が仕様と違う。** 仕様はMock Adapterへの到達を言うが、
-> Browserから見えるのは`POST /api/search`である。**Browser側で数えるなら仕様の文を直す。**
-> Backend側で数えるなら、受入用の入口が呼び出し回数を申告する必要がある。
+> **手順9はBrowser側で数えることにし、仕様の文を直した。**
+> 「Mock Adapterへの検索Requestが増えていない」より**強い条件**である。Frontendが要求して
+> Backendが黙って断った場合、Mock Adapterには届かないので元の文は通ってしまう。
+> [MVP仕様 §5.2](../product/mvp-spec.md#52-検索開始)が求めているのは
+> **Frontendが要求しないこと**である。
 
 ### D. Mobile / Desktopの主要Flowを確認する
 
 **[1-V](#1-v-視覚方針)から移した。** tokenの見え方は390 / 768 / 1280 / 1440pxで確認済みだが、
 **画面そのものは未確認である。**
 
-- [ ] 10手順を390pxと1280pxの両方で流す
-- [ ] Keyboardで主要操作へ到達できることを確認する
+- [x] 10手順を390pxと1280pxの両方で流した（`projects`を2つに分けた）
+- [x] Keyboardだけで検索してSeller画面まで行けることを確認するTestを足した
   （[MVP仕様 §3.3](../product/mvp-spec.md#33-共通ui)）
-- [ ] **人間が1回目視する。** 自動で守れるのは「押せる・読める」までである
+- [x] **Gridが1列に落ちないことを検査した** — 視覚方針が2列を下限と決めている。
+  **Layoutについて自動で言えるのはここまで**である
+- [x] **人間が1回目視した（2026-09-03）。** 1280pxと390pxの両方で、指摘は0件。
+  手順は[Test運用規約 §12](../development/test-policy.md#layoutを目視で確認するとき)。
+  自動で守れるのは「押せる・読める」までで、
+  **組版が破れていないか・写真が地に沈んでいないか**は目でしか見えない
+
+> **手順そのものが、この確認をするまで存在しなかった。** 「Mobile / Desktopの主要Flow確認」は
+> MVP仕様・視覚方針・todoに1行ずつあるだけで、**何をどう見るかを引き受ける文書が無かった。**
+> 見る側が「どこを見ればいいのか分からない」と言って初めて分かった。
+> **1行のTaskは、やり方が決まっていることを意味しない。**
 
 > **既知の罠。** headless Chromeは幅を500px未満へ狭められない。Playwrightは
 > `viewport`で390pxを指定できるが、**素のheadless Chromeへ落ちる経路を使うと
@@ -2038,9 +2054,21 @@ CIでも毎回その時間を払う。**同じことを2か所で測って、遅
 [CIとMerge基準 §3.1](../development/ci-policy.md#31-card-digger)が
 「**E2E受入Flow（Playwright）のJobはまだ足していない**」と書いたまま残っている。
 
-- [ ] `ci.yml`へ`e2e` Jobを足す（Browserのinstallを含む）
-- [ ] ci-policy §3.1のJob表を更新し、末尾の「まだ足していない」を消す
-- [ ] **必須Statusへ加えるかを決め、加えるならGitHubの設定も変える**
+- [x] `ci.yml`へ`e2e` Jobを足した（Chromiumのinstallと、失敗時のtrace回収を含む）
+- [x] ci-policy §3.1のJob表を更新し、「まだ足していない」を消した
+- [x] **文書の必須Statusを5つにした**
+- [ ] **GitHubの設定を5つへ揃える。** 文書を直しただけでは変わらない（[下記](#必須statusは文書を直しただけでは変わらない)）
+
+#### 必須Statusは文書を直しただけでは変わらない
+
+2026-09-02に`Frontend`を表へ書いた時点では、GitHubの必須Statusは3つのままだった。
+**Frontendが赤でもMergeできる状態が残っていた。**同じことを繰り返さないよう、
+`e2e`もPRがMergeされた後に実際の値を確認する。
+
+```bash
+gh api repos/mgmaru/card-digger/branches/main/protection \
+  --jq '.required_status_checks.contexts'
+```
 
 > **文書を直しただけでは、GitHubの設定は変わらない。** 2026-09-02に`Frontend`を
 > 表へ書いた時点では必須Statusが3つのままで、**Frontendが赤でもMergeできる状態が残っていた**

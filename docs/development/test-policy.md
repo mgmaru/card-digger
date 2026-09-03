@@ -175,7 +175,7 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 | Fork | `pytest` + `pytest-asyncio` + `httpx.MockTransport` | 上流のFrameworkへ合わせる。ただし新規cassetteは記録しない（[§4.4](#44-forkのtestに関する例外)） |
 | PoC (`poc/`) | 標準ライブラリ`unittest`を継続 | 既存資産があり、依存を増やさない |
 | Frontend | `vitest` + `@testing-library/react` + `jsdom` | **Viteの変換Pipelineをそのまま使い、Test用のBuild設定を二重に持たない。** Jestは同じ変換をもう一度組む必要がある |
-| E2E受入Flow | `Playwright` | Frontend・FastAPI・Mock Adapterを通した経路をBrowserで動かす。Versionは着手時に固定する |
+| E2E受入Flow | `@playwright/test` **1.62.1** | Frontend・FastAPI・Mock Adapterを通した経路をBrowserで動かす。**Chromiumのみ**（[TODO 1-5](../planning/todo.md#2026-09-03に決着した--chromiumだけにする)） |
 
 > Python依存管理Toolは**`uv`**とする（[MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)）。
 > 本文のコマンドは`uv run`を前置きして実行する。Package Versionは
@@ -204,6 +204,16 @@ src/backend/
     └── api/                 # Phase 1。Backend API Test（L3と同じ扱い）
 ```
 
+```text
+src/frontend/
+├── tests/                # Component / 単体。`vitest`が`tests/**/*.test.{ts,tsx}`だけを見る
+└── e2e/                  # E2E受入Flow。`playwright`が`e2e/`だけを見る
+```
+
+**2つのRunnerが互いのFileを拾わない。** 探索範囲が重ならないので、
+`vitest run`がBrowserを起動しようとすることも、`playwright test`がComponent Testを
+読むこともない。
+
 `tests/api/`はMock Adapterと`ScriptedPort`だけを使い、外部通信しない。Contract Testと分けるのは、
 `tests/contract/`が**`MarketplacePort`の全実装へ同じTestを流す**場所であり、HTTPの
 Status規則とJSONの形はその対象ではないためである。
@@ -216,6 +226,16 @@ uv run pytest tests              # L2 + L3
 uv run pytest tests/unit         # L2のみ
 uv run pytest tests/contract     # L3のみ
 ```
+
+```bash
+# src/frontendで実行する
+npm run test                     # Component / 単体
+npm run e2e                      # E2E受入Flow。BackendとFrontendはPlaywrightが起動する
+```
+
+**E2Eが起動するBackendは`scripts/acceptance_app.py`である。** 本番の`create_app()`へ
+Mock Adapterを渡しただけのもので、**別のApplicationではない。**外へ出ないことは
+`tests/unit/test_acceptance_app.py`が検査する。
 
 - L4はTestコマンドではなく、専用Scriptと手順書から手動実行する。
 - 実行手順は`src/backend/README.md`へ記載する。
@@ -712,3 +732,77 @@ L4第1回で、**全項目100%で合格しながら測定側に3つの弱点**�
 - [ ] 3回連続の安全Errorで停止する準備をした
 - [ ] 結果文書へ個人情報と生Responseを書かなかった
 - [ ] 実行日時、環境、対象commit SHAを記録した
+
+### Layoutを目視で確認するとき
+
+**E2Eが確かめられるのは「押せる・読める・辿り着ける」までである。**
+[視覚方針](../product/design-tokens.md)が決めたことの大半は**成立しているかを目でしか見られない。**
+この節はその見方を引き受ける。**値と理由は視覚方針が正本であり、ここには複製しない。**
+
+#### 何で見るか
+
+Mercariへ通信しない側で起動する。実Mercariだと**毎回違うものが出て、前回と比べられない。**
+
+```bash
+cd src/backend && uv run uvicorn --factory scripts.acceptance_app:create_acceptance_app --reload
+cd src/frontend && npm run dev
+```
+
+`ポケカ 引退品`で検索すると、**3種の販売形式と4年分の掲載日**が1画面に出る。
+Seller画面（`seller-sample-1`）は**2つの状態が違う理由で止まる**ようにしてある。
+
+#### どの幅で見るか — **2つとも見る**
+
+[§3.7](../product/design-tokens.md#37-grid列数と角丸)が**600pxを境に4つの変数だけ**を変える。
+境の両側を1つずつ見れば分岐は尽きる。**片方だけでは、変えたほうも変えなかったほうも確認できない。**
+
+| 幅 | 見る理由 |
+|---:|---|
+| **1280px** | 常用するDesktop幅 |
+| **390px** | `--grid-min`が150pxへ落ちる側。**2列が下限**と決めた境界の内側 |
+
+狭いほうはBrowserのDevToolsのresponsive modeか、Window幅を狭めて出す。
+
+#### 見るところ
+
+**どれも「決めたことが画面で成立しているか」を問う。** 好き嫌いを聞いていない。
+
+- [ ] **商品画像が地から浮いているか。** 沈んでいたら
+  [§3.1](../product/design-tokens.md#31-出発点--主役は商品画像であって画面ではない)の
+  前提（寒色の地で暖色の写真を前へ出す）が崩れている
+- [ ] **朱が出ている場所を数える。** 取得範囲・限界の注記の**縦罫**、`partial`の**見出しの文字**、
+  `形式不明`Badgeの3つ以外に無いこと（[§3.3](../product/design-tokens.md#33-朱は1つの意味しか持たない--partialtrueの警告色)）
+- [ ] **断り書きの段落が赤くなっていないこと。** 朱は縦罫だけで、文は墨（同上）
+- [ ] **`最後まで取得`のとき、朱の縦罫が消えていること。** 出続けると印の意味が消える
+- [ ] **`形式不明`が`通常出品`に見えないこと。** 3つのBadgeを並べて、
+  色・塗り・地紋の**どれか1つが落ちても区別が残る**か
+  （[§3.5](../product/design-tokens.md#35-販売形式badge--形式不明を通常出品に見せない)）
+- [ ] **明朝とゴシックが役割どおりか。** 取得件数・Seller Knowledgeの数値・見出しが明朝、
+  Button・Label・Cardの本文がゴシック。**小さい字に明朝が出ていない**
+  （[§3.4](../product/design-tokens.md#34-書体--明朝とゴシックを役割で分ける)）
+- [ ] **断り書きが読めること。** 常時画面に出ているものなので、読めなければ
+  [§2.3](../product/design-tokens.md#23-この製品は情報密度の高い道具である)に反する
+- [ ] **角が丸いのは入力欄とButtonだけか。** 画像とBadgeは直角
+  （[§3.7](../product/design-tokens.md#37-grid列数と角丸)）
+- [ ] **未更新期間の棒が、操作できるものに見えないこと。** 試作はSliderに見えて
+  誤解された（[§3.8](../product/design-tokens.md#38-未更新期間の棒)）
+- [ ] **棒が1日でも見えること。** 空白と「未取得」を見分けられなくなる（同上）
+- [ ] **Tabでfocusを送ると、環が二重に見えること。** 塗り潰した`オークション`Badgeや
+  Linkの上でも消えないこと（[§3.9](../product/design-tokens.md#39-品質下限26)）
+
+#### 390pxでだけ見るところ
+
+- [ ] **2列を保っているか。** 1列に落ちると一次選別の速度が落ちる
+- [ ] **横スクロールが出ていないか。** 検索Formと絞り込みは折り返して収まる
+- [ ] **小さくなったのが4つだけか。** 記録の数字・見出し・小見出し・Gridの最小幅。
+  **色・書体・余白の段階は変わらない**（[§3.7](../product/design-tokens.md#37-grid列数と角丸)）
+
+#### 見るべき画面
+
+- [ ] 検索画面の初期状態（Formと検索例）
+- [ ] 検索結果（取得範囲、絞り込み、Grid）
+- [ ] **絞り込みで0件にした状態**（`掲載開始日`へ`2030-01-01`）
+- [ ] Seller画面（Profile、Seller Knowledge、2つのTab）
+
+**気づいたことは進捗ではない。** 直すと決めたものだけを
+[TODO](../planning/todo.md)へTaskとして起こす。
