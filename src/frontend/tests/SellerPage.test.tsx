@@ -288,6 +288,115 @@ describe("profile", () => {
   });
 });
 
+describe("seller knowledge", () => {
+  it("shows the counts the bands were computed over", async () => {
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(panel).toHaveTextContent("分析対象142件");
+    expect(panel).toHaveTextContent("ポケカ関連63件 / 44.4%");
+    expect(panel).toHaveTextContent("TCG関連91件 / 64.1%");
+    expect(panel).toHaveTextContent("専門用語あり35件 / 24.6%");
+    expect(panel).toHaveTextContent("異なる専門用語7種類");
+  });
+
+  it("reads the two bands separately", async () => {
+    // 専門性 高 / 標本信頼度 低 is a valid result. One word for both would
+    // hide which of the two a reader should distrust.
+    sellerMock.mockResolvedValue(
+      analysis({
+        knowledge: {
+          ...analysis().knowledge,
+          level: "high",
+          sampleConfidence: "low",
+        },
+      }),
+    );
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(within(panel).getByText("専門性").parentElement).toHaveTextContent(
+      "高",
+    );
+    expect(
+      within(panel).getByText("標本信頼度").parentElement,
+    ).toHaveTextContent("低");
+  });
+
+  it("never presents the thresholds as a measured accuracy", async () => {
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(panel).toHaveTextContent("閾値はMVPの仮説であり");
+    expect(panel).toHaveTextContent("購入判断ではなく");
+  });
+
+  it("says what the bands were computed over, and which status stopped short", async () => {
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(panel).toHaveTextContent(
+      "Seller Knowledgeは取得した142件を対象に計算しています",
+    );
+    // 販売中 hit the item limit; 売却済み reached the end.
+    expect(panel).toHaveTextContent("販売中は上限100件で打ち切っています");
+    expect(panel.textContent).not.toMatch(/売却済みは上限/);
+  });
+
+  it("names both statuses when both stopped short", async () => {
+    sellerMock.mockResolvedValue(
+      analysis({
+        soldOut: {
+          items: [item("c", "sold_out")],
+          meta: meta({ uniqueItemCount: 42, pageCount: 2 }),
+        },
+      }),
+    );
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(panel).toHaveTextContent("販売中と売却済みは上限100件で打ち切っています");
+  });
+
+  it("draws no truncation note when both statuses reached the end", async () => {
+    const complete = meta({
+      reachedEnd: true,
+      truncated: false,
+      stopReason: "end_of_results",
+    });
+    sellerMock.mockResolvedValue(
+      analysis({
+        onSale: { items: [item("a", "on_sale")], meta: complete },
+        soldOut: { items: [item("c", "sold_out")], meta: complete },
+      }),
+    );
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(panel.textContent).not.toMatch(/打ち切っています/);
+  });
+
+  it("prints no ratio when nothing could be analysed", async () => {
+    // A ratio of nothing is not zero. "ポケカ関連 0件 / 0.0%" would read as a
+    // seller who lists no Pokémon cards.
+    sellerMock.mockResolvedValue(
+      analysis({
+        knowledge: {
+          analyzedItemCount: 0,
+          pokemonItemCount: 0,
+          tcgItemCount: 0,
+          specializedItemCount: 0,
+          distinctSpecializedTermCount: 0,
+          pokemonRatio: 0,
+          tcgRatio: 0,
+          specializedItemRatio: 0,
+          score: null,
+          level: "unknown",
+          sampleConfidence: "unknown",
+        },
+      }),
+    );
+    mount();
+    const panel = await screen.findByLabelText("Seller Knowledge");
+    expect(panel.textContent).not.toMatch(/%/);
+    expect(within(panel).getAllByText("判定不能")).toHaveLength(2);
+  });
+});
+
 describe("collected range", () => {
   it("prints both statuses separately, with the limit and the reason", async () => {
     mount();
