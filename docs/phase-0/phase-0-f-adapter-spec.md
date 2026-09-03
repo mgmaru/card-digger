@@ -246,11 +246,18 @@ class MarketplaceItem:
     like_count: int | None = None
 
 @dataclass(frozen=True)
+class RatingBreakdown:
+    good: int                       # 件数。尺度を持たないので画面へ出せる
+    normal: int
+    bad: int
+
+@dataclass(frozen=True)
 class Seller:
     id: str
     name: str
     rating: float | None
     rating_count: int | None
+    rating_breakdown: RatingBreakdown | None   # 3つ揃うか、丸ごと無いか
     listed_item_count: int | None   # 出品件数。販売件数ではない
     url: str
 
@@ -281,7 +288,9 @@ class SellerItemsPage:
 
 必須Fieldが欠けたRecordは黙って除外しない。Field名と操作を含むParse Errorとして、その取得操作を
 失敗させる。`SaleFormat.UNKNOWN`は未知形状を表す有効値であり、`FIXED_PRICE`へ変換しない。
-`item_condition`、`like_count`、評価、評価件数、販売件数だけはNullableとする。
+`item_condition`、`like_count`、評価、評価件数、評価の内訳、販売件数だけはNullableとする。
+評価の内訳は`good` / `normal` / `bad`が**3つ揃うか、丸ごと無いか**の2状態しか取らない。
+Forkが3つを自分の`Ratings`の必須Fieldとして宣言しているため、欠けた1つを含むObjectは届かない。
 
 `price_yen`は、通常出品では販売価格、Auctionでは取得時点の現在価格とする。
 Auctionの開始価格や確定落札額で代用しない。
@@ -401,6 +410,7 @@ value.astimezone(timezone.utc)
 | `name` | `name` | 転記 | — | — |
 | `rating` | `star_rating_score` | 主張 | **`assumed`** | **スケール未確認。** 5段階か100点かを観測していない |
 | `rating_count` | `num_ratings` | 転記 | — | — |
+| `rating_breakdown` | `ratings`（`good` / `normal` / `bad`） | 転記 | — | Profile構造標本3 / 3で`good` / `normal` / `bad`の整数を持つ（[構造サンプル](../../poc/mercapi/auction-result.md#9-出力した構造サンプル)。**`artifacts/`はGit管理外**）。**件数であり尺度を持たない** |
 | `listed_item_count` | `num_sell_items` | **主張** | **`observed`** | §6.4 |
 | `url` | `id`から生成 | 生成 | `observed` | Sellerページを開ける |
 
@@ -468,7 +478,11 @@ MVPは両方を並び替えの軸にする（[MVP仕様 §5.5](../product/mvp-sp
 | `rating` | 星評価のスケール（5段階か否か） | Seller画面へ評価を出す前 |
 
 L4では`5.0`が返っていたが、取りうる範囲を観測していない。100点満点なら「5.0」は
-極端に低い評価を意味する。**`assumed`なので、画面へ出す前に潰す。**
+極端に低い評価を意味する。**`assumed`なので、画面へ出さない。**
+
+**画面には`rating_breakdown`を出す**（[MVP仕様 §6.2](../product/mvp-spec.md#評価は件数の内訳で出す2026-09-03決定)）。
+件数は尺度を持たないため、この`assumed`を塞がずに評価を表示できる。
+**`rating`を出す必要が生じたときだけ、先に観測して`observed`へ上げる。**
 
 ### 6.4 `listed_item_count`は販売件数ではない
 

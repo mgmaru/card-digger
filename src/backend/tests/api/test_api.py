@@ -12,6 +12,7 @@ Two things are being checked here that no layer below can check on its own:
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -35,6 +36,7 @@ from card_digger.domain.models import (
     CollectionMeta,
     CollectionStopReason,
     ListingStatus,
+    RatingBreakdown,
     SaleFormat,
     Seller,
 )
@@ -49,6 +51,7 @@ def seller(seller_id: str = SELLER_ID) -> Seller:
         name="sample seller",
         rating=5.0,
         rating_count=12,
+        rating_breakdown=RatingBreakdown(good=10, normal=2, bad=0),
         listed_item_count=34,
         url=f"https://jp.mercari.com/user/profile/{seller_id}",
     )
@@ -375,6 +378,20 @@ class TestSellerAnalysis:
         assert len(body["onSale"]["items"]) == 2
         assert len(body["soldOut"]["items"]) == 3
 
+    def test_it_returns_the_ratings_counted_by_kind(self):
+        """Counts reach the screen; the score's scale is still unobserved."""
+        body = client(self.port_for()).get(f"/api/sellers/{SELLER_ID}/analysis").json()
+        assert body["seller"]["ratingBreakdown"] == {
+            "good": 10,
+            "normal": 2,
+            "bad": 0,
+        }
+
+    def test_a_profile_without_the_counts_returns_null(self):
+        port = self.port_for(profile=replace(seller(), rating_breakdown=None))
+        body = client(port).get(f"/api/sellers/{SELLER_ID}/analysis").json()
+        assert body["seller"]["ratingBreakdown"] is None
+
     def test_the_listing_count_is_not_presented_as_a_count_of_sales(self):
         # `num_sell_items` was read as a sales figure once and reached a domain
         # type and a screen label before anyone went back to the raw value.
@@ -385,6 +402,7 @@ class TestSellerAnalysis:
             "name",
             "rating",
             "ratingCount",
+            "ratingBreakdown",
             "listedItemCount",
             "url",
         }

@@ -70,6 +70,7 @@ function analysis(patch: Partial<SellerAnalysisResponse> = {}): SellerAnalysisRe
       name: "ポケカ引退おじさん",
       rating: 5,
       ratingCount: 247,
+      ratingBreakdown: { good: 245, normal: 2, bad: 0 },
       listedItemCount: 29,
       url: "https://jp.mercari.com/user/profile/s1",
     },
@@ -190,6 +191,34 @@ describe("profile", () => {
     expect(within(profile).queryByText("5")).not.toBeInTheDocument();
   });
 
+  it("shows the ratings as counts, which carry no scale", async () => {
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    expect(profile).toHaveTextContent("良い 245件 / 普通 2件 / 悪い 0件");
+  });
+
+  it("shows a dash rather than three zeroes when the counts are missing", async () => {
+    // "悪い 0件" invented from an absent object would be an assurance nobody
+    // made. Absent and "nobody rated this badly" are different answers.
+    sellerMock.mockResolvedValue(
+      analysis({
+        seller: {
+          id: "s1",
+          name: "ポケカ引退おじさん",
+          rating: 5,
+          ratingCount: 247,
+          ratingBreakdown: null,
+          listedItemCount: 29,
+          url: "https://jp.mercari.com/user/profile/s1",
+        },
+      }),
+    );
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    expect(profile.textContent).not.toMatch(/悪い/);
+    expect(within(profile).getAllByText("-")).toHaveLength(1);
+  });
+
   it("shows a dash for anything the profile did not carry", async () => {
     sellerMock.mockResolvedValue(
       analysis({
@@ -198,6 +227,7 @@ describe("profile", () => {
           name: "名無し",
           rating: null,
           ratingCount: null,
+          ratingBreakdown: null,
           listedItemCount: null,
           url: "https://jp.mercari.com/user/profile/s1",
         },
@@ -205,7 +235,7 @@ describe("profile", () => {
     );
     mount();
     const profile = await screen.findByLabelText("Seller");
-    expect(within(profile).getAllByText("-")).toHaveLength(2);
+    expect(within(profile).getAllByText("-")).toHaveLength(3);
   });
 
   it("links out to the seller on Mercari", async () => {

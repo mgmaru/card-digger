@@ -71,6 +71,7 @@ const ANALYSIS = {
     name: "テスト出品者",
     rating: 5,
     ratingCount: 128,
+    ratingBreakdown: { good: 126, normal: 2, bad: 0 },
     listedItemCount: 29,
     url: "https://jp.mercari.com/user/profile/s1",
   },

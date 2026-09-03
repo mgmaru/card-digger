@@ -44,7 +44,7 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `item/auction.json` | observed | — | 商品詳細 | `auction_info`の全Fieldを読み、`highest_bid`を価格にする |
 | `item/fixed_price.json` | observed | — | 商品詳細 | `auction_info`欠落を通常出品にする |
 | `item/auction_info_unknown_shape.json` | derived | `item/auction.json` | 商品詳細 | 未知形状の`auction_info`を`unknown`にする |
-| `seller/profile.json` | observed | — | Seller Profile | 名前・評価・評価件数・累計出品数を正規化する |
+| `seller/profile.json` | observed | — | Seller Profile | 名前・評価件数・評価の内訳・出品件数を正規化する |
 | `seller_items/page_1_has_next.json` | observed | — | Seller商品一覧 | `has_next=true`で末尾`pager_id`を次Cursorにする |
 | `seller_items/page_2_end.json` | derived | `seller_items/page_1_has_next.json` | Seller商品一覧 | `has_next=false`でCursorを返さない |
 | `seller_items/sold_out_end.json` | derived | `seller_items/page_2_end.json` | Seller商品一覧 | `sold_out`を状態別に取得する |
@@ -52,6 +52,17 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `seller_items/with_auction.json` | observed | — | Seller商品一覧 | `with_auction=true`時だけAuction商品に`auction_info`が付く |
 | `seller_items/unknown_auction_shape.json` | derived | `seller_items/with_auction.json` | Seller商品一覧 | 未知形状の`auction_info`を`unknown`にする |
 | `seller_items/has_next_without_cursor.json` | derived | `seller_items/page_1_has_next.json` | Seller商品一覧 | 続きがあるのにCursorがない応答をParse Errorにする |
+
+## `ratings`は`num_ratings`と揃えない
+
+`seller/profile.json`は`num_ratings`が128、`ratings.good`が126である。**`created`と`updated`を
+食い違わせているのと同じ理由。** 揃えると、Adapterが`ratings.good`のつもりで`num_ratings`を
+読んでもTestが通ってしまう。`normal`と`bad`も別の値にしてあり、3つの取り違えを捕まえる。
+
+内訳の構造は[構造サンプル](../../../../poc/mercapi/auction-result.md#9-出力した構造サンプル)の
+`profile/profile.json`（2026-09-01、3標本すべてに`good` / `normal` / `bad`の整数あり）に基づく。
+**`artifacts/`はGit管理外**なので、上の「出所」と同じ扱いになる。**合計が
+`num_ratings`と一致するかは観測していない**ため、Fixtureでもその関係を作らない。
 
 ## Fixtureにしない異常系
 

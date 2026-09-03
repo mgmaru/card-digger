@@ -30,6 +30,7 @@ from card_digger.domain.models import (
     ListingStatus,
     MarketplaceItem,
     PageInfo,
+    RatingBreakdown,
     SaleFormat,
     SearchPage,
     Seller,
@@ -325,15 +326,32 @@ def item_from_seller_item(
     )
 
 
+def _rating_breakdown(raw: Any) -> RatingBreakdown | None:
+    """The three rating counts, or nothing.
+
+    All three or none: the fork declares them required on its own `Ratings`, so
+    a profile that carries the object carries the whole of it, and one built
+    from a partial object would put a missing count next to a real one.
+    """
+    counts = [getattr(raw, name, None) for name in ("good", "normal", "bad")]
+    if any(count is None for count in counts):
+        return None
+    good, normal, bad = counts
+    return RatingBreakdown(good=good, normal=normal, bad=bad)
+
+
 def seller_from_profile(raw: Profile) -> Seller:
     operation = Operation.SELLER_PROFILE
     seller_id = str(_required(getattr(raw, "id_", None), "id", operation))
     rating = getattr(raw, "star_rating_score", None)
+    ratings = getattr(raw, "ratings", None)
     return Seller(
         id=seller_id,
         name=_required(getattr(raw, "name", None), "name", operation),
         rating=float(rating) if rating is not None else None,
         rating_count=getattr(raw, "num_ratings", None),
+        # Counts, unlike `rating`, which carries a scale we have not observed.
+        rating_breakdown=_rating_breakdown(ratings) if ratings is not None else None,
         # `num_sell_items` counts listings, not sales. See the domain type.
         listed_item_count=getattr(raw, "num_sell_items", None),
         url=SELLER_URL.format(seller_id),

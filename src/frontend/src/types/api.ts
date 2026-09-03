@@ -111,11 +111,26 @@ export type SearchResponse = {
   meta: CollectionMeta;
 };
 
+/**
+ * The seller's ratings counted by kind.
+ *
+ * What the screen shows in place of `rating`, whose scale has never been
+ * observed. Counts have no scale to get wrong. `null` as a whole when the
+ * profile did not carry them — never three zeroes, which would read as a
+ * seller nobody has ever rated.
+ */
+export type RatingBreakdown = {
+  good: number;
+  normal: number;
+  bad: number;
+};
+
 export type Seller = {
   id: string;
   name: string;
   rating: number | null;
   ratingCount: number | null;
+  ratingBreakdown: RatingBreakdown | null;
   /**
    * Mercari's count of this seller's listings across every state.
    * **Not** a count of sales, and never presented as one.

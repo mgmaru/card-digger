@@ -71,11 +71,28 @@ class MarketplaceItem:
 
 
 @dataclass(frozen=True)
+class RatingBreakdown:
+    """How many ratings of each kind a seller has been given.
+
+    Counts, not a score. `rating` carries a scale nobody here has observed the
+    range of, so it cannot be shown; three counts carry no scale at all and can
+    be. Present or absent as a whole, because the marketplace sends the three
+    together or not at all.
+    """
+
+    good: int
+    normal: int
+    bad: int
+
+
+@dataclass(frozen=True)
 class Seller:
     id: str
     name: str
     rating: float | None
     rating_count: int | None
+    #: The same ratings counted by kind, when the profile carried them.
+    rating_breakdown: RatingBreakdown | None
     #: Mercari's own count of this seller's listings, across every state.
     #:
     #: Not a count of sales. It was named `total_sales_count` until a seller
