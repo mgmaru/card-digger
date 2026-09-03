@@ -30,6 +30,7 @@ from card_digger.domain.models import (
     CollectionStopReason,
     ListingStatus,
     MarketplaceItem,
+    RatingBreakdown,
     SaleFormat,
     Seller,
 )
@@ -196,11 +197,29 @@ class SearchResponse(CamelModel):
     meta: CollectionMetaResponse
 
 
+class RatingBreakdownResponse(CamelModel):
+    """The seller's ratings counted by kind.
+
+    This is what the screen shows in place of `rating`, whose scale has never
+    been observed. Counts have no scale to get wrong.
+    """
+
+    good: int
+    normal: int
+    bad: int
+
+    @classmethod
+    def of(cls, breakdown: RatingBreakdown) -> "RatingBreakdownResponse":
+        return cls(good=breakdown.good, normal=breakdown.normal, bad=breakdown.bad)
+
+
 class SellerResponse(CamelModel):
     id: str
     name: str
     rating: float | None
     rating_count: int | None
+    #: `null` when the profile did not carry the counts.
+    rating_breakdown: RatingBreakdownResponse | None
     #: Mercari's count of this seller's listings across every state. **Not** a
     #: count of sales, and never presented as one.
     listed_item_count: int | None
@@ -213,6 +232,11 @@ class SellerResponse(CamelModel):
             name=seller.name,
             rating=seller.rating,
             rating_count=seller.rating_count,
+            rating_breakdown=(
+                None
+                if seller.rating_breakdown is None
+                else RatingBreakdownResponse.of(seller.rating_breakdown)
+            ),
             listed_item_count=seller.listed_item_count,
             url=seller.url,
         )

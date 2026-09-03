@@ -333,6 +333,54 @@ class TestOtherFields:
         assert seller.listed_item_count == 342
         assert seller.url == "https://jp.mercari.com/user/profile/100000001"
 
+    def test_a_profile_carries_its_ratings_counted_by_kind(self):
+        """The counts, which is what the screen shows instead of the score.
+
+        Deliberately not equal to `num_ratings` in the fixture: 126 good
+        against 128 ratings is what catches the two being read from each
+        other's field.
+        """
+        from conftest import profile as load_profile
+
+        seller = seller_from_profile(load_profile("seller/profile.json"))
+
+        assert seller.rating_breakdown.good == 126
+        assert seller.rating_breakdown.normal == 2
+        assert seller.rating_breakdown.bad == 0
+        assert seller.rating_count == 128
+
+    def test_a_profile_without_the_counts_carries_none(self):
+        """Absent, not zero.
+
+        The fork leaves an optional property it could not parse as None, so a
+        profile with no `ratings` arrives this way rather than as an object of
+        zeroes. Zero bad ratings and no answer are different things.
+        """
+        without = SimpleNamespace(
+            id_="100000001",
+            name="seller-sample-1",
+            star_rating_score=5,
+            num_ratings=128,
+            ratings=None,
+        )
+
+        assert seller_from_profile(without).rating_breakdown is None
+
+    def test_a_partial_ratings_object_carries_none(self):
+        """Defence in depth.
+
+        The fork declares all three required on its own `Ratings`, so this
+        cannot be driven from a fixture. Asserted directly so a partial object
+        never reaches a screen as "普通 0件" beside two real counts.
+        """
+        partial = SimpleNamespace(
+            id_="100000001",
+            name="seller-sample-1",
+            ratings=SimpleNamespace(good=126, normal=None, bad=0),
+        )
+
+        assert seller_from_profile(partial).rating_breakdown is None
+
     def test_the_profile_counter_is_listings_and_not_sales(self):
         """`num_sell_items` counts listings. Measured, not assumed.
 

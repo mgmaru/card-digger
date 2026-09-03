@@ -5,6 +5,7 @@
     "num_ratings": 128,
     "num_sell_items": 342,
     "star_rating_score": 5,
+    "ratings": { "good": 126, "normal": 2, "bad": 0 },
     "photo_url": "https://example.test/profile-1.webp",
     "photo_thumbnail_url": "https://example.test/profile-thumb-1.webp",
     "created": 1600000000

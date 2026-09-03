@@ -29,6 +29,7 @@ from card_digger.domain.models import (
     ItemCondition,
     ListingStatus,
     MarketplaceItem,
+    RatingBreakdown,
     SaleFormat,
     Seller,
 )
@@ -109,6 +110,7 @@ def _mock_port() -> MockAdapter:
                 name="seller-sample-1",
                 rating=5.0,
                 rating_count=128,
+                rating_breakdown=RatingBreakdown(good=126, normal=2, bad=0),
                 listed_item_count=342,
                 url=f"https://jp.mercari.com/user/profile/{SELLER_ID}",
             ),
