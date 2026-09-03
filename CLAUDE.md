@@ -40,6 +40,9 @@ cd src/frontend && npm run dev
 
 # Backend（http://127.0.0.1:8000）
 cd src/backend && uv run uvicorn --factory card_digger.api.main:create_app --reload
+
+# Backend（Mercariへ通信しない。E2E受入Flowと、画面だけ触りたいとき）
+cd src/backend && uv run uvicorn --factory scripts.acceptance_app:create_acceptance_app --reload
 ```
 
 CIと同じ検査をローカルで通すとき。
