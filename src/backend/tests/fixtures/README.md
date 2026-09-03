@@ -59,8 +59,9 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 食い違わせているのと同じ理由。** 揃えると、Adapterが`ratings.good`のつもりで`num_ratings`を
 読んでもTestが通ってしまう。`normal`と`bad`も別の値にしてあり、3つの取り違えを捕まえる。
 
-内訳の構造は[Profile構造標本](../../../../poc/mercapi/artifacts/structure-samples/profile/profile.json)
-（2026-09-01、3標本すべてに`good` / `normal` / `bad`の整数あり）に基づく。**合計が
+内訳の構造は[構造サンプル](../../../../poc/mercapi/auction-result.md#9-出力した構造サンプル)の
+`profile/profile.json`（2026-09-01、3標本すべてに`good` / `normal` / `bad`の整数あり）に基づく。
+**`artifacts/`はGit管理外**なので、上の「出所」と同じ扱いになる。**合計が
 `num_ratings`と一致するかは観測していない**ため、Fixtureでもその関係を作らない。
 
 ## Fixtureにしない異常系
