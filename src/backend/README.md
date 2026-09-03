@@ -32,14 +32,17 @@ card_digger/
     └── schemas.py       # FrontendへのJSON。Domainより狭い
 
 scripts/
-└── live_acceptance.py   # ライブ受入検証（L4）
+├── live_acceptance.py   # ライブ受入検証（L4）。実Mercariへ通信する
+└── acceptance_app.py    # E2E受入Flow用。Mock Adapterで同じApplicationを起動する
 ```
 
 `domain`と`application`は`mercapi`をimportしない。この境界は
 `tests/unit/test_layering.py`が静的に検査する。
 
 実Mercariへ接続しうるのは`create_app()`（引数なしの場合）と`scripts/live_acceptance.py`の
-2つだけで、**Testはどちらも通らない。**
+2つだけで、**Testはどちらも通らない。**`scripts/acceptance_app.py`は同じ`create_app()`を
+呼ぶが、**Mock Adapterを渡すので外へ出ない。**それを`tests/unit/test_acceptance_app.py`が
+検査する。
 
 ## 依存
 
@@ -80,6 +83,25 @@ LANへ公開することになる（[MVP仕様 §10](../../docs/product/mvp-spec
 
 `create_app()`は引数なしで実Mercariへ繋ぐ。Mock Adapterで動かすときは`marketplace=`へ渡す。
 **このコマンドは実Mercariへ通信する。**
+
+### Mercariへ通信せずに起動する（E2E受入Flowと開発用）
+
+```bash
+uv run uvicorn --factory scripts.acceptance_app:create_acceptance_app --reload
+```
+
+**同じ`create_app()`を、Mock Adapterと止まった時計で組み立てたもの**である。
+別のApplicationではないので、E2Eが通る経路は本番と同じものになる。
+
+| | 本番 | 受入用 |
+|---|---|---|
+| Marketplace | Mercari | **`MockAdapter`（`SEED`から答える）** |
+| Request間隔 | 2秒以上 | **0秒。**外へ出ないので守る相手がいない |
+| 時計 | 実時計 | **止めてある。**`2年前`が来春`3年前`にならない |
+
+種Dataが満たすべき条件（上限を跨ぐSeller、自力で終端に達する状態、3種の販売形式）は
+`tests/unit/test_acceptance_app.py`が固定する。**Playwright側からは見えない前提**なので、
+崩れたときに遠くで落ちないようにここで押さえる。
 
 ## ライブ受入検証（L4）
 

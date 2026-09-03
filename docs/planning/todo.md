@@ -1982,11 +1982,18 @@ CIでも毎回その時間を払う。**同じことを2か所で測って、遅
 `marketplace`をParameterに取る設計になっているので（実Mercariを既定にするのは
 `_mercari_marketplace()`）、**渡すだけの薄い入口を足せばよい。**
 
-- [ ] Mock Adapterと待ち時間0の`Sleeper`を渡す受入用のentry pointを作る
-- [ ] 10手順が必要とする種Dataを1か所へ置く（通常出品とAuctionの混在、掲載日の幅、
-  販売中と売却済みで**打ち切り理由が違う**Seller、Seller Knowledgeが計算できるTitle）
-- [ ] **この入口から実Mercariへ絶対に出ない**ことをTestで担保する
-- [ ] `CLAUDE.md`の「動かす」へ起動コマンドを追記する
+- [x] Mock Adapterと**間隔0**を渡す受入用のentry pointを作った — `scripts/acceptance_app.py`。
+  **待たないSleeperではなく`min_interval_seconds=0.0`**にした。
+  「待つが待たない」より「守る相手がいない」のほうが正しい
+- [x] 10手順が必要とする種Dataを1か所へ置いた — 販売中104件・売却済み12件のSellerで
+  **2つの状態が違う理由で止まる**。3種の販売形式と、4年分の掲載日の幅を持たせた
+- [x] **時計を止めた** — 決めていなかったが要った。実時計だと`2年前`が来春`3年前`になり、
+  **誰も触っていないのにE2Eが落ちる**
+- [x] **この入口から実Mercariへ絶対に出ない**ことをTestで担保した — Mock Adapterであること、
+  **Sourceが`MercariAdapter`も`Mercapi(`も含まないこと**の2つを検査する
+- [x] 種Dataが満たすべき前提をTestで固定した — **Playwright側からは見えない前提**なので、
+  崩れたときに遠くで落ちる
+- [x] `CLAUDE.md`と`src/backend/README.md`へ起動コマンドを追記した
 
 > **`MockデータでMercari停止時も開発できるようにする`はこの作業と同じものである。**
 > 非機能TODOに残っていた1行を、ここへ統合した。
