@@ -10,8 +10,10 @@ import { describe, expect, it } from "vitest";
 import {
   DORMANCY_AXIS_DAYS,
   dormancy,
+  durationLabel,
   elapsedDays,
   elapsedLabel,
+  longestWithoutUpdate,
 } from "../src/elapsed";
 
 const AT = "2026-09-02T14:03:00+09:00";
@@ -77,5 +79,37 @@ describe("dormancy", () => {
     const tended = dormancy(daysBefore(1), AT);
     const abandoned = dormancy(daysBefore(300), AT);
     expect(tended.ratio).toBeLessThan(abandoned.ratio);
+  });
+});
+
+describe("durationLabel", () => {
+  it("says how long something lasted, not when it happened", () => {
+    expect(durationLabel(0)).toBe("1日未満");
+    expect(durationLabel(1)).toBe("1日");
+    expect(durationLabel(29)).toBe("29日");
+    expect(durationLabel(60)).toBe("2か月");
+    expect(durationLabel(364)).toBe("12か月");
+    expect(durationLabel(365)).toBe("1年");
+    expect(durationLabel(430)).toBe("1年2か月");
+    expect(durationLabel(1890)).toBe("5年2か月");
+  });
+});
+
+describe("longestWithoutUpdate", () => {
+  const at = (days: number) => ({ updatedAt: daysBefore(days) });
+
+  it("finds the listing nobody has updated for longest", () => {
+    expect(longestWithoutUpdate([at(2), at(357), at(30)], AT)).toBe(357);
+  });
+
+  it("has no answer when nothing was collected", () => {
+    expect(longestWithoutUpdate([], AT)).toBeNull();
+  });
+
+  it("is the number that tells a wasted search from a useful one", () => {
+    // A keyword whose population outran the budget comes back like this.
+    expect(longestWithoutUpdate([at(1), at(3), at(7)], AT)).toBe(7);
+    // One narrow enough to exhaust comes back like this.
+    expect(longestWithoutUpdate([at(1), at(1890)], AT)).toBe(1890);
   });
 });

@@ -8,11 +8,12 @@
  * ([視覚方針 §3.3](../../../../docs/product/design-tokens.md)).
  */
 
+import { durationLabel, longestWithoutUpdate } from "../elapsed";
 import { toDateString, toDateTimeString } from "../jst";
 import { SORT_LABELS } from "../searchQuery";
 import type { SortKey } from "../searchState";
 import type { PriceBand } from "../validation";
-import type { CollectionMeta, CollectionStopReason } from "../types/api";
+import type { CollectionMeta, CollectionStopReason, Item } from "../types/api";
 
 import styles from "./CollectionRecord.module.css";
 
@@ -58,6 +59,7 @@ function dateRange(meta: CollectionMeta): string | null {
 
 export function CollectionRecord({
   meta,
+  items,
   sort,
   visibleCount,
   filtered,
@@ -66,6 +68,8 @@ export function CollectionRecord({
   busy,
 }: {
   meta: CollectionMeta;
+  /** Everything collected. The reach below describes the collection, not the view. */
+  items: readonly Item[];
   sort: SortKey;
   visibleCount: number;
   /** Whether anything was narrowed, so the matched count means something. */
@@ -77,6 +81,7 @@ export function CollectionRecord({
 }) {
   const range = dateRange(meta);
   const priceBand = bandLabel(band);
+  const reach = longestWithoutUpdate(items, meta.collectedAt);
 
   return (
     <section
@@ -97,6 +102,18 @@ export function CollectionRecord({
       )}
 
       {range && <p className={styles.extent}>取得した商品の掲載日時: {range}</p>}
+
+      {/*
+        How far back this search actually got. The one number that says
+        whether it was worth running: a keyword whose population outruns the
+        budget comes back reaching a few days, a narrow one reaches years.
+        Without it the reader has to read the bars to find out.
+      */}
+      {reach !== null && (
+        <p className={styles.reach}>
+          最も更新されていない出品: <b>{durationLabel(reach)}</b>
+        </p>
+      )}
 
       {filtered && (
         <p className={styles.extent}>

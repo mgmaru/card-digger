@@ -105,15 +105,15 @@ describe("initial state", () => {
   it("offers the form and some examples, and has collected nothing", () => {
     mount();
     expect(screen.getByLabelText("キーワード")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "ポケモンカード 引退" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ポケモンカード 押入れ" })).toBeInTheDocument();
     expect(searchMock).not.toHaveBeenCalled();
   });
 
   it("fills the keyword from an example without searching", async () => {
     const user = userEvent.setup();
     mount();
-    await user.click(screen.getByRole("button", { name: "ポケカ まとめ売り" }));
-    expect(screen.getByLabelText("キーワード")).toHaveValue("ポケカ まとめ売り");
+    await user.click(screen.getByRole("button", { name: "ポケカ 断捨離" }));
+    expect(screen.getByLabelText("キーワード")).toHaveValue("ポケカ 断捨離");
     expect(searchMock).not.toHaveBeenCalled();
   });
 });
@@ -329,6 +329,45 @@ describe("narrowing", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("YYYY-MM-DD");
     // The unreadable date does not narrow, so the screen still shows a result.
     expect(titles()).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("how far back the search reached", () => {
+  it("states the longest a collected listing has gone without an update", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+    // Item "a" was updated 2025-09-10, collected 2026-09-02: 357 days.
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "最も更新されていない出品: 11か月",
+    );
+  });
+
+  it("measures the whole collection, not what the filters left", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+
+    // Hiding the oldest listing must not change what the collection reached:
+    // the line describes the search, not the view.
+    await user.selectOptions(screen.getByLabelText("販売形式"), "オークション");
+    await waitFor(() => expect(titles()).toEqual(["c"]));
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "最も更新されていない出品: 11か月",
+    );
+  });
+
+  it("says nothing when nothing was collected", async () => {
+    searchMock.mockResolvedValue({
+      items: [],
+      meta: { ...META, uniqueItemCount: 0, pageCount: 1 },
+    });
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "存在しない語");
+    expect(screen.getByLabelText("取得範囲")).not.toHaveTextContent(
+      "最も更新されていない出品",
+    );
   });
 });
 

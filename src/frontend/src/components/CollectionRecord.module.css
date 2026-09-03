@@ -49,6 +49,19 @@
   margin-left: var(--space-3);
 }
 
+/* この検索が当たりだったかを言う1行。他の補足より少し強くする。 */
+.reach {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  font-variant-numeric: tabular-nums;
+}
+
+.reach b {
+  font-size: var(--text-sub);
+  font-weight: 400;
+}
+
 /* 取りこぼしが無いと言い切れる唯一の状態。朱の罫は引かない ―― 限界の印なので、
    限界が無いときに出すと印の意味が消える（視覚方針 §3.3）。 */
 .complete {

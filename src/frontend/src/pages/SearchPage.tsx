@@ -150,6 +150,7 @@ export function SearchPage() {
         <>
           <CollectionRecord
             meta={result.meta}
+            items={result.items}
             sort={sort}
             visibleCount={shown.length}
             filtered={narrowed}
