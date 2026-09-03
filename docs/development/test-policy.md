@@ -175,7 +175,7 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 | Fork | `pytest` + `pytest-asyncio` + `httpx.MockTransport` | 上流のFrameworkへ合わせる。ただし新規cassetteは記録しない（[§4.4](#44-forkのtestに関する例外)） |
 | PoC (`poc/`) | 標準ライブラリ`unittest`を継続 | 既存資産があり、依存を増やさない |
 | Frontend | `vitest` + `@testing-library/react` + `jsdom` | **Viteの変換Pipelineをそのまま使い、Test用のBuild設定を二重に持たない。** Jestは同じ変換をもう一度組む必要がある |
-| E2E受入Flow | `Playwright` | Frontend・FastAPI・Mock Adapterを通した経路をBrowserで動かす。Versionは着手時に固定する |
+| E2E受入Flow | `@playwright/test` **1.62.1** | Frontend・FastAPI・Mock Adapterを通した経路をBrowserで動かす。**Chromiumのみ**（[TODO 1-5](../planning/todo.md#2026-09-03に決着した--chromiumだけにする)） |
 
 > Python依存管理Toolは**`uv`**とする（[MVP仕様 §2](../product/mvp-spec.md#2-mvpの技術構成)）。
 > 本文のコマンドは`uv run`を前置きして実行する。Package Versionは
@@ -204,6 +204,16 @@ src/backend/
     └── api/                 # Phase 1。Backend API Test（L3と同じ扱い）
 ```
 
+```text
+src/frontend/
+├── tests/                # Component / 単体。`vitest`が`tests/**/*.test.{ts,tsx}`だけを見る
+└── e2e/                  # E2E受入Flow。`playwright`が`e2e/`だけを見る
+```
+
+**2つのRunnerが互いのFileを拾わない。** 探索範囲が重ならないので、
+`vitest run`がBrowserを起動しようとすることも、`playwright test`がComponent Testを
+読むこともない。
+
 `tests/api/`はMock Adapterと`ScriptedPort`だけを使い、外部通信しない。Contract Testと分けるのは、
 `tests/contract/`が**`MarketplacePort`の全実装へ同じTestを流す**場所であり、HTTPの
 Status規則とJSONの形はその対象ではないためである。
@@ -216,6 +226,16 @@ uv run pytest tests              # L2 + L3
 uv run pytest tests/unit         # L2のみ
 uv run pytest tests/contract     # L3のみ
 ```
+
+```bash
+# src/frontendで実行する
+npm run test                     # Component / 単体
+npm run e2e                      # E2E受入Flow。BackendとFrontendはPlaywrightが起動する
+```
+
+**E2Eが起動するBackendは`scripts/acceptance_app.py`である。** 本番の`create_app()`へ
+Mock Adapterを渡しただけのもので、**別のApplicationではない。**外へ出ないことは
+`tests/unit/test_acceptance_app.py`が検査する。
 
 - L4はTestコマンドではなく、専用Scriptと手順書から手動実行する。
 - 実行手順は`src/backend/README.md`へ記載する。

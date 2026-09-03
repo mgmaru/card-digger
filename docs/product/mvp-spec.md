@@ -163,6 +163,11 @@ Frameworkの選定理由は[Test運用規約 §4.1](../development/test-policy.m
 | `@testing-library/react` | 16.3.3 | peerが`react ^18.0.0 \|\| ^19.0.0` |
 | `@testing-library/jest-dom` | 7.0.1 | peerが`vitest >= 0.32` |
 | `@testing-library/user-event` | 14.6.7 | |
+| `@playwright/test` | 1.62.1 | **2026-09-03追加。**E2E受入Flow。**Browserは`chromium`だけを入れる** |
+
+**`@types/node`は入れていない。** `playwright.config.ts`が読むNodeのglobalは
+環境変数`CI`の1つだけで、そのために実行環境全体の型を足す必要が無い。
+`e2e/node-env.d.ts`で**読んでいる1つだけを宣言する。**2つ目が要るときは、そこへ書く。
 
 設定の落とし穴を1つ実測した。**`defineConfig`は`vitest/config`から取る。** `vite`から取ると
 `test`キーが型に無く、`tsc --noEmit`だけが落ちる（Testとbuildは通るため気付きにくい）。
@@ -1038,9 +1043,14 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 6. 商品CardからSeller画面を開く
 7. 販売中・売却済みの件数と打ち切り理由を確認する
 8. Seller Knowledgeと標本信頼度を確認する
-9. 検索画面へ戻り、**Mock Adapterへの検索Requestが増えていないこと**と、件数・Sort・Filterが
+9. 検索画面へ戻り、**Backendへ検索Requestが送られていないこと**と、件数・Sort・Filterが
    手順5のままであることを確認する
 10. 元Mercari商品Linkが正しいHTTPS URLであることを確認する
+
+> **手順9はBrowser側で数える。** 当初は「Mock Adapterへの検索Requestが増えていない」と
+> 書いていたが、**Browserから数えるほうが強い条件である。**Frontendが要求して
+> Backendが黙って断った場合、Mock Adapterには届かないので前者は通ってしまう。
+> [§5.2](#52-検索開始)が求めているのは**Frontendが要求しないこと**である。
 
 ### MVP完了条件
 

@@ -59,6 +59,7 @@ CIの並列実行や再実行はこの条件を守れない。
 | `poc` | `poc/mercapi`のUnit Test | 導入済み |
 | `frontend` | `npm ci` → `typecheck` → `test` → `build`（`src/frontend`） | **2026-09-02追加** |
 | `backend` | `uv run pytest`によるL2 / L3（`src/backend`） | 導入済み |
+| `e2e` | PlaywrightによるE2E受入Flow。**Chromiumのみ、390pxと1280pxの2幅** | **2026-09-03追加** |
 
 `frontend` Jobは`src/frontend/package.json`の3つのScriptに依存する。
 
@@ -87,8 +88,21 @@ Node.jsのVersionはJob内で`26`に固定する。根拠は
 > [検証の落とし穴 §3](../retrospectives/2026-09-01-verification-pitfalls.md)の
 > 「構造上100%にしかならない指標」と同じである。
 
-E2E受入Flow（Playwright）のJobはまだ足していない。Frontendと`GET /api/sellers/{sellerId}/analysis`が
-揃ってから、Versionの固定とあわせて追加する。
+#### `e2e` Jobを足した（2026-09-03）
+
+**外部へ出ない。** 駆動するBackendは`scripts/acceptance_app.py`で、本番の`create_app()`へ
+Mock Adapterを渡しただけのものである。[§2](#2-ciで実行する範囲)の「CIからL4を実行しない」に
+触れない。
+
+| 項目 | 値 | 理由 |
+|---|---|---|
+| Browser | **`chromium`だけ** | 単一利用者のLocal実行。install時間がいちばん短い |
+| 幅 | **390pxと1280px** | [視覚方針](../product/design-tokens.md)が変える変数は600pxを境に4つだけ。両側を1つずつ踏めば分岐は尽きる |
+| Request間隔 | **0秒** | Mercariへ出ないので守る相手がいない。2秒間隔はUnit Testが実測で守る |
+| 失敗時 | traceをArtifactへ上げる（7日） | Browserの中で何が起きたかは、logだけでは分からない |
+
+**BackendとFrontendの両方が要るのでJobを分けた。** 既存の`frontend` / `backend` Jobの
+Stepにすると、片方のJobがもう片方の環境を丸ごと持つことになる。
 
 ### 3.2 `mgmaru/mercapi`
 
@@ -183,7 +197,8 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 | Allow deletions | **無効** | `main`を消せないようにする |
 
 必須Statusは`Docs links`、`PoC unit tests`、`Frontend unit and component tests`、
-`Backend unit and contract tests`の4つとする（2026-09-02に`Frontend`を追加）。
+`Backend unit and contract tests`、`E2E acceptance flow`の5つとする
+（2026-09-02に`Frontend`、2026-09-03に`E2E`を追加）。
 
 > **この文書を直しただけでは、GitHubの設定は変わらなかった。** `Frontend`をこの表へ書いた時点では
 > 必須Statusは3つのままで、**Frontendが赤でもMergeできる状態が残っていた。** 気付いたのは、
