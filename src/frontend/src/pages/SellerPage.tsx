@@ -13,8 +13,10 @@ import { Link, useParams } from "react-router";
 
 import { SellerItems } from "../components/SellerItems";
 import { SellerProfile } from "../components/SellerProfile";
+import { latestMoment } from "../elapsed";
 import { useSellerAnalysis } from "../useSellerAnalysis";
 import type { ApiFailureKind } from "../api/client";
+import type { SellerAnalysisResponse } from "../types/api";
 
 import styles from "./SellerPage.module.css";
 
@@ -47,6 +49,37 @@ const FAILURES: Record<ApiFailureKind, { message: string; retryable: boolean }> 
   unexpected: { message: "取得できませんでした", retryable: true },
 };
 
+/**
+ * When this seller last moved anything we can see.
+ *
+ * Read across both statuses, not just the listings still for sale. A seller
+ * who never edits a listing but sold something yesterday is active, and
+ * on-sale alone would report them as five years gone.
+ *
+ * Still a lower bound: it says the seller was here at least this recently,
+ * over the hundred listings per status that were collected. The screen says so.
+ */
+function lastUpdate(analysis: SellerAnalysisResponse): string | null {
+  return latestMoment(
+    [...analysis.onSale.items, ...analysis.soldOut.items].map(
+      (item) => item.updatedAt,
+    ),
+  );
+}
+
+/**
+ * The end of the collection.
+ *
+ * The two statuses are collected one after the other (section 6.1), so the
+ * later of the two snapshots is when the analysis as a whole finished.
+ */
+function collectedAt(analysis: SellerAnalysisResponse): string {
+  const { onSale, soldOut } = analysis;
+  return new Date(soldOut.meta.collectedAt) > new Date(onSale.meta.collectedAt)
+    ? soldOut.meta.collectedAt
+    : onSale.meta.collectedAt;
+}
+
 export function SellerPage() {
   const { sellerId } = useParams<{ sellerId: string }>();
   const { status, analysis, error, retry } = useSellerAnalysis(sellerId ?? "");
@@ -77,7 +110,11 @@ export function SellerPage() {
 
       {status === "success" && analysis && (
         <>
-          <SellerProfile seller={analysis.seller} />
+          <SellerProfile
+            seller={analysis.seller}
+            lastUpdatedAt={lastUpdate(analysis)}
+            collectedAt={collectedAt(analysis)}
+          />
           <SellerItems onSale={analysis.onSale} soldOut={analysis.soldOut} />
         </>
       )}
