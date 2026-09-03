@@ -410,7 +410,7 @@ value.astimezone(timezone.utc)
 | `name` | `name` | 転記 | — | — |
 | `rating` | `star_rating_score` | 主張 | **`assumed`** | **スケール未確認。** 5段階か100点かを観測していない |
 | `rating_count` | `num_ratings` | 転記 | — | — |
-| `rating_breakdown` | `ratings`（`good` / `normal` / `bad`） | 転記 | — | Profile構造標本3 / 3で`good` / `normal` / `bad`の整数を持つ（[構造標本](../../poc/mercapi/artifacts/structure-samples/profile/profile.json)）。**件数であり尺度を持たない** |
+| `rating_breakdown` | `ratings`（`good` / `normal` / `bad`） | 転記 | — | Profile構造標本3 / 3で`good` / `normal` / `bad`の整数を持つ（[構造サンプル](../../poc/mercapi/auction-result.md#9-出力した構造サンプル)。**`artifacts/`はGit管理外**）。**件数であり尺度を持たない** |
 | `listed_item_count` | `num_sell_items` | **主張** | **`observed`** | §6.4 |
 | `url` | `id`から生成 | 生成 | `observed` | Sellerページを開ける |
 

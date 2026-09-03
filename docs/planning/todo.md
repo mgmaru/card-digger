@@ -1625,8 +1625,8 @@ Frontendは103件。**棒の位置ずれはTestでは捕まらなかった**（�
 ##### 実装中に見つかった手掛かり（2026-09-03。決着ではない）
 
 **構造標本の`star_rating_score`は3標本とも1桁である**
-（[Profile構造標本](../../poc/mercapi/artifacts/structure-samples/profile/profile.json)。
-値は伏せてあり、桁数だけが記録されている）。同じ標本の`ratings.good`は3桁、`bad`は1桁で、
+（[構造サンプル](../../poc/mercapi/auction-result.md#9-出力した構造サンプル)の
+`profile/profile.json`。**`artifacts/`はGit管理外**で、値は伏せて桁数だけが記録されている）。同じ標本の`ratings.good`は3桁、`bad`は1桁で、
 **評価が数百件あってほぼ良いSellerが1桁のスコアを持っている。**
 100点満点なら2桁になるはずで、5段階を示唆する。
 
