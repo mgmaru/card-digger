@@ -1029,7 +1029,7 @@ Mock Adapterと固定Fixtureだけを使い、実Mercariへ通信しない。
 - 画像PlaceholderのTest
 - Sellerの状態別Tabと取得範囲表示のTest
 - Seller KnowledgeのScoreと注意書き表示のTest
-- Mobile / Desktopの主要Flow確認
+- Mobile / Desktopの主要Flow確認（**手順**は[Test運用規約 §12](../development/test-policy.md#layoutを目視で確認するとき)）
 
 ### E2E受入Flow
 
