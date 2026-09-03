@@ -5,13 +5,15 @@
  * (MVP specification section 6.1). Going back to the search finds it exactly
  * as it was left, because that result never lived here.
  *
- * Seller Knowledge is 1-4. The counts it will be computed over are already
- * printed above, by the range lines.
+ * Seller Knowledge sits between the profile and the grid. It answers "is this
+ * seller worth a look", which is the question asked before scrolling a hundred
+ * cards rather than after.
  */
 
 import { Link, useParams } from "react-router";
 
 import { SellerItems } from "../components/SellerItems";
+import { SellerKnowledgePanel } from "../components/SellerKnowledge";
 import { SellerProfile } from "../components/SellerProfile";
 import { latestMoment } from "../elapsed";
 import { useSellerAnalysis } from "../useSellerAnalysis";
@@ -114,6 +116,11 @@ export function SellerPage() {
             seller={analysis.seller}
             lastUpdatedAt={lastUpdate(analysis)}
             collectedAt={collectedAt(analysis)}
+          />
+          <SellerKnowledgePanel
+            knowledge={analysis.knowledge}
+            onSale={analysis.onSale}
+            soldOut={analysis.soldOut}
           />
           <SellerItems onSale={analysis.onSale} soldOut={analysis.soldOut} />
         </>

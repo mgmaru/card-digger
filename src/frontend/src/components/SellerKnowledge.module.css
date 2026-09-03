@@ -1,0 +1,74 @@
+/* 記録の声。取得件数と同じく、こちらが数えた値なので明朝で組む（視覚方針 §3.4）。 */
+
+.knowledge {
+  font-family: var(--font-record);
+  max-width: var(--measure);
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.heading {
+  font-weight: 400;
+  font-size: var(--text-sub);
+  margin: 0 0 var(--space-4);
+}
+
+/* 「（取得範囲内）」は見出しの一部だが、見出しそのものではない。
+   小さく静かにして、Seller Knowledgeという語を先に読ませる。 */
+.scope {
+  font-family: var(--font-ui);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  margin-left: var(--space-2);
+}
+
+.facts {
+  margin: 0 0 var(--space-4);
+}
+
+.fact,
+.band {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.fact dt,
+.band dt {
+  font-family: var(--font-ui);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  /* 値の左端を揃える。全角6字で「異なる専門用語」まで収まる。 */
+  flex: 0 0 7em;
+}
+
+.fact dd,
+.band dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 専門性と標本信頼度は、数えた件数ではなく判定である。少し大きくして分ける。 */
+.bands {
+  margin: 0 0 var(--space-4);
+}
+
+.band dd {
+  font-size: var(--text-sub);
+  line-height: var(--leading-dense);
+}
+
+/* 朱の縦罫は1つの意味しか持たない —— Card Diggerが自分の限界を書き足した行。
+   文字は墨のまま（視覚方針 §3.3）。 */
+.limits {
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.limits p {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
