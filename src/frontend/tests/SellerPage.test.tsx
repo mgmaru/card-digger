@@ -6,6 +6,7 @@
  * prevent: the limit was ours, not theirs.
  */
 
+import { StrictMode } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -134,6 +135,25 @@ describe("collecting", () => {
     await screen.findByText("ポケカ引退おじさん");
     expect(sellerMock).toHaveBeenCalledTimes(1);
     expect(sellerMock).toHaveBeenCalledWith("s1");
+  });
+
+  it("still fills in when React mounts the effect twice", async () => {
+    // StrictMode is how `npm run dev` renders, and it mounts, cleans up and
+    // mounts again. The guard that stops that from costing a second Mercari
+    // collection must not also discard the answer: one request goes out, and
+    // the screen still fills in. Without this the page read 取得中 for ever,
+    // in development only, with every test passing.
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={["/sellers/s1"]}>
+          <Routes>
+            <Route path="/sellers/:sellerId" element={<SellerPage />} />
+          </Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    await screen.findByText("ポケカ引退おじさん");
+    expect(sellerMock).toHaveBeenCalledTimes(1);
   });
 
   it("says what it is doing while it collects", async () => {
