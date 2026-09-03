@@ -28,8 +28,27 @@ import {
 
 import styles from "./SearchForm.module.css";
 
-/** Section 9's initial state asks for examples. These are what the tool is for. */
-const EXAMPLES = ["ポケモンカード 引退", "ポケカ まとめ売り", "ポケモンカード 大量"];
+/**
+ * Section 9's initial state asks for examples. These are chosen, not decorative.
+ *
+ * "引退", "まとめ売り" and "大量" are what everyone selling a bulk lot writes,
+ * so their populations run to tens of thousands and a collection never gets
+ * past the last few days. The words below describe the same situation and are
+ * rarer, which is the whole point: a smaller population is one the budget can
+ * exhaust, and only an exhausted search reaches listings nobody has updated
+ * in years.
+ *
+ * Measured, not guessed. At ¥3,000–5,000, "ポケモンカード 大量" stopped at the
+ * page limit having reached 7 days back; "ポケモンカード 押入れ" ran out of
+ * results having reached 5 years.
+ */
+const EXAMPLES = [
+  "ポケモンカード 押入れ",
+  "ポケモンカード 物置",
+  "ポケモンカード 実家",
+  "ポケカ 断捨離",
+  "ポケモンカード 遺品",
+];
 
 export function SearchForm({
   values,
@@ -136,7 +155,7 @@ export function SearchForm({
 
       {showExamples && (
         <p className={styles.examples}>
-          例:{" "}
+          使う人が少ない語ほど母集団が小さく、古い出品まで遡れます。例:{" "}
           {EXAMPLES.map((example) => (
             <button
               key={example}

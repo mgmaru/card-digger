@@ -60,6 +60,29 @@ export function elapsedLabel(from: string, to: string): string {
   return `${Math.floor(days / DORMANCY_AXIS_DAYS)}年前`;
 }
 
+/**
+ * A span of time as a length, not as a moment.
+ *
+ * Separate from `elapsedLabel` because it answers a different question. That
+ * one says when something happened ("11か月前"); this one says how long
+ * something has lasted ("11か月"), which is what the reader compares between
+ * one search and the next.
+ */
+export function durationLabel(days: number): string {
+  if (days < 1) {
+    return "1日未満";
+  }
+  if (days < 30) {
+    return `${days}日`;
+  }
+  if (days < DORMANCY_AXIS_DAYS) {
+    return `${Math.floor(days / 30)}か月`;
+  }
+  const years = Math.floor(days / DORMANCY_AXIS_DAYS);
+  const months = Math.floor((days % DORMANCY_AXIS_DAYS) / 30);
+  return months === 0 ? `${years}年` : `${years}年${months}か月`;
+}
+
 export type Dormancy = {
   /** Days since the listing was last touched, as of the snapshot. */
   days: number;
@@ -77,6 +100,27 @@ export type Dormancy = {
  * still tending it, and only the second separates an abandoned retirement lot
  * from a listing whose seller is still adjusting the price.
  */
+/**
+ * The longest a listing in this collection has gone without an update.
+ *
+ * This is the number that says whether a search was worth running. A keyword
+ * whose population outruns the collection budget comes back full of listings
+ * touched this week; one narrow enough to exhaust comes back reaching years.
+ * Measured over everything collected, not over what the filters left, because
+ * it describes the collection.
+ */
+export function longestWithoutUpdate(
+  items: readonly { updatedAt: string }[],
+  collectedAt: string,
+): number | null {
+  if (items.length === 0) {
+    return null;
+  }
+  return Math.max(
+    ...items.map((item) => elapsedDays(item.updatedAt, collectedAt)),
+  );
+}
+
 export function dormancy(updatedAt: string, collectedAt: string): Dormancy {
   const days = elapsedDays(updatedAt, collectedAt);
   const capped = days >= DORMANCY_AXIS_DAYS;

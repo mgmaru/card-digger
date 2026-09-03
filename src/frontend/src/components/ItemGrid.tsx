@@ -6,6 +6,11 @@
  * still large enough to judge, not how many fit
  * ([視覚方針 §3.7](../../../../docs/product/design-tokens.md#37-grid列数と角丸)).
  *
+ * "更新" throughout, never "触られていない". The cards above already label the
+ * field 更新日時, and a second word for the same thing invites the reader to
+ * wonder whether it means something else — a like, a view, anything Mercari
+ * users do rather than what the seller does.
+ *
  * The notes here are stated once rather than on every card. Repeated forty
  * times they would stop being read, which is the opposite of what section 2.3
  * of the visual direction asks for.
@@ -40,7 +45,7 @@ export function ItemGrid({
       <div className={styles.legend}>
         <p className={styles.scale}>
           <span>更新されたばかり</span>
-          <span>{DORMANCY_AXIS_DAYS}日以上 触られていない</span>
+          <span>{DORMANCY_AXIS_DAYS}日以上 更新されていない</span>
         </p>
         <p className={styles.note}>
           各Cardの下の線は、最後に更新されてから経った期間です。
