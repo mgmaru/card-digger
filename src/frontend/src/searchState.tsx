@@ -66,17 +66,27 @@ export type Filters = {
   createdTo: string | null;
   saleFormat: SaleFormatFilter;
   /**
-   * Keep only listings untouched for at least this many days.
+   * Bounds on how long a listing has gone untouched, in days.
    *
    * Counted from `updatedAt` to `collectedAt`, the same span the bar on each
-   * card draws. **This is a fact about the listing, not about the seller.** A
-   * listing nobody has touched for a year says nothing about whether its
-   * seller is still around; that question is answered one seller at a time on
-   * the seller screen, and cannot be answered for a whole result set without
-   * collecting each of them
+   * card draws. Two bounds because the axis answers two opposite questions,
+   * and neither one is the other's default:
+   *
+   * - `min` keeps the **neglected** listings. This is what the product hunts
+   *   for, and what `updated_asc` and the bar are built around.
+   * - `max` keeps the **recently touched** ones, where something moved not
+   *   long ago and there is a better chance the listing can still be bought.
+   *
+   * **Both are facts about the listing, not about the seller.** A listing
+   * touched last week is evidence that someone was there, not proof that the
+   * seller is active — Mercari puts no label on `updatedAt`, which is why the
+   * seller screen says 最も新しい更新 rather than 最終活動. Whether a seller is
+   * still around is answered one seller at a time, and cannot be answered for
+   * a whole result set without collecting each of them
    * ([O-8](../../../docs/planning/todo.md#o-8--sellerの活動で絞るのを今やらない理由2026-09-04)).
    */
   minUntouchedDays: number | null;
+  maxUntouchedDays: number | null;
 };
 
 export const INITIAL_FILTERS: Filters = {
@@ -84,6 +94,7 @@ export const INITIAL_FILTERS: Filters = {
   createdTo: null,
   saleFormat: "all",
   minUntouchedDays: null,
+  maxUntouchedDays: null,
 };
 
 export type SearchStatus = "idle" | "loading" | "success" | "error";

@@ -186,6 +186,33 @@ describe("filterItems by days without an update", () => {
       .toEqual(["a"]);
   });
 
+  it("keeps what was touched recently when given an upper bound", () => {
+    // The opposite question: something moved on these lately, so there is a
+    // better chance of still being able to buy. It is evidence about the
+    // listing, not proof about the seller.
+    expect(ids(filterItems(ITEMS, withFilter({ maxUntouchedDays: 30 }), COLLECTED_AT)))
+      .toEqual(["b", "c"]);
+  });
+
+  it("includes the listing sitting exactly on the upper bound", () => {
+    expect(ids(filterItems(ITEMS, withFilter({ maxUntouchedDays: 4 }), COLLECTED_AT)))
+      .toEqual(["b", "c"]);
+    expect(ids(filterItems(ITEMS, withFilter({ maxUntouchedDays: 3 }), COLLECTED_AT)))
+      .toEqual(["b"]);
+  });
+
+  it("takes both ends as one band", () => {
+    expect(
+      ids(
+        filterItems(
+          ITEMS,
+          withFilter({ minUntouchedDays: 4, maxUntouchedDays: 300 }),
+          COLLECTED_AT,
+        ),
+      ),
+    ).toEqual(["c", "d"]);
+  });
+
   it("cannot reach a listing that was never collected", () => {
     // Nothing to assert but the shape of the answer: the filter only ever
     // returns a subset of what it was given. Section 5.3 is the reason this

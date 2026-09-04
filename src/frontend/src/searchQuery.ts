@@ -83,7 +83,8 @@ export function hasActiveFilter(filters: Filters): boolean {
     filters.createdFrom !== null ||
     filters.createdTo !== null ||
     filters.saleFormat !== "all" ||
-    filters.minUntouchedDays !== null
+    filters.minUntouchedDays !== null ||
+    filters.maxUntouchedDays !== null
   );
 }
 
@@ -97,7 +98,9 @@ export function hasActiveFilter(filters: Filters): boolean {
  *
  * Days without an update are counted to `collectedAt`, like every other
  * duration on the screen, so the same result narrows the same way however
- * long the tab has been open.
+ * long the tab has been open. Both bounds are inclusive: the two answer
+ * opposite questions — the neglected listings, and the ones something touched
+ * recently — and a reader who names a number means to include it.
  *
  * **None of this reaches further back.** Filtering removes listings already
  * in hand; it cannot add one that was never collected. The only thing that
@@ -131,11 +134,20 @@ export function filterItems(
         return false;
       }
     }
-    if (
-      filters.minUntouchedDays !== null &&
-      elapsedDays(item.updatedAt, collectedAt) < filters.minUntouchedDays
-    ) {
-      return false;
+    if (filters.minUntouchedDays !== null || filters.maxUntouchedDays !== null) {
+      const untouched = elapsedDays(item.updatedAt, collectedAt);
+      if (
+        filters.minUntouchedDays !== null &&
+        untouched < filters.minUntouchedDays
+      ) {
+        return false;
+      }
+      if (
+        filters.maxUntouchedDays !== null &&
+        untouched > filters.maxUntouchedDays
+      ) {
+        return false;
+      }
     }
     return true;
   });

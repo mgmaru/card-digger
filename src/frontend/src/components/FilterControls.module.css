@@ -28,8 +28,9 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 4桁（9999日 ＝ 27年）まで入る幅。2つ並ぶので、余白のほうを削る。 */
 .days {
-  width: 5rem;
+  width: 4rem;
   font-variant-numeric: tabular-nums;
 }
 
