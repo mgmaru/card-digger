@@ -371,6 +371,11 @@ git switch -c chore/sync-upstream-YYYYMMDD main
 |---|---|---|---|---|
 | **2026-09-05** | `b3bdec98` | **`9c3a87aa`** | 商品詳細の`seller.is_inactive`を読む（[Fork PR #3](https://github.com/mgmaru/mercapi/pull/3)）。Seller画面の「非アクティブ」表示に必要 | Fork 94 → **99 passed**、`black --check`クリア、Card Digger Backend **475 passed**、E2E **6 passed** |
 
+L1〜L3はいずれもFixtureとMockで通しており、**Fork経由で実Mercariの応答を読む経路だけは
+自動Testの対象外**である（[Test運用規約 §3](test-policy.md#3-test層)）。この1点は
+**2026-09-05に実アプリを起動して目視で確認した** —— 実Mercariの検索からSeller画面まで開き、
+「非アクティブ」が表示されることを見た。**率を測ってはいないので、L4ではなく起動確認である。**
+
 **既知の制約。** `is_inactive`の意味は確定していない（`unverifiable`）。
 値を読めることと、値が何を指すかは別で、後者は
 [観測結果](../../poc/mercapi/inactive-result.md)のとおり照合相手が存在しない。
