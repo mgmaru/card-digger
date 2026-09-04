@@ -414,6 +414,27 @@ value.astimezone(timezone.utc)
 | `listed_item_count` | `num_sell_items` | **主張** | **`observed`** | §6.4 |
 | `url` | `id`から生成 | 生成 | `observed` | Sellerページを開ける |
 
+#### `is_inactive`を載せない（2026-09-04決定）
+
+商品詳細Responseの`seller`は**18項目**を持ち、Forkが写しているのは16項目である。
+落ちている2つが`is_inactive`と`region_code`で、前者は「出品者が生きているか」を
+Mercari自身が持つ判定に見えた。**実測して載せないと決めた**
+（[観測結果](../../poc/mercapi/inactive-result.md)。3回、標本139件、True 17件）。
+
+| 分かったこと | 状態 |
+|---|---|
+| `seller`は常に`is_inactive`を持つ | **確定。** 139 / 139。欠落0・null 0 |
+| 出品者についての事実である（商品ごとに変わらない） | **確定。** 同一Sellerの別商品と12 / 12一致 |
+| **買い手に見える対応物がある** | **`unverifiable`。** Sellerページ・商品ページを両群で開き、`data-testid`の語彙全体（25〜70個）と候補語11語で比べて差が出ない |
+| **「休眠」を指す** | **支持されない。** Trueは登録の新しい小規模な口座に偏り、登録日の範囲は両群で完全に重なる |
+
+**`unverifiable`だから載せない、のではない。** `created_at`も`unverifiable`だが載せている
+（[上記](#created_atがunverifiableである理由2026-09-01観測)）。違いは、`created_at`は
+**値の意味が分かっていて呼び方だけが確認できない**のに対し、`is_inactive`は
+**値が何を指すのかが分からない**ことにある。限界を書いて出すことができない。
+
+Domain型に無いため、Field対応表にも行を持たない。**この節が、載せなかった理由の記録である。**
+
 #### 規則
 
 - **`assumed`の主張を画面へ出さない。** 出す必要が生じたら、先に観測して`observed`へ上げる
