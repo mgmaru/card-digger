@@ -1,3 +1,6 @@
-mercapi @ git+https://github.com/kynacio/mercapi.git@20ba68fd42677997c4c91b4e4eb17c1e7e387efa
+# 取得元はFork。upstream `kynacio/mercapi` は2026-09-04時点でHTTP 404を返す。
+# SHAは変えていない。20ba68fdはForkの履歴にあり、同じSHAは同じ木を指す。
+# 経緯: docs/development/mercapi-fork-operations.md §1.1
+mercapi @ git+https://github.com/mgmaru/mercapi.git@20ba68fd42677997c4c91b4e4eb17c1e7e387efa
 Pillow==11.3.0
 playwright==1.55.0

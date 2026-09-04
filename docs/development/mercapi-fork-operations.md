@@ -16,12 +16,40 @@
 
 | Repository | 呼称 | 役割 | Card Digger側からの変更 |
 |---|---|---|---|
-| `kynacio/mercapi` | `upstream` | Fork元。一般公開されている本家実装 | 直接Pushしない |
+| `kynacio/mercapi` | `upstream` | Fork元。**2026-09-04時点で参照できない**（[§1.1](#11-upstreamは現在参照できない2026-09-04)） | 直接Pushしない |
 | `mgmaru/mercapi` | Fork / `origin` | Sellerページング機能を追加して管理する依存ライブラリ | BranchとPull Requestで変更する |
 | `mgmaru/card-digger` | Application | ForkをMercari Adapter経由で利用する | 検証済みFork commit SHAだけを参照する |
 
 ForkとCard Diggerは別Repository、別Directoryとして管理する。ForkのソースをCard Diggerへ
 コピーせず、Git submoduleにもせず、PythonのVCS依存として利用する。
+
+### 1.1 upstreamは現在参照できない（2026-09-04）
+
+**`https://github.com/kynacio/mercapi`がHTTP 404を返す。** 削除・改名・非公開のどれかは
+外からは判別できない。
+
+気付いたのはCIである。`poc/mercapi/requirements.txt`がupstreamのURLからinstallしようとして
+止まった。**エラーは「認証を求められた」形で出る**ため、消えたのか権限が無いのかは読み取れない。
+
+```text
+failed to fetch commit `20ba68fd...`
+fatal: could not read Username for 'https://github.com': terminal prompts disabled
+```
+
+| | 影響 |
+|---|---|
+| Fork `mgmaru/mercapi` | **無い。** 独立したRepositoryとして残り、匿名で取得できる |
+| Card DiggerのBackend依存 | **無い。** 元からForkの`b3bdec98`を固定している |
+| PoCの依存 | **あった。** upstreamから取得していたため、**Forkの同じSHAへ替えた** |
+| 各文書が引用するupstream commit SHA | **記述は正しいまま。** 同じSHAはForkの履歴にあり、内容も同じである |
+| upstreamへPull Requestを出す（[§4](#4-forkへ機能を追加する)）／取込（[§2.1](#21-upstreamからfork)） | **実行できない** |
+
+**SHAは変えていない。** `20ba68fd`は`b3bdec98`の祖先であり、Gitで同じSHAは同じ木を指す。
+取得元だけが変わり、PoCが測ったコードは1バイトも変わらない。
+
+**復活したときは[§2.1](#21-upstreamからfork)の取込判断をそのまま使う。** 消えている間は
+[O-6](../planning/todo.md#オプション--判断済みで保留しているもの)の「upstreamが対応したとき」という
+再開契機が成り立たない。
 
 ## 2. 更新を止める2つの境界
 
