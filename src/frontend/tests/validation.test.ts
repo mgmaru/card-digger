@@ -153,6 +153,39 @@ describe("days without an update", () => {
     expect(errors.minUntouchedDays).toBeTruthy();
     expect(filters.saleFormat).toBe("auction");
   });
+
+  it("takes an upper bound as well, which asks the opposite question", () => {
+    // 30日以下 keeps what was touched recently. 365日以上 keeps what nobody
+    // has touched. Neither is the other's default.
+    expect(validateFilters(form({ maxUntouchedDays: "30" })).filters)
+      .toMatchObject({ minUntouchedDays: null, maxUntouchedDays: 30 });
+  });
+
+  it("takes both ends at once", () => {
+    const { filters, errors } = validateFilters(
+      form({ minUntouchedDays: "30", maxUntouchedDays: "365" }),
+    );
+
+    expect(errors).toEqual({});
+    expect(filters).toMatchObject({ minUntouchedDays: 30, maxUntouchedDays: 365 });
+  });
+
+  it("allows the two ends to be equal", () => {
+    expect(
+      validateFilters(form({ minUntouchedDays: "30", maxUntouchedDays: "30" })).errors,
+    ).toEqual({});
+  });
+
+  it("refuses a pair that cannot hold anything, and drops the upper bound", () => {
+    // Applying both would empty the screen, which reads as "nothing matched"
+    // rather than as a mistake.
+    const { filters, errors } = validateFilters(
+      form({ minUntouchedDays: "365", maxUntouchedDays: "30" }),
+    );
+
+    expect(errors.maxUntouchedDays).toBeTruthy();
+    expect(filters).toMatchObject({ minUntouchedDays: 365, maxUntouchedDays: null });
+  });
 });
 
 describe("reporting", () => {
@@ -162,10 +195,12 @@ describe("reporting", () => {
       createdTo: "also nope",
       saleFormat: "all",
       minUntouchedDays: "半年",
+      maxUntouchedDays: "ずっと",
     });
     expect(Object.keys(errors).sort()).toEqual([
       "createdFrom",
       "createdTo",
+      "maxUntouchedDays",
       "minUntouchedDays",
     ]);
   });

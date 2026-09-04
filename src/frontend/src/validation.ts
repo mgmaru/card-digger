@@ -24,7 +24,11 @@ import type { Filters, SaleFormatFilter } from "./searchState";
 
 export const KEYWORD_MAX_LENGTH = 100;
 
-export type FilterFieldName = "createdFrom" | "createdTo" | "minUntouchedDays";
+export type FilterFieldName =
+  | "createdFrom"
+  | "createdTo"
+  | "minUntouchedDays"
+  | "maxUntouchedDays";
 
 /** The fields that make up the question asked of Mercari. */
 export type SearchFieldName = "keyword" | "minPriceYen" | "maxPriceYen";
@@ -59,6 +63,7 @@ export type FilterFormValues = {
   createdTo: string;
   saleFormat: SaleFormatFilter;
   minUntouchedDays: string;
+  maxUntouchedDays: string;
 };
 
 export const EMPTY_FILTER_FORM: FilterFormValues = {
@@ -66,6 +71,7 @@ export const EMPTY_FILTER_FORM: FilterFormValues = {
   createdTo: "",
   saleFormat: "all",
   minUntouchedDays: "",
+  maxUntouchedDays: "",
 };
 
 /**
@@ -175,9 +181,27 @@ export function validateFilters(values: FilterFormValues): FilterValidation {
     createdTo = null;
   }
 
-  const untouched = parseWholeNumber(values.minUntouchedDays);
-  if (untouched === "invalid") {
+  const least = parseWholeNumber(values.minUntouchedDays);
+  const most = parseWholeNumber(values.maxUntouchedDays);
+  if (least === "invalid") {
     errors.minUntouchedDays = "0以上の整数で入力してください";
+  }
+  if (most === "invalid") {
+    errors.maxUntouchedDays = "0以上の整数で入力してください";
+  }
+
+  let minUntouchedDays = least === "invalid" ? null : least;
+  let maxUntouchedDays = most === "invalid" ? null : most;
+  if (
+    typeof minUntouchedDays === "number" &&
+    typeof maxUntouchedDays === "number" &&
+    minUntouchedDays > maxUntouchedDays
+  ) {
+    // An empty screen with two numbers above it that cannot both hold reads as
+    // "nothing matched" rather than as a mistake. Drop the upper bound and say
+    // so, the way the listing dates do.
+    errors.maxUntouchedDays = "「日以下」は「日以上」と同じか大きい値にしてください";
+    maxUntouchedDays = null;
   }
 
   return {
@@ -185,7 +209,8 @@ export function validateFilters(values: FilterFormValues): FilterValidation {
       createdFrom,
       createdTo,
       saleFormat: values.saleFormat,
-      minUntouchedDays: untouched === "invalid" ? null : untouched,
+      minUntouchedDays,
+      maxUntouchedDays,
     },
     errors,
   };

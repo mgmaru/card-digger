@@ -102,32 +102,60 @@ export function FilterControls({
         </div>
 
         {/*
-          Days without an update. **The listing's own axis, not the seller's.**
-          A listing untouched for a year says nothing about whether its seller
-          is still around — that is answered one seller at a time, on the
-          seller screen.
+          Days without an update, as two bounds on one axis. **The listing's
+          own axis, not the seller's.**
 
-          No preset list. The only number with a source is 365, which is the
-          length this product already calls old (section 5.3, and the axis of
-          the bar under each card); 30, 90 and 180 would be invented here.
+          They answer opposite questions and neither is the other's default.
+          `日以上` keeps the neglected listings, which is what this product
+          hunts for. `日以下` keeps the ones something touched recently, where
+          there is a better chance of still being able to buy.
+
+          Neither says whether the seller is around. Mercari puts no label on
+          `updatedAt`, so a listing touched last week is evidence that someone
+          was there, not proof — the seller screen says 最も新しい更新 for the
+          same reason.
+
+          One label for the pair, read out with each suffix, because the field
+          is one thing with two ends. No preset list: the only number with a
+          source is 365, the length this product already calls old (section 5.3
+          and the bar under each card). 30, 90 and 180 would be invented here,
+          so only the lower bound carries a placeholder.
         */}
         <div className={styles.field}>
-          <label className={styles.label} htmlFor={field("untouched")}>
+          <span className={styles.label} id={field("untouched-label")}>
             未更新日数
-          </label>
+          </span>
           <input
-            id={field("untouched")}
+            id={field("untouched-min")}
             className={styles.days}
             inputMode="numeric"
             placeholder="365"
             value={values.minUntouchedDays}
+            aria-labelledby={`${field("untouched-label")} ${field("least")}`}
             aria-invalid={errors.minUntouchedDays ? true : undefined}
             aria-describedby={
-              errors.minUntouchedDays ? errorId("untouched") : undefined
+              errors.minUntouchedDays ? errorId("least") : undefined
             }
             onChange={(event) => set("minUntouchedDays", event.target.value)}
           />
-          <span className={styles.unit}>日以上</span>
+          <span className={styles.unit} id={field("least")}>
+            日以上
+          </span>
+          <input
+            id={field("untouched-max")}
+            className={styles.days}
+            inputMode="numeric"
+            value={values.maxUntouchedDays}
+            aria-labelledby={`${field("untouched-label")} ${field("most")}`}
+            aria-invalid={errors.maxUntouchedDays ? true : undefined}
+            aria-describedby={
+              errors.maxUntouchedDays ? errorId("most") : undefined
+            }
+            onChange={(event) => set("maxUntouchedDays", event.target.value)}
+          />
+          <span className={styles.unit} id={field("most")}>
+            日以下
+          </span>
         </div>
 
         <div className={styles.field}>
@@ -154,7 +182,8 @@ export function FilterControls({
         [
           ["createdFrom", "from"],
           ["createdTo", "to"],
-          ["minUntouchedDays", "untouched"],
+          ["minUntouchedDays", "least"],
+          ["maxUntouchedDays", "most"],
         ] as const
       )
         .filter(([name]) => errors[name])
