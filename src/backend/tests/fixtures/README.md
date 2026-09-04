@@ -37,6 +37,7 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `search/auction_empty_object.json` | derived | `search/page_1_has_next.json` | 検索 | 空`auction`を`fixed_price`へ寄せず`unknown`にする |
 | `search/auction_unknown_shape.json` | derived | `search/page_1_has_next.json` | 検索 | 未知キーだけの`auction`を`unknown`にする |
 | `search/statuses.json` | derived | `search/page_1_has_next.json` | 検索 | `trading`を独立状態として保持し、未知Statusを`unknown`にする |
+| `search/unknown_condition.json` | derived | `search/page_1_has_next.json` | 検索 | 表に無い状態番号を名前無しにし、番号が無い商品を状態なしにする |
 | `search/missing_created.json` | derived | `search/page_1_has_next.json` | 検索 | 出品日時欠落をParse Errorにする |
 | `search/missing_updated.json` | derived | `search/page_1_has_next.json` | 検索 | 更新日時欠落をParse Errorにする |
 | `search/missing_image.json` | derived | `search/page_1_has_next.json` | 検索 | 画像URL欠落をParse Errorにする |

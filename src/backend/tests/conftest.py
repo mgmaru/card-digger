@@ -182,6 +182,7 @@ def sleeper(clock: FrozenClock) -> RecordingSleeper:
 # --- Building domain items and pages for the collection tests -----------------
 
 from card_digger.domain.models import (  # noqa: E402
+    ItemCondition,
     ListingStatus,
     MarketplaceItem,
     PageInfo,
@@ -203,6 +204,7 @@ def make_item(
     status: ListingStatus = ListingStatus.ON_SALE,
     price_yen: int = 1000,
     sale_format: SaleFormat = SaleFormat.FIXED_PRICE,
+    item_condition: ItemCondition | None = None,
 ) -> MarketplaceItem:
     return MarketplaceItem(
         id=id_,
@@ -217,6 +219,7 @@ def make_item(
         listing_status=status,
         sale_format=sale_format,
         seller_id=seller_id,
+        item_condition=item_condition,
     )
 
 

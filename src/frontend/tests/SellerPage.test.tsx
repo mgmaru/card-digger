@@ -64,6 +64,8 @@ function item(
     listingStatus: status,
     saleFormat: "fixed_price",
     sellerId: "s1",
+    // Mercari reports none for a seller's own listings.
+    itemCondition: null,
   };
 }
 

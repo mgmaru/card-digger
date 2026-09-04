@@ -19,6 +19,7 @@ from mercapi.mapping import map_to_class
 from mercapi.models import Item, SearchResults, SellerItemsPage
 
 from card_digger.adapters.mercari import (
+    ITEM_CONDITIONS,
     item_from_item_detail,
     item_from_search_result,
     item_from_seller_item,
@@ -27,7 +28,7 @@ from card_digger.adapters.mercari import (
     to_utc,
 )
 from card_digger.domain.errors import ErrorCode, MarketplaceError
-from card_digger.domain.models import ListingStatus, SaleFormat
+from card_digger.domain.models import ItemCondition, ListingStatus, SaleFormat
 
 
 CREATED_EPOCH = 1756600000
@@ -299,6 +300,55 @@ class TestRequiredFields:
             seller_from_profile(nameless)
 
         assert raised.value.code is ErrorCode.PARSE_ERROR
+
+
+class TestItemCondition:
+    """The number a search returns, and the name it is shown under.
+
+    A search reports the condition as a number with no name beside it, and the
+    MVP fetches no item detail for a search result. The name therefore comes
+    from Mercari's own `itemConditions` table, checked against the item page a
+    buyer reads on 2026-09-04 (`poc/mercapi/condition-result.md`).
+    """
+
+    def test_a_search_number_is_given_the_name_mercari_uses(self):
+        item = item_from_search_result(search_item("search/page_1_has_next.json", 0))
+
+        assert item.item_condition == ItemCondition(id="3", name="目立った傷や汚れなし")
+
+    def test_a_number_outside_the_table_keeps_the_number_and_takes_no_name(self):
+        """Nameless, so the screen says 状態不明 rather than guessing.
+
+        Borrowing the nearest entry would put a made up grade on the thing
+        someone is deciding whether to buy.
+        """
+        item = item_from_search_result(search_item("search/unknown_condition.json", 0))
+
+        assert item.item_condition == ItemCondition(id="99", name=None)
+
+    def test_a_listing_that_reports_no_condition_has_none(self):
+        item = item_from_search_result(search_item("search/unknown_condition.json", 1))
+
+        assert item.item_condition is None
+
+    def test_the_table_holds_every_number_mercari_publishes(self):
+        """Six, including the one never seen on a listing.
+
+        `6` was not observed in either run of the probe. It is in Mercari's
+        master table, so it is here; what is missing is a listing carrying it,
+        which is a limit of the observation and not a reason to drop it.
+        """
+        assert set(ITEM_CONDITIONS) == {"1", "2", "3", "4", "5", "6"}
+
+    def test_a_seller_listing_carries_no_condition(self):
+        """A seller's own listing page does not report one.
+
+        Pinned because the screen depends on it: the condition appears on
+        search cards and nowhere else, and this is why.
+        """
+        item = item_from_seller_item(seller_item("seller_items/with_auction.json"))
+
+        assert item.item_condition is None
 
 
 class TestOtherFields:

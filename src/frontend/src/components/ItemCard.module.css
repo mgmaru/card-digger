@@ -110,6 +110,12 @@
   margin: 0;
 }
 
+/* 状態だけ、同じ枠の中で他の2行より濃くする。掲載日と更新日時は文脈だが、
+   状態は仕入れるかを決める軸そのもの（視覚方針 §3.9）。 */
+.condition {
+  color: var(--ink);
+}
+
 .dates dd .nowrap + .nowrap {
   margin-left: var(--space-2);
 }

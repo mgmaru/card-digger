@@ -71,6 +71,29 @@ SELLER_ITEM_AUCTION_FIELDS = (
     "highest_bid",
 )
 
+#: What each condition number means, from Mercari's own `itemConditions` master
+#: endpoint. A search result carries the number and nothing else, and the MVP
+#: does not fetch item details for search results, so the name has to be looked
+#: up here.
+#:
+#: Verified 2026-09-04 against the item page a buyer reads: the number from a
+#: search matched `[data-testid="商品の状態"]` on 20 of 20 listings, exactly,
+#: across numbers 1 to 5 (`poc/mercapi/condition-result.md`). Number 6 was
+#: never observed — it is in Mercari's table, so it is here, but nothing has
+#: confirmed a listing carries it.
+#:
+#: A number outside this table stays nameless rather than borrowing the closest
+#: entry. The screen says 状態不明, which is true, where "傷や汚れあり" for an
+#: unknown number would be a guess about the thing someone is deciding to buy.
+ITEM_CONDITIONS = {
+    "1": "新品、未使用",
+    "2": "未使用に近い",
+    "3": "目立った傷や汚れなし",
+    "4": "やや傷や汚れあり",
+    "5": "傷や汚れあり",
+    "6": "全体的に状態が悪い",
+}
+
 _REQUESTABLE_STATUSES = {
     ListingStatus.ON_SALE,
     ListingStatus.TRADING,
@@ -225,6 +248,19 @@ def _photo_url(entry: Any) -> str | None:
     return uri.strip() or None if isinstance(uri, str) else None
 
 
+def _search_condition(condition_id: Any) -> ItemCondition | None:
+    """The condition of a search result, named where the number is known.
+
+    A search reports the condition as a number. Nothing else on the response
+    says what it means, so the name comes from `ITEM_CONDITIONS` — and stays
+    absent when the number is not in it.
+    """
+    if condition_id is None:
+        return None
+    number = str(condition_id)
+    return ItemCondition(id=number, name=ITEM_CONDITIONS.get(number))
+
+
 def item_from_search_result(raw: Any) -> MarketplaceItem:
     """Normalise one entry of a search page."""
     operation = Operation.SEARCH
@@ -236,6 +272,7 @@ def item_from_search_result(raw: Any) -> MarketplaceItem:
     if not image_urls:
         raise _parse_error(operation, "missing image url")
     condition_id = getattr(raw, "item_condition_id", None)
+    condition = _search_condition(condition_id)
     return MarketplaceItem(
         id=item_id,
         title=_required(getattr(raw, "name", None), "name", operation),
@@ -252,11 +289,7 @@ def item_from_search_result(raw: Any) -> MarketplaceItem:
         listing_status=listing_status(getattr(raw, "status", None)),
         sale_format=format_,
         seller_id=str(_required(getattr(raw, "seller_id", None), "sellerId", operation)),
-        item_condition=(
-            ItemCondition(id=str(condition_id), name=None)
-            if condition_id is not None
-            else None
-        ),
+        item_condition=condition,
         # A search page reports no like count. It is not zero, it is unknown.
         like_count=None,
     )

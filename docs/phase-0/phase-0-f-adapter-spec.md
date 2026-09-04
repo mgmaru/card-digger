@@ -3,7 +3,7 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-08-31**（Auction追加検証の結果と、0-F-4実装で判明した2件を反映）
+- 最終更新日: **2026-09-04**（`item_condition`の根拠区分を`observed`へ改めた）
 - ステータス: **実装基準として採用**
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)

@@ -30,6 +30,7 @@ function item(patch: Partial<Item> = {}): Item {
     listingStatus: "on_sale",
     saleFormat: "fixed_price",
     sellerId: "s1",
+    itemCondition: { id: "3", name: "目立った傷や汚れなし" },
     ...patch,
   };
 }
@@ -38,6 +39,14 @@ function mount(patch: Partial<Item> = {}) {
   return render(
     <MemoryRouter>
       <ItemCard item={item(patch)} collectedAt={COLLECTED_AT} />
+    </MemoryRouter>,
+  );
+}
+
+function mountSellerCard(patch: Partial<Item> = {}) {
+  return render(
+    <MemoryRouter>
+      <ItemCard item={item(patch)} collectedAt={COLLECTED_AT} variant="seller" />
     </MemoryRouter>,
   );
 }
@@ -92,6 +101,39 @@ describe("dates", () => {
   it("shows the update time as an elapsed time", () => {
     mount();
     expect(screen.getByText("11か月前")).toBeInTheDocument();
+  });
+});
+
+describe("condition", () => {
+  it("shows the name Mercari grades the listing under", () => {
+    mount({ itemCondition: { id: "4", name: "やや傷や汚れあり" } });
+    expect(screen.getByText("やや傷や汚れあり")).toBeInTheDocument();
+  });
+
+  it("says 不明 for a number it has no name for", () => {
+    // A grade Mercari added since. Borrowing the nearest one would put a made
+    // up condition on the thing someone is deciding whether to buy.
+    mount({ itemCondition: { id: "9", name: null } });
+    expect(screen.getByText("不明")).toBeInTheDocument();
+  });
+
+  it("says 不明 when the listing reports none at all", () => {
+    mount({ itemCondition: null });
+    expect(screen.getByText("不明")).toBeInTheDocument();
+  });
+
+  it("does not borrow 状態, which the seller screen uses for something else", () => {
+    // There, 状態 is whether a listing is on sale. Mercari's own label for
+    // wear is 商品の状態, so the card uses that.
+    mount();
+    expect(screen.getByText("商品の状態")).toBeInTheDocument();
+  });
+
+  it("is absent on a seller card", () => {
+    // Mercari's seller endpoint reports no condition, so every card on that
+    // screen would read 不明 — a column of nothing.
+    mountSellerCard({ itemCondition: null });
+    expect(screen.queryByText("商品の状態")).not.toBeInTheDocument();
   });
 });
 

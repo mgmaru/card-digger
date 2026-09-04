@@ -38,6 +38,7 @@ const RESULT: SearchResponse = {
       listingStatus: "on_sale",
       saleFormat: "fixed_price",
       sellerId: "s1",
+      itemCondition: { id: "3", name: "目立った傷や汚れなし" },
     },
   ],
   meta: {
