@@ -116,6 +116,7 @@ export function SellerPage() {
             seller={analysis.seller}
             lastUpdatedAt={lastUpdate(analysis)}
             collectedAt={collectedAt(analysis)}
+            isInactive={analysis.sellerIsInactive}
           />
           <SellerKnowledgePanel
             knowledge={analysis.knowledge}

@@ -29,6 +29,10 @@ L1〜L3のTestが読む**固定入力データ**。生ResponseのDumpではな�
 観測元はいずれも[Auction情報の追加検証](../../../../poc/mercapi/auction-result.md)（2026-08-31、
 upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構造サンプルとする。
 
+`item/seller_*.json`の`is_inactive`だけは[`is_inactive`の観測](../../../../poc/mercapi/inactive-result.md)
+（2026-09-04、標本139件すべてが`seller.is_inactive`を持つ）を出所とする。値の有無だけを変えた
+`derived`であり、Field名・階層・型は発明していない。
+
 | Fixture | 区分 | 派生元 | 取得元 | 検証観点 |
 |---|---|---|---|---|
 | `search/page_1_has_next.json` | observed | — | 検索 | 通常出品とAuctionが並ぶ1ページ目。`nextPageToken`を次Cursorにする |
@@ -45,6 +49,9 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `item/auction.json` | observed | — | 商品詳細 | `auction_info`の全Fieldを読み、`highest_bid`を価格にする |
 | `item/fixed_price.json` | observed | — | 商品詳細 | `auction_info`欠落を通常出品にする |
 | `item/auction_info_unknown_shape.json` | derived | `item/auction.json` | 商品詳細 | 未知形状の`auction_info`を`unknown`にする |
+| `item/seller_inactive.json` | derived | `item/fixed_price.json` | 商品詳細 | `seller.is_inactive`が`true`のとき読む |
+| `item/seller_active.json` | derived | `item/fixed_price.json` | 商品詳細 | `false`は答えであり`False`のまま運ぶ |
+| `item/seller_without_is_inactive.json` | derived | `item/fixed_price.json` | 商品詳細 | **Field欠落を`False`にせず不明にする** |
 | `seller/profile.json` | observed | — | Seller Profile | 名前・評価件数・評価の内訳・出品件数を正規化する |
 | `seller_items/page_1_has_next.json` | observed | — | Seller商品一覧 | `has_next=true`で末尾`pager_id`を次Cursorにする |
 | `seller_items/page_2_end.json` | derived | `seller_items/page_1_has_next.json` | Seller商品一覧 | `has_next=false`でCursorを返さない |

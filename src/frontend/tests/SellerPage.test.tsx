@@ -107,6 +107,7 @@ function analysis(patch: Partial<SellerAnalysisResponse> = {}): SellerAnalysisRe
       level: "high",
       sampleConfidence: "high",
     },
+    sellerIsInactive: false,
     ...patch,
   };
 }
@@ -280,6 +281,50 @@ describe("profile", () => {
     const profile = await screen.findByLabelText("Seller");
     const row = within(profile).getByText("最も新しい更新").parentElement;
     expect(row).toHaveTextContent("-");
+  });
+
+  it("shows Mercari's inactive flag under Mercari's own name", async () => {
+    sellerMock.mockResolvedValue(analysis({ sellerIsInactive: true }));
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    const row = within(profile).getByText("非アクティブ").parentElement;
+    expect(row).toHaveTextContent("はい");
+  });
+
+  it("shows いいえ when Mercari says the seller is not flagged", async () => {
+    sellerMock.mockResolvedValue(analysis({ sellerIsInactive: false }));
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    const row = within(profile).getByText("非アクティブ").parentElement;
+    expect(row).toHaveTextContent("いいえ");
+  });
+
+  it("shows a dash, never いいえ, when the flag could not be read", async () => {
+    // A seller with nothing to read it from is not a seller Mercari called
+    // active. This is the one way the transcription could become a claim.
+    sellerMock.mockResolvedValue(analysis({ sellerIsInactive: null }));
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    const row = within(profile).getByText("非アクティブ").parentElement;
+    expect(row).toHaveTextContent("-");
+    expect(row).not.toHaveTextContent("いいえ");
+  });
+
+  it("says the meaning of the flag has not been confirmed", async () => {
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    expect(profile).toHaveTextContent("この値が何を指すかは確認できていません");
+  });
+
+  it("never interprets the flag for the reader", async () => {
+    // 休眠 and 退会 were both measured against and neither was supported.
+    // Transcribing the field is the whole basis for showing it at all.
+    sellerMock.mockResolvedValue(analysis({ sellerIsInactive: true }));
+    mount();
+    const profile = await screen.findByLabelText("Seller");
+    for (const claim of ["休眠", "退会", "買えません", "取引できません"]) {
+      expect(profile).not.toHaveTextContent(claim);
+    }
   });
 
   it("links out to the seller on Mercari", async () => {

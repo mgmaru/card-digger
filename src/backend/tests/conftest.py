@@ -205,6 +205,7 @@ def make_item(
     price_yen: int = 1000,
     sale_format: SaleFormat = SaleFormat.FIXED_PRICE,
     item_condition: ItemCondition | None = None,
+    seller_is_inactive: bool | None = None,
 ) -> MarketplaceItem:
     return MarketplaceItem(
         id=id_,
@@ -220,6 +221,7 @@ def make_item(
         sale_format=sale_format,
         seller_id=seller_id,
         item_condition=item_condition,
+        seller_is_inactive=seller_is_inactive,
     )
 
 

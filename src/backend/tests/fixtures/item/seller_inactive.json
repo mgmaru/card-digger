@@ -1,0 +1,28 @@
+{
+  "data": {
+    "id": "m000000000010",
+    "status": "on_sale",
+    "name": "sample-item-of-an-inactive-seller",
+    "price": 1200,
+    "created": 1756600000,
+    "updated": 1757377600,
+    "num_likes": 0,
+    "num_comments": 0,
+    "photos": [
+      "https://example.test/image-1.webp"
+    ],
+    "thumbnails": [
+      "https://example.test/thumb-1.webp"
+    ],
+    "item_condition": {
+      "id": 3,
+      "name": "sample-condition",
+      "subname": ""
+    },
+    "seller": {
+      "id": 100000001,
+      "name": "seller-sample-1",
+      "is_inactive": true
+    }
+  }
+}

@@ -47,6 +47,10 @@ class SellerAnalysis:
     on_sale: SellerItemsCollection
     sold_out: SellerItemsCollection
     profile_error: CollectionError | None = None
+    #: Mercari's `is_inactive` for this seller, or None when it was not
+    #: obtained. Not on `Seller`: that is built from the profile, and the
+    #: profile does not carry this. It costs one item detail request.
+    seller_is_inactive: bool | None = None
 
 
 async def analyze_seller(
@@ -94,8 +98,46 @@ async def analyze_seller(
         port, seller_id, ListingStatus.SOLD_OUT, gate=gate, clock=clock, limits=limits
     )
     return SellerAnalysis(
-        seller_id=seller_id, seller=seller, on_sale=on_sale, sold_out=sold_out
+        seller_id=seller_id,
+        seller=seller,
+        on_sale=on_sale,
+        sold_out=sold_out,
+        seller_is_inactive=await _is_inactive(port, on_sale, sold_out, gate=gate),
     )
+
+
+async def _is_inactive(
+    port: MarketplacePort,
+    on_sale: SellerItemsCollection,
+    sold_out: SellerItemsCollection,
+    *,
+    gate: RequestGate,
+) -> bool | None:
+    """Mercari's flag on this seller, for one more request.
+
+    The flag lives on an item's seller object and nowhere else — the profile
+    endpoint does not carry it — so learning it costs one item detail. Any of
+    this seller's listings answers: measured 2026-09-04, two listings of the
+    same seller agreed 12 times out of 12.
+
+    On sale first, because that is the tab already in front of the reader, and
+    sold out as the fallback, because a seller who has retired may have nothing
+    left for sale and is exactly the case worth asking about. With neither,
+    nothing is fetched.
+
+    A failure here returns None and is not recorded as a collection error. The
+    profile and both listing collections have already succeeded by this point,
+    and losing one supplementary field is not a reason to present the rest as
+    partial.
+    """
+    listing = next(iter(on_sale.items), None) or next(iter(sold_out.items), None)
+    if listing is None:
+        return None
+    try:
+        item = await gate.run(Operation.ITEM, lambda: port.get_item(listing.id))
+    except (MarketplaceError, SafetyStop):
+        return None
+    return item.seller_is_inactive
 
 
 async def _collect_status(

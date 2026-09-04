@@ -68,6 +68,20 @@ class MarketplaceItem:
     seller_id: str
     item_condition: ItemCondition | None = None
     like_count: int | None = None
+    #: What the marketplace said about this listing's seller, when it said
+    #: anything. `None` means it was not asked or did not answer, which is not
+    #: the same as it saying no.
+    #:
+    #: A fact about the person, carried here because this is where it arrives:
+    #: only an item detail has it, the way `seller_id` does. A search result
+    #: and a seller's own listing page both leave it `None`.
+    #:
+    #: What it means is Mercari's to say and has not been established. Measured
+    #: 2026-09-04 over 139 listings: always present, the same for every listing
+    #: of one seller (12 of 12), and never set on a listing touched within
+    #: ninety days (0 of 55). Nothing on a page a buyer reads corresponds to
+    #: it, so it is shown transcribed and never interpreted.
+    seller_is_inactive: bool | None = None
 
 
 @dataclass(frozen=True)

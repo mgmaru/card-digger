@@ -189,6 +189,16 @@ export type SellerAnalysisResponse = {
   onSale: SellerItems;
   soldOut: SellerItems;
   knowledge: SellerKnowledge;
+  /**
+   * Mercari's own `is_inactive` for this seller.
+   *
+   * `null` when it could not be obtained — a seller with no listings to read
+   * it from, or a request that failed — which is **not** the same as `false`.
+   *
+   * Sits beside `seller` rather than inside it because the profile endpoint
+   * does not carry it. The backend reads it from one of the seller's listings.
+   */
+  sellerIsInactive: boolean | null;
 };
 
 export type HealthResponse = {

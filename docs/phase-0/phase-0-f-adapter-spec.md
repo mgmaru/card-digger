@@ -401,6 +401,7 @@ value.astimezone(timezone.utc)
 | `seller_id` | `seller_id` / `seller.id_` | 転記 | `observed` | この値でProfileを取得できる |
 | `item_condition` | `item_condition` / `item_condition_id` | 転記 | **`observed`** | 検索の`item_condition_id`が商品ページの`[data-testid="商品の状態"]`と20 / 20一致（[観測結果](../../poc/mercapi/condition-result.md)）。番号`6`は**未観測**。表示名はMercariのmaster Endpointが正本 |
 | `like_count` | `num_likes` | 転記 | `derived` | 商品ページに`data-testid="icon-heart-button"`がある。**値は突き合わせていない** |
+| **`seller_is_inactive`** | **`seller.is_inactive`** | **転記** | **`unverifiable`** | 商品詳細139 / 139が保持し、同一Sellerの別商品と12 / 12一致。**照合相手が存在しない**（[観測結果](../../poc/mercapi/inactive-result.md)）。下記 |
 
 #### `Seller`
 
@@ -414,26 +415,47 @@ value.astimezone(timezone.utc)
 | `listed_item_count` | `num_sell_items` | **主張** | **`observed`** | §6.4 |
 | `url` | `id`から生成 | 生成 | `observed` | Sellerページを開ける |
 
-#### `is_inactive`を載せない（2026-09-04決定）
+#### `seller_is_inactive`は転記であって主張ではない（2026-09-05決定）
 
-商品詳細Responseの`seller`は**18項目**を持ち、Forkが写しているのは16項目である。
-落ちている2つが`is_inactive`と`region_code`で、前者は「出品者が生きているか」を
-Mercari自身が持つ判定に見えた。**実測して載せないと決めた**
-（[観測結果](../../poc/mercapi/inactive-result.md)。3回、標本139件、True 17件）。
+商品詳細Responseの`seller`は**18項目**を持ち、Forkが写しているのは17項目である
+（残る1つは`region_code`）。`is_inactive`は
+[2026-09-04の実測](../../poc/mercapi/inactive-result.md)を経てDomainへ載せた。
 
 | 分かったこと | 状態 |
 |---|---|
-| `seller`は常に`is_inactive`を持つ | **確定。** 139 / 139。欠落0・null 0 |
+| `seller`は常に`is_inactive`を持つ | **確定。** 139 / 139。厳密に真偽値で、非真偽値0件 |
 | 出品者についての事実である（商品ごとに変わらない） | **確定。** 同一Sellerの別商品と12 / 12一致 |
 | **買い手に見える対応物がある** | **`unverifiable`。** Sellerページ・商品ページを両群で開き、`data-testid`の語彙全体（25〜70個）と候補語11語で比べて差が出ない |
-| **「休眠」を指す** | **支持されない。** Trueは登録の新しい小規模な口座に偏り、登録日の範囲は両群で完全に重なる |
+| **「休眠」を指す** | **未確定。** Trueは登録の新しい小規模な口座に寄り、登録日の範囲は両群で完全に重なる |
 
-**`unverifiable`だから載せない、のではない。** `created_at`も`unverifiable`だが載せている
-（[上記](#created_atがunverifiableである理由2026-09-01観測)）。違いは、`created_at`は
-**値の意味が分かっていて呼び方だけが確認できない**のに対し、`is_inactive`は
-**値が何を指すのかが分からない**ことにある。限界を書いて出すことができない。
+**`unverifiable`なので載せられる。** `assumed`（やっていない）なら塞ぐべきTaskだが、
+これは**やる手段が無い**——この値はMercariの画面に現れないと考えられ、
+API＋DOMという検証手段は今後も成立しない。`created_at`と同じ区分であり、
+**限界を画面へ書いたうえで出す**（[MVP仕様 §6.2](../product/mvp-spec.md#非アクティブを出す2026-09-05決定)）。
 
-Domain型に無いため、Field対応表にも行を持たない。**この節が、載せなかった理由の記録である。**
+**画面の語が「非アクティブ」なのは転記だからである。** `is_inactive`から意味が動いていない。
+「休眠中」「退会済み」は意味を選ぶ**主張**にあたり、根拠が無いので使わない。
+
+##### `MarketplaceItem`に置く理由
+
+**出品者についての事実だが、商品Responseが運ぶ。** `seller_id`と同じ形である。
+
+| 経路 | `is_inactive` |
+|---|---|
+| 検索 | **無い**（`seller` object自体が無い） |
+| **商品詳細** | **ある** |
+| Seller商品一覧 | **無い** |
+| **Seller Profile** | **無い**（全37項目を確認） |
+
+Profileに無い以上、`Seller`型へは置けない。置けば**Profileから作った`Seller`が常に`None`を持つ**
+ことになり、「取得元によって埋まったり埋まらなかったりするField」を型が抱える。
+
+##### 欠落を`False`にしない
+
+Fork側の型は`Optional[bool]`である。**「Mercariが何も言っていない」と「Mercariがそうでないと
+言った」は別の答え**であり、区別を落とすと、Mercariが何も言っていない出品者について
+Mercariが活動中と言ったことにしてしまう。Adapterは真偽値以外を`None`にする——
+`"false"`は真、`0`は偽と評価されるため、型を見ずに通すと形の変化がそのまま答えになる。
 
 #### 規則
 

@@ -365,6 +365,16 @@ git switch -c chore/sync-upstream-YYYYMMDD main
 | Test | Fork Unit、Adapter Unit / Contract、ライブ検証の結果 |
 | 既知の制約 | 未解決Error、互換性、再検証条件 |
 
+### 7.1 実施記録
+
+| 日 | 旧SHA | 新SHA | 理由 | Test |
+|---|---|---|---|---|
+| **2026-09-05** | `b3bdec98` | **`9c3a87aa`** | 商品詳細の`seller.is_inactive`を読む（[Fork PR #3](https://github.com/mgmaru/mercapi/pull/3)）。Seller画面の「非アクティブ」表示に必要 | Fork 94 → **99 passed**、`black --check`クリア、Card Digger Backend **475 passed**、E2E **6 passed** |
+
+**既知の制約。** `is_inactive`の意味は確定していない（`unverifiable`）。
+値を読めることと、値が何を指すかは別で、後者は
+[観測結果](../../poc/mercapi/inactive-result.md)のとおり照合相手が存在しない。
+
 ## 8. 問題発生時の戻し方
 
 新しいFork commitで問題が発生した場合は、まずCard Diggerの依存指定を直前の検証済みSHAへ戻す。
