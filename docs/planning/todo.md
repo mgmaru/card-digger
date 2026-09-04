@@ -2223,7 +2223,7 @@ Phase 0-FにもMVPにも必須ではない。**着手しないことがそのま
 | O-1 | Seller商品で`trading`を要求する | MVPが販売中・売却済みの2画面で、表示先が無い | 「取引中」を表示する要件／Seller Knowledgeで「売れた」に含めると決めたとき | **小。** Application層に閉じる。Fork変更・SHA更新なし |
 | O-2 | 入札件数`total_bids`をDomainへ追加する | MVPの表示要件に無い | Auctionの盛り上がりを画面に出したくなったとき | **小。** 3経路すべてで取得済み。Fork変更なし |
 | O-3 | 開始価格`initial_price`をDomainへ追加する | 検索モデルに無くFork変更が要る。**商品ページにも表示されず、正しさを検証できない** | 「開始価格300円 → 現在900円」のような推移を表示する要件 | **大。** Fork変更＋依存SHA更新が必要 |
-| O-6 | DPoP署名を`ecdsa`から`cryptography` backendへ切り替える | `ecdsa`の`GHSA-wj6h-64fc-37mp`（HIGH、**修正予定なし**）を`mercapi`が直接踏んでいる。ただしDPoP鍵は自分のRequestを証明するだけで、MVPは未認証・単一利用者である | 認証を伴う操作を足すとき／upstreamが対応したとき | **中。** Fork変更＋依存SHA更新が必要 |
+| O-6 | DPoP署名を`ecdsa`から`cryptography` backendへ切り替える | `ecdsa`の`GHSA-wj6h-64fc-37mp`（HIGH、**修正予定なし**）を`mercapi`が直接踏んでいる。ただしDPoP鍵は自分のRequestを証明するだけで、MVPは未認証・単一利用者である | 認証を伴う操作を足すとき／upstreamが対応したとき（**upstreamは2026-09-04時点で参照できない**。[Fork運用手順 §1.1](../development/mercapi-fork-operations.md#11-upstreamは現在参照できない2026-09-04)） | **中。** Fork変更＋依存SHA更新が必要 |
 | O-7 | **語彙で母集団を絞る**（`excludeKeyword` / `categoryId`） | **削った先に何があったか永久に分からない。** 「まとめ」を除外すると本命の「まとめ売り」が消える。母集団を削る操作はこの製品がいちばん嫌う性質を持つ | 価格帯と語彙の工夫で足りなくなったとき | **中。** APIにあり、Fork変更は不要。**設計のほうが重い** |
 | O-5 | 検索結果・Seller情報をCacheする | **TTLを決める根拠が無い。** Auctionの`highest_bid`は入札のたびに動くが、入札間隔を測っていない。MVPが必要とする「戻っても再検索しない」はCacheなしで足りる | 同じ取得を繰り返す画面が増えたとき／入札間隔を実測してTTLの根拠ができたとき | **小。** `MarketplacePort`を実装するDecoratorで包む。`application/`と`domain/`は変更なし |
 | **O-8** | **Sellerの活動で検索結果を絞る** | **活動を取得していない。** Profileに最終ログインも最終活動も無く（`created`は登録日）、検索Responseは`sellerId`しか持たない。安く作れる代理指標は**肯定にしか使えない** | Seller画面で1人ずつ確かめるだけでは足りなくなったとき／Seller収集の費用が下がったとき | **大。** 1 Sellerあたり1回以上の収集が要り、検索1回（20〜30秒）に対し分単位が乗る |
