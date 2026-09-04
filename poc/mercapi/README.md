@@ -131,6 +131,39 @@ poc/mercapi/.venv/bin/python poc/mercapi/timestamp_probe.py --skip-page-check
 
 `created`が「出品日時」かどうかは**商品ページに照合相手が無く、検証できません。**
 
+## 商品の状態の追加観測
+
+検索が返す`itemConditionId`が、買い手が商品ページで読む「商品の状態」と同じ意味かを確かめます。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/condition_probe.py
+```
+
+対応表そのものはMercariが公開しています（master Endpoint `itemConditions`。Forkの
+`docs/facets/conditions.json`に6件のsnapshot）。**未検証なのは番号と表示の結び付きだけ**なので、
+実行は次の3つを見ます。
+
+1. master Endpointの答えが、Forkのsnapshotと今も同じか（Request 1件）
+2. 検索1ページが返す番号の内訳（欠落件数を含む）
+3. 標本の商品ページ`[data-testid="商品の状態"]`と、表が与える表示名の**厳密比較**
+
+包含一致は別に数え、一致率へ入れません。要素が見つからなければ**比較不能**として数え、
+そのページが持っていた`data-testid`を記録します（次の実行を当てずっぽうにしないため）。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/condition_probe.py --skip-page-check
+poc/mercapi/.venv/bin/python poc/mercapi/condition_probe.py --skip-master
+```
+
+標本は番号ごとに巡回して選びます（既定: 番号あたり4件、上限20件）。
+**現れなかった番号は未観測であり、合格ではありません。**
+繰り返し実行するときは`--output`を分けてください。既定の出力先は同じで、**前回のartifactを上書きします。**
+
+結果は[商品の状態の追加観測結果](condition-result.md)。判定は
+**Forkのsnapshotはmaster Endpointと同一**、
+**検索の`itemConditionId`は商品ページの表示と一致する**（番号1〜5で20 / 20）でした。
+番号`6`（全体的に状態が悪い）は母集団239件で**未観測**です。
+
 ## テスト
 
 ```bash
@@ -152,6 +185,9 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `timestamp_probe.py`: `created`と`updated`の意味を観測するランナー
 - `test_timestamp_probe.py`: ラベル解析、標本選択、時刻比較の単体テスト
 - `timestamp-result.md`: 2026-09-01の`created` / `updated`観測結果
+- `condition_probe.py`: 検索の`itemConditionId`と商品ページの表示を突き合わせるランナー
+- `test_condition_probe.py`: 表の解析、標本選択、比較判定、率の数え方の単体テスト
+- `condition-result.md`: 2026-09-04の商品の状態の観測結果
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証
