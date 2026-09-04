@@ -83,7 +83,7 @@ export type Filters = {
    * seller screen says 最も新しい更新 rather than 最終活動. Whether a seller is
    * still around is answered one seller at a time, and cannot be answered for
    * a whole result set without collecting each of them
-   * ([O-8](../../../docs/planning/todo.md#o-8--sellerの活動で絞るのを今やらない理由2026-09-04)).
+   * ([O-8](../../../docs/planning/todo.md#o-8--sellerの活動で検索結果を絞るのを打ち切った理由2026-09-04)).
    */
   minUntouchedDays: number | null;
   maxUntouchedDays: number | null;
