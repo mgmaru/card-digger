@@ -317,6 +317,13 @@ class SellerAnalysisResponse(CamelModel):
     on_sale: SellerItemsResponse
     sold_out: SellerItemsResponse
     knowledge: SellerKnowledgeResponse
+    #: Mercari's own `is_inactive` for this seller. `null` when it could not be
+    #: obtained, which is not the same as `false`.
+    #:
+    #: Sits beside `seller` rather than inside it because it does not come from
+    #: the profile: the profile carries no such field, and this is read from one
+    #: of the seller's listings.
+    seller_is_inactive: bool | None = None
 
 
 class HealthResponse(CamelModel):

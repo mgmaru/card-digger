@@ -401,9 +401,12 @@ class TestTheStatusRuleItself:
 
 
 class TestSellerAnalysis:
-    def port_for(self, on_sale=(), sold_out=(), profile=None) -> ScriptedPort:
+    def port_for(self, on_sale=(), sold_out=(), profile=None, item=None) -> ScriptedPort:
         return ScriptedPort(
             seller=profile if profile is not None else seller(),
+            # Every analysis ends by reading `is_inactive` off one of the
+            # seller's listings, so the script always has an answer for it.
+            item=item if item is not None else [make_item("m000000000001")],
             seller_pages={
                 ListingStatus.ON_SALE: [make_seller_page(on_sale, ListingStatus.ON_SALE)],
                 ListingStatus.SOLD_OUT: [
@@ -471,6 +474,37 @@ class TestSellerAnalysis:
         assert body["knowledge"]["level"] == "unknown"
         assert body["knowledge"]["sampleConfidence"] == "unknown"
 
+    def test_it_reports_mercari_s_inactive_flag_beside_the_profile(self):
+        port = self.port_for(
+            on_sale=make_items(1),
+            item=[make_item("m000000000001", seller_is_inactive=True)],
+        )
+
+        body = client(port).get(f"/api/sellers/{SELLER_ID}/analysis").json()
+
+        assert body["sellerIsInactive"] is True
+        # Beside the profile, not inside it: the profile endpoint carries no
+        # such field, and this was read from one of the seller's listings.
+        assert "isInactive" not in body["seller"]
+
+    def test_a_seller_mercari_did_not_flag_is_false(self):
+        port = self.port_for(
+            on_sale=make_items(1),
+            item=[make_item("m000000000001", seller_is_inactive=False)],
+        )
+
+        body = client(port).get(f"/api/sellers/{SELLER_ID}/analysis").json()
+
+        assert body["sellerIsInactive"] is False
+
+    def test_a_seller_with_no_listings_reports_null_not_false(self):
+        """Nothing to ask about is not an answer of "active"."""
+        port = self.port_for()
+
+        body = client(port).get(f"/api/sellers/{SELLER_ID}/analysis").json()
+
+        assert body["sellerIsInactive"] is None
+
     def test_a_missing_seller_is_a_404(self):
         port = ScriptedPort(
             seller=MarketplaceError(ErrorCode.NOT_FOUND_404, Operation.SELLER_PROFILE)
@@ -499,6 +533,7 @@ class TestSellerAnalysis:
         # for itself that it came back short.
         port = ScriptedPort(
             seller=seller(),
+            item=[make_item("m000000000001")],
             seller_pages={
                 ListingStatus.ON_SALE: [
                     MarketplaceError(ErrorCode.PARSE_ERROR, Operation.SELLER_ON_SALE)
@@ -646,6 +681,7 @@ class CountingMarketplace:
     def __init__(self) -> None:
         self.searches = 0
         self.profiles = 0
+        self.items = 0
         self.running = 0
         self.highest_overlap = 0
 
@@ -661,7 +697,11 @@ class CountingMarketplace:
         return make_search_page(make_items(2))
 
     async def get_item(self, item_id):
-        raise NotImplementedError
+        # The seller analysis reads `is_inactive` from one listing. Counted
+        # like the rest, so the overlap check covers it too.
+        self.items += 1
+        await self._one()
+        return make_item(item_id)
 
     async def get_seller(self, seller_id):
         self.profiles += 1

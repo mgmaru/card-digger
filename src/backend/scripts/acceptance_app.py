@@ -95,6 +95,15 @@ SELLER_TWO = Seller(
 )
 
 
+#: What Mercari would say about each seed seller's `is_inactive`.
+#:
+#: Both answers are present because both render differently and neither is a
+#: default: the screen must be able to show 「いいえ」 as an answer rather than
+#: as the absence of one. Seller two is the flagged one, so the flow can reach
+#: a 「はい」 without the search result changing.
+INACTIVE_BY_SELLER = {"100000001": False, "100000002": True}
+
+
 def _item(
     number: int,
     title: str,
@@ -124,6 +133,10 @@ def _item(
         # Seller listings carry none: Mercari's seller endpoint does not report
         # a condition, and the seed says so by leaving it out.
         item_condition=condition,
+        # Every seeded listing carries it, the way a real item detail does. The
+        # seller screen reads it from whichever listing it fetches, so it has
+        # to be the same on all of one seller's.
+        seller_is_inactive=INACTIVE_BY_SELLER.get(seller.id),
     )
 
 

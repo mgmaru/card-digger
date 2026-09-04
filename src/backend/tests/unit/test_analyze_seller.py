@@ -8,7 +8,7 @@ them. Neither is ever described as everything the seller has.
 from __future__ import annotations
 
 import pytest
-from conftest import ScriptedPort, make_items, make_seller_page
+from conftest import ScriptedPort, make_item, make_items, make_seller_page
 
 from card_digger.application.analyze_seller import analyze_seller
 from card_digger.application.collection import (
@@ -36,9 +36,13 @@ SELLER = Seller(
 )
 
 
-def port_with(on_sale, sold_out, *, seller=SELLER) -> ScriptedPort:
+def port_with(on_sale, sold_out, *, seller=SELLER, item=None) -> ScriptedPort:
+    # One item detail is always available: every analysis ends by fetching one
+    # of the seller's listings for `is_inactive`, so a port without an answer
+    # for it is not a port this application ever talks to.
     return ScriptedPort(
         seller=[seller],
+        item=item if item is not None else [make_item("m000000000001")],
         seller_pages={
             ListingStatus.ON_SALE: on_sale,
             ListingStatus.SOLD_OUT: sold_out,
@@ -78,6 +82,9 @@ class TestBothStatuses:
             "seller",
             "seller_items:on_sale",
             "seller_items:sold_out",
+            # The one extra request, and last: it needs a listing to ask about,
+            # so it cannot happen before the listings have been collected.
+            "item",
         ]
 
     async def test_each_status_keeps_its_own_cursor(self, clock, sleeper):
@@ -239,6 +246,128 @@ class TestFailures:
         assert gate.stopped is True
         assert analysis.profile_error.code is ErrorCode.RATE_LIMITED_429
         assert analysis.on_sale.meta.stop_reason is CollectionStopReason.SAFETY_STOP
+
+
+class TestIsInactive:
+    """Mercari's own flag on the seller, read from one of their listings.
+
+    The profile endpoint does not carry it, so this costs one extra request.
+    What the flag means has not been established, which is why nothing here
+    turns an absent answer into a negative one.
+    """
+
+    def item_with(self, flag):
+        return make_item("m000000000001", seller_is_inactive=flag)
+
+    async def test_takes_the_flag_from_an_on_sale_listing(self, clock, sleeper):
+        port = port_with(
+            [page(make_items(1), ListingStatus.ON_SALE)],
+            [page(make_items(1, start=2), ListingStatus.SOLD_OUT)],
+            item=[self.item_with(True)],
+        )
+
+        analysis = await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert analysis.seller_is_inactive is True
+        assert port.calls_to("item")[0].args == ("m000000000001",)
+
+    async def test_false_is_an_answer_and_survives(self, clock, sleeper):
+        port = port_with(
+            [page(make_items(1), ListingStatus.ON_SALE)],
+            [page(make_items(1, start=2), ListingStatus.SOLD_OUT)],
+            item=[self.item_with(False)],
+        )
+
+        analysis = await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert analysis.seller_is_inactive is False
+
+    async def test_falls_back_to_a_sold_out_listing(self, clock, sleeper):
+        """A seller who has retired may have nothing left for sale.
+
+        That is the case this whole field is interesting for, so an empty on
+        sale list must not end the question.
+        """
+        port = port_with(
+            [page((), ListingStatus.ON_SALE)],
+            [page(make_items(1, start=7), ListingStatus.SOLD_OUT)],
+            item=[self.item_with(True)],
+        )
+
+        analysis = await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert analysis.seller_is_inactive is True
+        assert port.calls_to("item")[0].args == ("m000000000007",)
+
+    async def test_asks_nothing_when_the_seller_has_no_listings(self, clock, sleeper):
+        port = port_with(
+            [page((), ListingStatus.ON_SALE)],
+            [page((), ListingStatus.SOLD_OUT)],
+        )
+
+        analysis = await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert analysis.seller_is_inactive is None
+        assert port.calls_to("item") == []
+
+    async def test_a_listing_that_does_not_carry_the_flag_leaves_it_unknown(
+        self, clock, sleeper
+    ):
+        port = port_with(
+            [page(make_items(1), ListingStatus.ON_SALE)],
+            [page(make_items(1, start=2), ListingStatus.SOLD_OUT)],
+            item=[self.item_with(None)],
+        )
+
+        analysis = await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert analysis.seller_is_inactive is None
+
+    async def test_a_failed_item_request_does_not_spoil_the_analysis(
+        self, clock, sleeper
+    ):
+        """Everything else already succeeded. One missing field is not partial."""
+        port = port_with(
+            [page(make_items(1), ListingStatus.ON_SALE)],
+            [page(make_items(1, start=2), ListingStatus.SOLD_OUT)],
+            item=[MarketplaceError(ErrorCode.PARSE_ERROR, Operation.ITEM)],
+        )
+
+        analysis = await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert analysis.seller_is_inactive is None
+        assert analysis.seller is not None
+        assert analysis.on_sale.meta.partial is False
+        assert analysis.sold_out.meta.partial is False
+
+    async def test_a_safety_stop_leaves_it_unknown_rather_than_raising(
+        self, clock, sleeper
+    ):
+        port = port_with(
+            [page(make_items(1), ListingStatus.ON_SALE)],
+            [page(make_items(1, start=2), ListingStatus.SOLD_OUT)],
+            item=[MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.ITEM)],
+        )
+        gate = RequestGate(clock, sleeper, max_retries=0)
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            with pytest.raises(MarketplaceError):
+                await gate.run(Operation.SEARCH, _raises_rate_limit())
+
+        analysis = await analyze_seller(
+            port, SELLER_ID, clock=clock, sleeper=sleeper, gate=gate
+        )
+
+        assert analysis.seller_is_inactive is None
+
+    async def test_it_costs_exactly_one_request(self, clock, sleeper):
+        port = port_with(
+            [page(make_items(3), ListingStatus.ON_SALE)],
+            [page(make_items(3, start=4), ListingStatus.SOLD_OUT)],
+        )
+
+        await analyze_seller(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert len(port.calls_to("item")) == 1
 
 
 def _raises_rate_limit():

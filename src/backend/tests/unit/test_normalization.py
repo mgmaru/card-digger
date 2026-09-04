@@ -444,3 +444,63 @@ class TestOtherFields:
 
         assert not hasattr(seller, "total_sales_count")
         assert seller.listed_item_count == 342
+
+
+class TestSellerIsInactive:
+    """Mercari's own flag on the seller, as it arrives on an item detail.
+
+    The only mistake that matters is letting "Mercari did not say" read as
+    "Mercari said no", so absence is tested as carefully as either answer.
+    """
+
+    def test_an_inactive_seller_arrives_as_true(self):
+        item = item_from_item_detail(item_detail("item/seller_inactive.json"))
+
+        assert item.seller_is_inactive is True
+
+    def test_an_active_seller_arrives_as_false(self):
+        item = item_from_item_detail(item_detail("item/seller_active.json"))
+
+        assert item.seller_is_inactive is False
+
+    def test_a_seller_without_the_flag_is_unknown_and_not_false(self):
+        item = item_from_item_detail(
+            item_detail("item/seller_without_is_inactive.json")
+        )
+
+        assert item.seller_is_inactive is None
+
+    def test_a_value_that_is_not_a_boolean_is_unknown(self):
+        """A shape change must not become an answer.
+
+        `"false"` is truthy and `0` is falsey, and either would be read as a
+        statement about a person if the type were not checked.
+        """
+        for value in ("true", "false", 0, 1, [], {}):
+            seller = SimpleNamespace(id_=1, is_inactive=value)
+            raw = SimpleNamespace(
+                id_="m000000000001",
+                name="sample",
+                price=1000,
+                photos=["https://example.test/a.webp"],
+                created=datetime.fromtimestamp(CREATED_EPOCH),
+                updated=datetime.fromtimestamp(CREATED_EPOCH),
+                status="on_sale",
+                seller=seller,
+                item_condition=None,
+                auction_info=None,
+                num_likes=0,
+            )
+
+            assert item_from_item_detail(raw).seller_is_inactive is None
+
+    def test_a_search_result_never_carries_it(self):
+        """The search response has no seller object at all."""
+        item = item_from_search_result(search_item("search/page_1_has_next.json", 0))
+
+        assert item.seller_is_inactive is None
+
+    def test_a_seller_listing_never_carries_it(self):
+        item = item_from_seller_item(seller_item("seller_items/page_1_has_next.json", 0))
+
+        assert item.seller_is_inactive is None

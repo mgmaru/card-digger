@@ -141,6 +141,13 @@ test("the ten step acceptance flow", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/sellers/${SELLER_ID}$`));
   await expect(profile(page)).toContainText("seller-sample-1");
 
+  // Mercari's own is_inactive, transcribed. Seller one is not flagged, and
+  // いいえ is an answer here rather than the absence of one — which is why the
+  // limit beside it says the meaning of the value is unconfirmed.
+  await expect(profile(page)).toContainText("非アクティブ");
+  await expect(profile(page)).toContainText("いいえ");
+  await expect(profile(page)).toContainText("この値が何を指すかは確認できていません");
+
   // --- 7. 販売中・売却済みの件数と打ち切り理由を確認する -------------------
   const items = page.getByLabel("Seller商品");
   // The two stopped for different reasons, and both are printed whichever tab

@@ -206,6 +206,7 @@ def create_app(
             knowledge=SellerKnowledgeResponse.of(
                 seller_knowledge(analysis.on_sale.items, analysis.sold_out.items)
             ),
+            seller_is_inactive=analysis.seller_is_inactive,
         )
 
     return app

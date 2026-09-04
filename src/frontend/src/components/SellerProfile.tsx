@@ -40,10 +40,29 @@ function Ratings({ breakdown }: { breakdown: RatingBreakdown | null }) {
   );
 }
 
+/**
+ * Mercari's `is_inactive`, transcribed and not interpreted.
+ *
+ * The label is the field name and nothing more. Every other rendering of it
+ * would be a claim: 休眠中 picks dormancy, 退会済み picks withdrawal, and both
+ * were measured and neither was supported. What the flag means is Mercari's to
+ * say, and it has not said.
+ *
+ * `null` is `-`, never いいえ. A seller with no listings to read it from, or a
+ * request that failed, is not a seller Mercari called active.
+ */
+function InactiveFlag({ value }: { value: boolean | null }) {
+  if (value === null) {
+    return <>{MISSING}</>;
+  }
+  return <>{value ? "はい" : "いいえ"}</>;
+}
+
 export function SellerProfile({
   seller,
   lastUpdatedAt,
   collectedAt,
+  isInactive,
 }: {
   seller: Seller;
   /**
@@ -58,6 +77,16 @@ export function SellerProfile({
   lastUpdatedAt: string | null;
   /** The snapshot both statuses were collected by. Durations count to this. */
   collectedAt: string;
+  /**
+   * Mercari's own flag on this seller, read from one of their listings.
+   *
+   * Unlike 最も新しい更新, which this application works out from what it
+   * collected, this is the marketplace's own answer. What that answer means
+   * has not been established: nothing on a page a buyer reads corresponds to
+   * it (measured 2026-09-04). So it is shown under Mercari's own name, with
+   * the limit written below.
+   */
+  isInactive: boolean | null;
 }) {
   return (
     <section className={styles.profile} aria-label="Seller">
@@ -70,6 +99,12 @@ export function SellerProfile({
             {lastUpdatedAt === null
               ? MISSING
               : elapsedLabel(lastUpdatedAt, collectedAt)}
+          </dd>
+        </div>
+        <div className={styles.fact}>
+          <dt>非アクティブ</dt>
+          <dd>
+            <InactiveFlag value={isInactive} />
           </dd>
         </div>
         <div className={styles.fact}>
@@ -99,6 +134,11 @@ export function SellerProfile({
           「最も新しい更新」は取得した商品の更新日時のうち最も新しいものです。
           この出品者が今も動いているかの手掛かりであり、
           取得できていない出品の更新は含みません。
+        </p>
+        <p>
+          「非アクティブ」はMercariが商品データで返す値をそのまま表示しています。
+          Mercariの画面に対応する表示が無いため、
+          この値が何を指すかは確認できていません。
         </p>
         <p>出品件数は現在の出品数であり、累計販売件数ではありません。</p>
         <p>

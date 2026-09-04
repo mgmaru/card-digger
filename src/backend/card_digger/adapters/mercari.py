@@ -330,7 +330,22 @@ def item_from_item_detail(raw: Item) -> MarketplaceItem:
             else None
         ),
         like_count=getattr(raw, "num_likes", None),
+        # Read as it arrives, including its absence. The fork types it
+        # `Optional[bool]` precisely so that "Mercari did not say" survives the
+        # trip, and coercing it here would undo that.
+        seller_is_inactive=_seller_is_inactive(seller),
     )
+
+
+def _seller_is_inactive(seller: Any) -> bool | None:
+    """Mercari's flag on the seller, or nothing.
+
+    Only `True` and `False` are answers. Anything else — the field absent, or a
+    value that is not a boolean — is `None`, because the one mistake that
+    matters here is letting "no answer" read as "not inactive".
+    """
+    value = getattr(seller, "is_inactive", None)
+    return value if isinstance(value, bool) else None
 
 
 def item_from_seller_item(
