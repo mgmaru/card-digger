@@ -289,6 +289,21 @@ describe("narrowing", () => {
     expect(searchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("filters by how long a listing has gone untouched", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+
+    // As of the snapshot: a 357 days, c 5, b 2.
+    await user.type(screen.getByLabelText("未更新日数"), "100");
+    await waitFor(() => expect(titles()).toEqual(["a"]));
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した条件に一致: 1件 / 825件",
+    );
+    // Narrowing never asks for more. It can only remove what is in hand.
+    expect(searchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("reorders by every sort without collecting again", async () => {
     const user = userEvent.setup();
     mount();

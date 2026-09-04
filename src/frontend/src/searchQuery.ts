@@ -11,6 +11,7 @@
  * the oldest within what was collected, not the oldest on Mercari.
  */
 
+import { elapsedDays } from "./elapsed";
 import { startOfDay, startOfNextDay } from "./jst";
 import type { Filters, SortKey } from "./searchState";
 import type { Item } from "./types/api";
@@ -81,7 +82,8 @@ export function hasActiveFilter(filters: Filters): boolean {
   return (
     filters.createdFrom !== null ||
     filters.createdTo !== null ||
-    filters.saleFormat !== "all"
+    filters.saleFormat !== "all" ||
+    filters.minUntouchedDays !== null
   );
 }
 
@@ -93,13 +95,23 @@ export function hasActiveFilter(filters: Filters): boolean {
  * `unknown` — folding an unreadable sale format into `fixed_price` would put
  * a bid in progress next to a price someone can just pay.
  *
- * Price is absent by design. Mercari applies the band before ordering and
- * paging, so everything here is already inside it; repeating the test would
- * only invite the belief that it could be widened without collecting again.
+ * Days without an update are counted to `collectedAt`, like every other
+ * duration on the screen, so the same result narrows the same way however
+ * long the tab has been open.
+ *
+ * **None of this reaches further back.** Filtering removes listings already
+ * in hand; it cannot add one that was never collected. The only thing that
+ * changes what a search reaches is the price band, which Mercari applies
+ * before ordering and paging (section 5.3).
+ *
+ * Price is absent by design, for that same reason: everything here is already
+ * inside the band, and repeating the test would invite the belief that it
+ * could be widened without collecting again.
  */
 export function filterItems(
   items: readonly Item[],
   filters: Filters,
+  collectedAt: string,
 ): Item[] {
   const from =
     filters.createdFrom === null ? null : startOfDay(filters.createdFrom);
@@ -119,6 +131,12 @@ export function filterItems(
         return false;
       }
     }
+    if (
+      filters.minUntouchedDays !== null &&
+      elapsedDays(item.updatedAt, collectedAt) < filters.minUntouchedDays
+    ) {
+      return false;
+    }
     return true;
   });
 }
@@ -128,6 +146,7 @@ export function visibleItems(
   items: readonly Item[],
   filters: Filters,
   sort: SortKey,
+  collectedAt: string,
 ): Item[] {
-  return sortItems(filterItems(items, filters), sort);
+  return sortItems(filterItems(items, filters, collectedAt), sort);
 }

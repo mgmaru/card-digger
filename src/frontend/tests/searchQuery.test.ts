@@ -41,6 +41,13 @@ const ITEMS: Item[] = [
   item("d", "2025-11-03T10:00:00+09:00", "2025-12-20T10:00:00+09:00", 31000, "auction"),
 ];
 
+/**
+ * The moment the set was collected. Every duration is counted to this.
+ *
+ * Days without an update, as of this snapshot: a 356, d 255, c 4, b 1.
+ */
+const COLLECTED_AT = "2026-09-01T10:00:00+09:00";
+
 const ids = (list: Item[]) => list.map((i) => i.id);
 const withFilter = (patch: Partial<Filters>): Filters => ({
   ...INITIAL_FILTERS,
@@ -81,14 +88,14 @@ describe("sortItems", () => {
 
 describe("filterItems", () => {
   it("keeps `unknown` under `all` and never under `fixed_price`", () => {
-    expect(ids(filterItems(ITEMS, withFilter({ saleFormat: "all" })))).toContain(
+    expect(ids(filterItems(ITEMS, withFilter({ saleFormat: "all" }), COLLECTED_AT))).toContain(
       "c",
     );
     expect(
-      ids(filterItems(ITEMS, withFilter({ saleFormat: "fixed_price" }))),
+      ids(filterItems(ITEMS, withFilter({ saleFormat: "fixed_price" }), COLLECTED_AT)),
     ).not.toContain("c");
     expect(
-      ids(filterItems(ITEMS, withFilter({ saleFormat: "unknown" }))),
+      ids(filterItems(ITEMS, withFilter({ saleFormat: "unknown" }), COLLECTED_AT)),
     ).toEqual(["c"]);
   });
 
@@ -100,10 +107,10 @@ describe("filterItems", () => {
       100,
     );
     expect(
-      ids(filterItems([midnight], withFilter({ createdFrom: "2025-09-15" }))),
+      ids(filterItems([midnight], withFilter({ createdFrom: "2025-09-15" }), COLLECTED_AT)),
     ).toEqual(["midnight"]);
     expect(
-      ids(filterItems([midnight], withFilter({ createdFrom: "2025-09-16" }))),
+      ids(filterItems([midnight], withFilter({ createdFrom: "2025-09-16" }), COLLECTED_AT)),
     ).toEqual([]);
   });
 
@@ -115,10 +122,10 @@ describe("filterItems", () => {
       100,
     );
     expect(
-      ids(filterItems([lastSecond], withFilter({ createdTo: "2025-09-15" }))),
+      ids(filterItems([lastSecond], withFilter({ createdTo: "2025-09-15" }), COLLECTED_AT)),
     ).toEqual(["last"]);
     expect(
-      ids(filterItems([lastSecond], withFilter({ createdTo: "2025-09-14" }))),
+      ids(filterItems([lastSecond], withFilter({ createdTo: "2025-09-14" }), COLLECTED_AT)),
     ).toEqual([]);
   });
 
@@ -132,7 +139,7 @@ describe("filterItems", () => {
       100,
     );
     expect(
-      ids(filterItems([earlyMorning], withFilter({ createdFrom: "2025-09-15" }))),
+      ids(filterItems([earlyMorning], withFilter({ createdFrom: "2025-09-15" }), COLLECTED_AT)),
     ).toEqual(["tokyo"]);
   });
 
@@ -142,16 +149,59 @@ describe("filterItems", () => {
         filterItems(
           ITEMS,
           withFilter({ createdFrom: "2025-08-22", createdTo: "2025-11-03" }),
+          COLLECTED_AT,
         ),
       ),
     ).toEqual(["a", "b", "d"]);
   });
 });
 
+describe("filterItems by days without an update", () => {
+  it("keeps the listings nobody has touched for at least that long", () => {
+    expect(ids(filterItems(ITEMS, withFilter({ minUntouchedDays: 100 }), COLLECTED_AT)))
+      .toEqual(["a", "d"]);
+  });
+
+  it("includes the listing that sits exactly on the threshold", () => {
+    expect(ids(filterItems(ITEMS, withFilter({ minUntouchedDays: 356 }), COLLECTED_AT)))
+      .toEqual(["a"]);
+    expect(ids(filterItems(ITEMS, withFilter({ minUntouchedDays: 357 }), COLLECTED_AT)))
+      .toEqual([]);
+  });
+
+  it("keeps everything at zero, which narrows nothing", () => {
+    expect(ids(filterItems(ITEMS, withFilter({ minUntouchedDays: 0 }), COLLECTED_AT)))
+      .toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("counts to the snapshot, not to the clock", () => {
+    // Collected in January; `a` was last touched in September, so it has been
+    // untouched for 113 days as of that snapshot. Counted against the real
+    // clock instead it would be well past 200 and would survive.
+    const january = "2026-01-01T10:00:00+09:00";
+
+    expect(ids(filterItems(ITEMS, withFilter({ minUntouchedDays: 200 }), january)))
+      .toEqual([]);
+    expect(ids(filterItems(ITEMS, withFilter({ minUntouchedDays: 113 }), january)))
+      .toEqual(["a"]);
+  });
+
+  it("cannot reach a listing that was never collected", () => {
+    // Nothing to assert but the shape of the answer: the filter only ever
+    // returns a subset of what it was given. Section 5.3 is the reason this
+    // matters — the price band is the only thing that changes what a search
+    // reaches.
+    const narrowed = filterItems(ITEMS, withFilter({ minUntouchedDays: 300 }), COLLECTED_AT);
+
+    expect(narrowed.every((kept) => ITEMS.includes(kept))).toBe(true);
+    expect(narrowed.length).toBeLessThanOrEqual(ITEMS.length);
+  });
+});
+
 describe("visibleItems", () => {
   it("filters before ordering", () => {
     expect(
-      ids(visibleItems(ITEMS, withFilter({ saleFormat: "fixed_price" }), "price_asc")),
+      ids(visibleItems(ITEMS, withFilter({ saleFormat: "fixed_price" }), "price_asc", COLLECTED_AT)),
     ).toEqual(["b", "a"]);
   });
 
@@ -159,7 +209,7 @@ describe("visibleItems", () => {
     // The band went to Mercari, which applied it before paging. Everything
     // here is already inside it, and re-testing would suggest it could be
     // widened without collecting again.
-    expect(ids(visibleItems(ITEMS, INITIAL_FILTERS, "price_asc"))).toEqual([
+    expect(ids(visibleItems(ITEMS, INITIAL_FILTERS, "price_asc", COLLECTED_AT))).toEqual([
       "c",
       "b",
       "d",
