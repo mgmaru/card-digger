@@ -14,7 +14,7 @@ import { Link } from "react-router";
 
 import { dormancy, elapsedDays, elapsedLabel } from "../elapsed";
 import { toDateString } from "../jst";
-import type { Item, ListingStatus, SaleFormat } from "../types/api";
+import type { Item, ItemCondition, ListingStatus, SaleFormat } from "../types/api";
 
 import styles from "./ItemCard.module.css";
 
@@ -62,6 +62,21 @@ const STATUSES: Record<ListingStatus, string> = {
   sold_out: "売却済み",
   unknown: "状態不明",
 };
+
+/**
+ * What the card says about how worn a listing is.
+ *
+ * A number with no name reads the same as no number at all: `不明` is the true
+ * word in both cases, and the difference between them — a grade Mercari added
+ * since, or a listing that reported nothing — is not something a card being
+ * scanned can act on.
+ *
+ * The row is labelled 商品の状態, which is Mercari's own wording. `状態` alone
+ * is taken: the seller screen uses it for whether a listing is on sale.
+ */
+function conditionLabel(condition: ItemCondition | null): string {
+  return condition?.name ?? "不明";
+}
 
 export function ItemCard({
   item,
@@ -122,6 +137,14 @@ export function ItemCard({
         and repeating it per card would bury the listing it belongs to.
       */}
       <dl className={styles.dates}>
+        {/* Search only. A seller's listing page reports no condition at all,
+            so every card there would read 状態不明 — a row of nothing. */}
+        {variant === "search" && (
+          <>
+            <dt>商品の状態</dt>
+            <dd className={styles.condition}>{conditionLabel(item.itemCondition)}</dd>
+          </>
+        )}
         <dt title="Mercariの商品ページには表示されない値です">掲載日</dt>
         <dd>
           <span className={styles.nowrap}>

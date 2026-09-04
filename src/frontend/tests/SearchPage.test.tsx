@@ -41,6 +41,7 @@ function item(
     listingStatus: "on_sale",
     saleFormat,
     sellerId: `seller-${id}`,
+    itemCondition: { id: "3", name: "目立った傷や汚れなし" },
   };
 }
 

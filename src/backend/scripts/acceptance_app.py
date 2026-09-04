@@ -30,10 +30,12 @@ from typing import Iterator
 
 from fastapi import FastAPI, Response
 
+from card_digger.adapters.mercari import ITEM_CONDITIONS
 from card_digger.adapters.mock import MockAdapter
 from card_digger.api.main import create_app
 from card_digger.application.access import MarketplaceAccess
 from card_digger.domain.models import (
+    ItemCondition,
     ListingStatus,
     MarketplaceItem,
     RatingBreakdown,
@@ -103,6 +105,7 @@ def _item(
     price_yen: int = 4200,
     created_days_ago: int,
     updated_days_ago: int,
+    condition: ItemCondition | None = None,
 ) -> MarketplaceItem:
     item_id = f"m{number:012d}"
     return MarketplaceItem(
@@ -118,26 +121,33 @@ def _item(
         listing_status=status,
         sale_format=sale_format,
         seller_id=seller.id,
+        # Seller listings carry none: Mercari's seller endpoint does not report
+        # a condition, and the seed says so by leaving it out.
+        item_condition=condition,
     )
 
 
 #: The listings the search is meant to find, and the only ones carrying the
 #: keyword. Each row is (title, sale format, price, created days ago, updated
-#: days ago) and the spread is what the date filters and the six sorts are
-#: exercised against.
-_FOUND: tuple[tuple[str, SaleFormat, int, int, int], ...] = (
-    ("ポケカ 引退品 まとめ売り SR多数", SaleFormat.FIXED_PRICE, 4800, 900, 870),
-    ("ポケカ 引退品 押入れから発掘 未整理", SaleFormat.FIXED_PRICE, 3200, 1400, 1380),
-    ("ポケカ 引退品 旧裏 まとめ", SaleFormat.FIXED_PRICE, 4500, 640, 12),
-    ("ポケカ 引退品 PSA10 含む", SaleFormat.AUCTION, 5000, 420, 3),
-    ("ポケカ 引退品 実家の物置 段ボール1箱", SaleFormat.FIXED_PRICE, 3900, 1120, 1100),
-    ("ポケカ 引退品 SAR AR まとめ", SaleFormat.FIXED_PRICE, 4700, 210, 190),
-    ("ポケカ 引退品 未開封BOX シュリンク付き", SaleFormat.AUCTION, 4990, 95, 1),
-    ("ポケカ 引退品 バインダーごと", SaleFormat.UNKNOWN, 3500, 730, 700),
-    ("ポケカ 引退品 断捨離 まとめて", SaleFormat.FIXED_PRICE, 3100, 55, 40),
-    ("ポケカ 引退品 プロモ 初版 あり", SaleFormat.FIXED_PRICE, 4300, 310, 8),
-    ("ポケカ 引退品 遺品整理 状態はさまざま", SaleFormat.FIXED_PRICE, 3700, 1250, 1240),
-    ("ポケカ 引退品 UR SR まとめ売り", SaleFormat.FIXED_PRICE, 4100, 180, 30),
+#: days ago, condition number) and the spread is what the date filters and the
+#: six sorts are exercised against.
+#:
+#: The numbers walk the whole of `ITEM_CONDITIONS`, and one row carries `None`:
+#: a listing that reports no condition reads 状態不明 on a card, and that path
+#: has to be visible on the screen too.
+_FOUND: tuple[tuple[str, SaleFormat, int, int, int, str | None], ...] = (
+    ("ポケカ 引退品 まとめ売り SR多数", SaleFormat.FIXED_PRICE, 4800, 900, 870, "3"),
+    ("ポケカ 引退品 押入れから発掘 未整理", SaleFormat.FIXED_PRICE, 3200, 1400, 1380, "5"),
+    ("ポケカ 引退品 旧裏 まとめ", SaleFormat.FIXED_PRICE, 4500, 640, 12, "4"),
+    ("ポケカ 引退品 PSA10 含む", SaleFormat.AUCTION, 5000, 420, 3, "2"),
+    ("ポケカ 引退品 実家の物置 段ボール1箱", SaleFormat.FIXED_PRICE, 3900, 1120, 1100, "6"),
+    ("ポケカ 引退品 SAR AR まとめ", SaleFormat.FIXED_PRICE, 4700, 210, 190, "3"),
+    ("ポケカ 引退品 未開封BOX シュリンク付き", SaleFormat.AUCTION, 4990, 95, 1, "1"),
+    ("ポケカ 引退品 バインダーごと", SaleFormat.UNKNOWN, 3500, 730, 700, None),
+    ("ポケカ 引退品 断捨離 まとめて", SaleFormat.FIXED_PRICE, 3100, 55, 40, "4"),
+    ("ポケカ 引退品 プロモ 初版 あり", SaleFormat.FIXED_PRICE, 4300, 310, 8, "2"),
+    ("ポケカ 引退品 遺品整理 状態はさまざま", SaleFormat.FIXED_PRICE, 3700, 1250, 1240, "5"),
+    ("ポケカ 引退品 UR SR まとめ売り", SaleFormat.FIXED_PRICE, 4100, 180, 30, "1"),
 )
 
 #: Titles for the rest of the seller's shelf, which the search does not reach.
@@ -184,7 +194,9 @@ def _shelf_items(
 def _seed_items() -> tuple[MarketplaceItem, ...]:
     items: list[MarketplaceItem] = []
 
-    for index, (title, sale_format, price, created, updated) in enumerate(_FOUND):
+    for index, (title, sale_format, price, created, updated, condition) in enumerate(
+        _FOUND
+    ):
         items.append(
             _item(
                 index + 1,
@@ -195,6 +207,11 @@ def _seed_items() -> tuple[MarketplaceItem, ...]:
                 price_yen=price,
                 created_days_ago=created,
                 updated_days_ago=updated,
+                condition=(
+                    ItemCondition(id=condition, name=ITEM_CONDITIONS[condition])
+                    if condition is not None
+                    else None
+                ),
             )
         )
 

@@ -145,12 +145,27 @@ class CollectionMetaResponse(CamelModel):
         )
 
 
+class ItemConditionResponse(CamelModel):
+    """How worn a listing is, as Mercari grades it.
+
+    The name is absent when the number is not one this repository has a name
+    for. Both parts are sent: the screen shows the name, and the number is what
+    the value actually is, so a listing is never described by a name nobody
+    verified.
+    """
+
+    id: str | None
+    name: str | None
+
+
 class ItemResponse(CamelModel):
     """One listing, as a card on a screen needs it.
 
-    Condition and like count are domain fields but not response fields: the
-    MVP does not fetch item details for search results, so returning them
-    would mean returning `null` for almost every listing.
+    The like count is a domain field but not a response field: only an item
+    detail carries it, and the MVP does not fetch details for search results.
+    **The condition is different.** A search result carries its number, so it
+    costs no request, and the name comes from Mercari's own table
+    (`ITEM_CONDITIONS`, verified 2026-09-04).
     """
 
     id: str
@@ -168,6 +183,8 @@ class ItemResponse(CamelModel):
     listing_status: ListingStatus
     sale_format: SaleFormat
     seller_id: str
+    #: Absent when the listing reports no condition at all.
+    item_condition: ItemConditionResponse | None = None
 
     @classmethod
     def of(cls, item: MarketplaceItem) -> "ItemResponse":
@@ -182,6 +199,13 @@ class ItemResponse(CamelModel):
             listing_status=item.listing_status,
             sale_format=item.sale_format,
             seller_id=item.seller_id,
+            item_condition=(
+                ItemConditionResponse(
+                    id=item.item_condition.id, name=item.item_condition.name
+                )
+                if item.item_condition is not None
+                else None
+            ),
         )
 
 

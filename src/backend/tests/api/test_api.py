@@ -35,6 +35,7 @@ from card_digger.domain.models import (
     CollectionError,
     CollectionMeta,
     CollectionStopReason,
+    ItemCondition,
     ListingStatus,
     RatingBreakdown,
     SaleFormat,
@@ -189,7 +190,47 @@ class TestSearchResponse:
             "listingStatus",
             "saleFormat",
             "sellerId",
+            "itemCondition",
         }
+
+    def test_a_listing_reports_its_condition_with_the_name(self):
+        """The number is what the value is; the name is what the screen shows."""
+        items = (
+            make_item(
+                "m000000000001",
+                item_condition=ItemCondition(id="4", name="やや傷や汚れあり"),
+            ),
+        )
+
+        response = client(MockAdapter(items=items)).post(
+            "/api/search", json={"keyword": "sample"}
+        )
+
+        assert response.json()["items"][0]["itemCondition"] == {
+            "id": "4",
+            "name": "やや傷や汚れあり",
+        }
+
+    def test_a_number_with_no_name_is_sent_without_one(self):
+        """A number Mercari added since is still the truth about the listing.
+
+        Sending the number and no name lets the screen say 状態不明, which is
+        what it is, instead of the response inventing a grade.
+        """
+        items = (make_item("m000000000001", item_condition=ItemCondition(id="9", name=None)),)
+
+        response = client(MockAdapter(items=items)).post(
+            "/api/search", json={"keyword": "sample"}
+        )
+
+        assert response.json()["items"][0]["itemCondition"] == {"id": "9", "name": None}
+
+    def test_a_listing_with_no_condition_at_all_reports_nothing(self):
+        response = client(MockAdapter(items=make_items(1))).post(
+            "/api/search", json={"keyword": "sample"}
+        )
+
+        assert response.json()["items"][0]["itemCondition"] is None
 
     def test_the_metadata_fields_are_the_ones_the_frontend_reads(self):
         response = client(MockAdapter(items=make_items(1))).post(

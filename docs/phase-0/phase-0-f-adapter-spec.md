@@ -3,7 +3,7 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-08-31**（Auction追加検証の結果と、0-F-4実装で判明した2件を反映）
+- 最終更新日: **2026-09-04**（`item_condition`の根拠区分を`observed`へ改めた）
 - ステータス: **実装基準として採用**
 - 対象: Phase 0-Fの`mercapi` Fork、Mercari Adapter、取得Policy、Contract Test
 - 前提: [Phase 0-Eの選定結果](phase-0-e-selection.md)
@@ -399,7 +399,7 @@ value.astimezone(timezone.utc)
 | `listing_status` | `status` | 転記 | `observed` | `on_sale` / `trading` / `sold_out`の3値を実際に観測した |
 | `sale_format` | `auction` / `auction_info`の有無 | **主張** | **`observed`** | 商品ページを正として20 / 20一致 |
 | `seller_id` | `seller_id` / `seller.id_` | 転記 | `observed` | この値でProfileを取得できる |
-| `item_condition` | `item_condition` / `item_condition_id` | 転記 | `derived` | 商品ページに`data-testid="商品の状態"`がある。**値は突き合わせていない** |
+| `item_condition` | `item_condition` / `item_condition_id` | 転記 | **`observed`** | 検索の`item_condition_id`が商品ページの`[data-testid="商品の状態"]`と20 / 20一致（[観測結果](../../poc/mercapi/condition-result.md)）。番号`6`は**未観測**。表示名はMercariのmaster Endpointが正本 |
 | `like_count` | `num_likes` | 転記 | `derived` | 商品ページに`data-testid="icon-heart-button"`がある。**値は突き合わせていない** |
 
 #### `Seller`

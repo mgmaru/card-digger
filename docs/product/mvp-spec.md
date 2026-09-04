@@ -3,7 +3,7 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-09-02**
+- 最終更新日: **2026-09-04**（商品の状態の表示を追加）
 - ステータス: **Phase 1の実装基準として採用**
 - 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
 - Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)。**[実測結果](../../poc/mercapi/auction-result.md)で合格**
@@ -244,6 +244,7 @@ DOM向けのexportを持つ。
 - 最低価格・最高価格の指定（**Mercariへ送る検索条件。取得範囲が変わる**）
 - 掲載開始日・終了日Filter（Asia/Tokyoの日単位）
 - 販売形式（通常出品・オークション・不明）の保持とBadge表示
+- 商品の状態の表示（**検索Responseの番号を、Mercariのmaster表で名前にする。追加Requestなし**）
 - 販売形式Filter（Auction追加検証に合格したため有効）
 - 取得範囲内の古い順・新しい順
 - 価格の安い順・高い順
@@ -281,7 +282,8 @@ DOM向けのexportを持つ。
 - Seller Knowledgeによる検索結果全体のFilter / Ranking
 - Search Card上へのSeller Knowledge表示
 - Card Digger内の商品詳細画面
-- 検索結果全件の商品詳細・いいね・コンディション取得
+- 検索結果全件の商品詳細取得（いいね数はここでしか取れないため出さない。
+  **商品の状態は検索Responseに番号があり、詳細取得は要らない**）
 - 画像本体のBackend Proxy、保存、AI画像解析
 - 相場取得、利益計算、Opportunity Score
 - 自動購入、自動交渉
@@ -581,6 +583,7 @@ Sortの値は`<軸>_<方向>`で揃える。**軸を省略しない。**
 - 先頭画像1枚。画像取得失敗時はPlaceholder
 - Title。2〜3行で省略し、完全なTitleはAccessible NameまたはTooltipで確認可能にする
 - 販売形式Badge（`通常出品`、`オークション`、`形式不明`）
+- **商品の状態**（下記）
 - 通常出品は「価格」、Auctionは「現在価格（取得時点）」、不明は「価格（取得時点）」
 - Auctionの価格は`highest_bid`（取得時点の現在価格）。開始価格や確定落札額ではない
 - 出品日時（Asia/Tokyo）。**Mercariの商品ページには表示されない値**である旨を添える
@@ -589,6 +592,25 @@ Sortの値は`<軸>_<方向>`で揃える。**軸を省略しない。**
 - **未更新期間の棒**（下記）
 - 「Mercariで商品を見る」外部Link
 - 「Sellerを分析」Link
+
+#### 商品の状態（2026-09-04決定）
+
+**検索Responseは状態を番号だけで返す。** 名前はMercariの`itemConditions` master表から引く。
+番号1〜5が商品ページの`[data-testid="商品の状態"]`と20 / 20で一致することを実測した
+（[観測結果](../../poc/mercapi/condition-result.md)）。
+
+| 項目 | 決めたこと |
+|---|---|
+| 出す画面 | **検索Cardだけ。** Seller商品一覧Responseは状態を持たない |
+| 表の出所 | Mercariの`itemConditions`。**名前をこちらで考えない** |
+| 未知の番号・欠落 | **`不明`。** 近い名前へ寄せない。`SaleFormat.UNKNOWN`と同じ扱い |
+| 語 | Labelは`商品の状態`。`状態`は[§6.2](#62-表示)が販売状態に使っている |
+| 追加Request | **0。** 詳細APIを呼ばない（[§4](#4-mvpに含めない機能)） |
+
+**番号`6`（全体的に状態が悪い）は未観測である。** master表に有るので表示できるが、
+その番号を持つ商品を実際に見てはいない。
+
+見え方は[視覚方針 §3.9](design-tokens.md#39-商品の状態は文字で出す--badgeを増やさない)が持つ。
 
 #### 未更新期間の棒（2026-09-02決定）
 
@@ -912,8 +934,10 @@ Request:
 **この2つはMercariへ渡り、取得範囲を変える**（[§5.3](#価格帯だけが到達範囲を変える2026-09-03)）。
 同じKeywordでも帯が違えば別の収集として扱い、合流させない。
 
-Responseは取得した全`items`と`CollectionMeta`を返す。掲載日・販売形式Filter、Sort、
-Filter後件数はFrontendが計算する。外部取得が
+Responseは取得した全`items`と`CollectionMeta`を返す。各`item`は`itemCondition`を持ち、
+`{ "id": "4", "name": "やや傷や汚れあり" }`の形をとる。**`name`は表に無い番号のとき`null`**、
+状態を報告しない商品では`itemCondition`自体が`null`になる（[§5.6](#商品の状態2026-09-04決定)）。
+掲載日・販売形式Filter、Sort、Filter後件数はFrontendが計算する。外部取得が
 部分失敗した場合はHTTP 200で取得済み結果を返すが、`partial=true`と`errors`を必須にする。
 
 ### `GET /api/sellers/{sellerId}/analysis`

@@ -114,6 +114,24 @@ class TestTheSeedSupportsTheFlow:
             SaleFormat.UNKNOWN,
         }
 
+    def test_the_search_shows_a_named_condition_and_a_missing_one(self):
+        """Both paths of the condition badge are on the screen.
+
+        A named condition and a listing that reports none read differently
+        (状態不明), and the flow only exercises what the seed contains.
+        """
+        found = [item for item in acceptance_app.SEED if item.listing_status is ListingStatus.ON_SALE]
+        named = {item.item_condition.name for item in found if item.item_condition}
+
+        assert len(named) >= 3
+        assert any(item.item_condition is None for item in found)
+
+    def test_no_seller_shelf_listing_claims_a_condition(self):
+        """Mercari's seller endpoint reports none, so neither does the seed."""
+        shelf = [item for item in acceptance_app.SEED if item.listing_status is not ListingStatus.ON_SALE]
+
+        assert shelf and all(item.item_condition is None for item in shelf)
+
     def test_the_search_reaches_two_sellers(self):
         """Step 6 opens a seller from a card, so there has to be a choice."""
         found = [

@@ -90,6 +90,18 @@ export type CollectionMeta = {
   oldListingCount: number | null;
 };
 
+/**
+ * How worn a listing is, as Mercari grades it.
+ *
+ * A search result carries the number only, so the name is looked up in the
+ * backend from Mercari's own table. `name` is `null` for a number that table
+ * does not hold — a grade nobody verified is worse than none at all.
+ */
+export type ItemCondition = {
+  id: string | null;
+  name: string | null;
+};
+
 export type Item = {
   id: string;
   title: string;
@@ -107,6 +119,8 @@ export type Item = {
   listingStatus: ListingStatus;
   saleFormat: SaleFormat;
   sellerId: string;
+  /** `null` when the listing reports no condition at all. */
+  itemCondition: ItemCondition | null;
 };
 
 /** Everything collected, unsorted and unfiltered. The frontend narrows it. */
