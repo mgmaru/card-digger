@@ -65,12 +65,25 @@ export type Filters = {
   createdFrom: string | null;
   createdTo: string | null;
   saleFormat: SaleFormatFilter;
+  /**
+   * Keep only listings untouched for at least this many days.
+   *
+   * Counted from `updatedAt` to `collectedAt`, the same span the bar on each
+   * card draws. **This is a fact about the listing, not about the seller.** A
+   * listing nobody has touched for a year says nothing about whether its
+   * seller is still around; that question is answered one seller at a time on
+   * the seller screen, and cannot be answered for a whole result set without
+   * collecting each of them
+   * ([O-8](../../../docs/planning/todo.md#o-8--sellerの活動で絞るのを今やらない理由2026-09-04)).
+   */
+  minUntouchedDays: number | null;
 };
 
 export const INITIAL_FILTERS: Filters = {
   createdFrom: null,
   createdTo: null,
   saleFormat: "all",
+  minUntouchedDays: null,
 };
 
 export type SearchStatus = "idle" | "loading" | "success" | "error";

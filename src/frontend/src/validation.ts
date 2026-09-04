@@ -9,9 +9,9 @@
  * (section 5.2). The band belongs on this side: Mercari applies it before
  * ordering and paging, so it decides what can be reached at all.
  *
- * The listing date and the sale format only reorder and hide what is already
- * on screen, so they are judged as they change and a half-typed one simply
- * does not narrow.
+ * The listing date, the sale format and the days without an update only
+ * reorder and hide what is already on screen, so they are judged as they
+ * change and a half-typed one simply does not narrow.
  *
  * The rules are the specification's. The messages are not: section 9 asks for
  * "対象Fieldの近くに修正方法を表示" without fixing the words, and the sections
@@ -24,7 +24,7 @@ import type { Filters, SaleFormatFilter } from "./searchState";
 
 export const KEYWORD_MAX_LENGTH = 100;
 
-export type FilterFieldName = "createdFrom" | "createdTo";
+export type FilterFieldName = "createdFrom" | "createdTo" | "minUntouchedDays";
 
 /** The fields that make up the question asked of Mercari. */
 export type SearchFieldName = "keyword" | "minPriceYen" | "maxPriceYen";
@@ -58,22 +58,25 @@ export type FilterFormValues = {
   createdFrom: string;
   createdTo: string;
   saleFormat: SaleFormatFilter;
+  minUntouchedDays: string;
 };
 
 export const EMPTY_FILTER_FORM: FilterFormValues = {
   createdFrom: "",
   createdTo: "",
   saleFormat: "all",
+  minUntouchedDays: "",
 };
 
 /**
- * A price field: blank, or a whole number of yen that is not negative.
+ * A count field: blank, or a whole number that is not negative.
  *
- * `Number` alone would accept `1e3`, ` 12 ` and `12.5`. A price with a decimal
- * point is not a Mercari price, and accepting one would silently compare
- * against something no listing can hold.
+ * `Number` alone would accept `1e3`, ` 12 ` and `12.5`. Neither field this
+ * parses can hold a fraction — a price with a decimal point is not a Mercari
+ * price, and days are counted whole — so accepting one would silently compare
+ * against something no listing can match.
  */
-function parsePrice(raw: string): number | null | "invalid" {
+function parseWholeNumber(raw: string): number | null | "invalid" {
   const trimmed = raw.trim();
   if (trimmed === "") {
     return null;
@@ -114,8 +117,8 @@ export function validateSearch(values: SearchFormValues): SearchValidation {
     errors.keyword = `キーワードは${KEYWORD_MAX_LENGTH}文字までです（現在${keyword.length}文字）`;
   }
 
-  const min = parsePrice(values.minPriceYen);
-  const max = parsePrice(values.maxPriceYen);
+  const min = parseWholeNumber(values.minPriceYen);
+  const max = parseWholeNumber(values.maxPriceYen);
   if (min === "invalid") {
     errors.minPriceYen = "0以上の整数で入力してください";
   }
@@ -172,8 +175,18 @@ export function validateFilters(values: FilterFormValues): FilterValidation {
     createdTo = null;
   }
 
+  const untouched = parseWholeNumber(values.minUntouchedDays);
+  if (untouched === "invalid") {
+    errors.minUntouchedDays = "0以上の整数で入力してください";
+  }
+
   return {
-    filters: { createdFrom, createdTo, saleFormat: values.saleFormat },
+    filters: {
+      createdFrom,
+      createdTo,
+      saleFormat: values.saleFormat,
+      minUntouchedDays: untouched === "invalid" ? null : untouched,
+    },
     errors,
   };
 }

@@ -123,14 +123,51 @@ describe("listing date", () => {
   });
 });
 
+describe("days without an update", () => {
+  it("takes a whole number of days", () => {
+    expect(validateFilters(form({ minUntouchedDays: "365" })).filters.minUntouchedDays)
+      .toBe(365);
+  });
+
+  it("narrows nothing when left blank", () => {
+    expect(validateFilters(form({ minUntouchedDays: "" })).filters.minUntouchedDays)
+      .toBeNull();
+  });
+
+  it("refuses anything that is not a whole number", () => {
+    // A half day cannot be compared against a count of whole days, and `-1`
+    // would keep everything while reading as a filter.
+    for (const raw of ["1.5", "-1", "365日", "1e3"]) {
+      const { filters, errors } = validateFilters(form({ minUntouchedDays: raw }));
+      expect(errors.minUntouchedDays).toBeTruthy();
+      // The bad value narrows nothing rather than emptying the screen.
+      expect(filters.minUntouchedDays).toBeNull();
+    }
+  });
+
+  it("keeps the other fields working while this one is half typed", () => {
+    const { filters, errors } = validateFilters(
+      form({ minUntouchedDays: "3x", saleFormat: "auction" }),
+    );
+
+    expect(errors.minUntouchedDays).toBeTruthy();
+    expect(filters.saleFormat).toBe("auction");
+  });
+});
+
 describe("reporting", () => {
   it("reports every bad field at once, not just the first", () => {
     const { errors } = validateFilters({
       createdFrom: "nope",
       createdTo: "also nope",
       saleFormat: "all",
+      minUntouchedDays: "半年",
     });
-    expect(Object.keys(errors).sort()).toEqual(["createdFrom", "createdTo"]);
+    expect(Object.keys(errors).sort()).toEqual([
+      "createdFrom",
+      "createdTo",
+      "minUntouchedDays",
+    ]);
   });
 
   it("keeps the sale format, which cannot be typed wrong", () => {

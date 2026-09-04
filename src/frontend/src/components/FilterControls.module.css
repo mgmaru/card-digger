@@ -28,6 +28,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+.days {
+  width: 5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 単位はSearchFormの「円」と同じ扱い（視覚方針 §3.6の補足段階）。 */
+.unit {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
 /* 朱の縦罫だけ。文字は墨のまま（視覚方針 §3.3）。 */
 .error {
   margin: var(--space-3) 0 0;

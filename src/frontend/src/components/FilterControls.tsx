@@ -9,6 +9,10 @@
  * once it started going to Mercari, because it decides what gets collected
  * rather than what gets shown, and leaving it here would have suggested it
  * was free.
+ *
+ * The reverse is worth saying too: **nothing here reaches further back.**
+ * Narrowing to listings untouched for a year removes the rest from view; it
+ * does not fetch one that was never collected.
  */
 
 import { useId } from "react";
@@ -97,6 +101,35 @@ export function FilterControls({
           />
         </div>
 
+        {/*
+          Days without an update. **The listing's own axis, not the seller's.**
+          A listing untouched for a year says nothing about whether its seller
+          is still around — that is answered one seller at a time, on the
+          seller screen.
+
+          No preset list. The only number with a source is 365, which is the
+          length this product already calls old (section 5.3, and the axis of
+          the bar under each card); 30, 90 and 180 would be invented here.
+        */}
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor={field("untouched")}>
+            未更新日数
+          </label>
+          <input
+            id={field("untouched")}
+            className={styles.days}
+            inputMode="numeric"
+            placeholder="365"
+            value={values.minUntouchedDays}
+            aria-invalid={errors.minUntouchedDays ? true : undefined}
+            aria-describedby={
+              errors.minUntouchedDays ? errorId("untouched") : undefined
+            }
+            onChange={(event) => set("minUntouchedDays", event.target.value)}
+          />
+          <span className={styles.unit}>日以上</span>
+        </div>
+
         <div className={styles.field}>
           <label className={styles.label} htmlFor={field("format")}>
             販売形式
@@ -121,6 +154,7 @@ export function FilterControls({
         [
           ["createdFrom", "from"],
           ["createdTo", "to"],
+          ["minUntouchedDays", "untouched"],
         ] as const
       )
         .filter(([name]) => errors[name])

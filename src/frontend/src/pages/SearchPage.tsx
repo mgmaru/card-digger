@@ -109,7 +109,10 @@ export function SearchPage() {
   };
 
   const shown = useMemo(
-    () => (result ? visibleItems(result.items, filters, sort) : []),
+    () =>
+      result
+        ? visibleItems(result.items, filters, sort, result.meta.collectedAt)
+        : [],
     [result, filters, sort],
   );
 
