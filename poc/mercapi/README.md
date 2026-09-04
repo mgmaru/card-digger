@@ -164,6 +164,58 @@ poc/mercapi/.venv/bin/python poc/mercapi/condition_probe.py --skip-master
 **検索の`itemConditionId`は商品ページの表示と一致する**（番号1〜5で20 / 20）でした。
 番号`6`（全体的に状態が悪い）は母集団239件で**未観測**です。
 
+## `is_inactive`の追加観測
+
+商品詳細Responseの`seller`にある`is_inactive`が何を指すのかを確かめます。
+**Forkはこの値を持っていない**ため（`models/item/data.py`の`Seller`にも
+`mapping/definitions.py`にも無い）、`condition_probe.py`がmaster Endpointを読むのと同じ
+やり方で生Responseを直接読みます。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/inactive_probe.py
+```
+
+実行は5つを見ます。**読み方の規則は実行前にコードへ書いてあります**（`meaning_verdict`）。
+
+1. `seller`に`is_inactive`があるか。key一覧を記録する（値は取らない）
+2. `True`の標本が集まるか。未更新日数との関係
+3. **新規利用者と休眠を区別できるか**（登録日・評価数・出品数の中央値を両群で比べる）
+4. 同一Sellerの別商品で一致するか
+5. **買い手に見える対応物があるか**（Sellerページ・商品ページの`data-testid`語彙を両群で比べる）
+
+**価格帯を割るのが要点です。** 検索は`updated`の降順で返り順序を変えられないため、
+放置された出品へ届く唯一の方法が「母集団が尽きるまで狭める」ことになります。
+**終端まで届かなかった帯の未更新日数は下限であり、その帯の裾ではありません。**
+帯ごとに終端到達を記録します。
+
+```bash
+# 母集団だけを見る（検索Requestのみ。帯の割り方を決めるとき）
+poc/mercapi/.venv/bin/python poc/mercapi/inactive_probe.py --skip-item-details --skip-page-check
+
+# 価格帯と標本数を変える
+poc/mercapi/.venv/bin/python poc/mercapi/inactive_probe.py \
+  --price-min 1000 --price-max 5000 --bands 16 --max-items 64
+```
+
+`True`は少ないため、1回の実行で群が5人に届かないことがあります。その場合は**複数回の結果を
+まとめます**（Mercariへは接続しません）。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/inactive_probe.py \
+  --merge poc/mercapi/artifacts/inactive-run2.json poc/mercapi/artifacts/inactive-run3.json
+```
+
+ページの比較結果はまとめません。対照は**同時に開いたページの間**で成り立つものであり、
+別々の実行を混ぜると誰も測っていない対照を作ることになります。
+
+**繰り返し実行するときは`--output`を分けてください。** 既定の出力先は同じで、
+前回のartifactを上書きします。
+
+結果は[`is_inactive`の観測結果](inactive-result.md)。判定は
+**意味を確定できず、買い手に見える対応物も無い**（`unverifiable`）でした。
+`True`は「登録が比較的新しく規模の小さい口座」に偏り、**休眠と切り分けられません。**
+**画面へは出しません。**
+
 ## テスト
 
 ```bash
@@ -188,6 +240,9 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `condition_probe.py`: 検索の`itemConditionId`と商品ページの表示を突き合わせるランナー
 - `test_condition_probe.py`: 表の解析、標本選択、比較判定、率の数え方の単体テスト
 - `condition-result.md`: 2026-09-04の商品の状態の観測結果
+- `inactive_probe.py`: `is_inactive`の意味と、買い手に見える対応物の有無を探すランナー
+- `test_inactive_probe.py`: 帯の分割、標本選択、群の中央値、判定規則、対照の数え方の単体テスト
+- `inactive-result.md`: 2026-09-04の`is_inactive`観測結果
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証
