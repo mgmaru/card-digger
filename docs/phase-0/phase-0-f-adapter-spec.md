@@ -399,7 +399,7 @@ value.astimezone(timezone.utc)
 | `listing_status` | `status` | 転記 | `observed` | `on_sale` / `trading` / `sold_out`の3値を実際に観測した |
 | `sale_format` | `auction` / `auction_info`の有無 | **主張** | **`observed`** | 商品ページを正として20 / 20一致 |
 | `seller_id` | `seller_id` / `seller.id_` | 転記 | `observed` | この値でProfileを取得できる |
-| `item_condition` | `item_condition` / `item_condition_id` | 転記 | `derived` | 商品ページに`data-testid="商品の状態"`がある。**値は突き合わせていない** |
+| `item_condition` | `item_condition` / `item_condition_id` | 転記 | **`observed`** | 検索の`item_condition_id`が商品ページの`[data-testid="商品の状態"]`と20 / 20一致（[観測結果](../../poc/mercapi/condition-result.md)）。番号`6`は**未観測**。表示名はMercariのmaster Endpointが正本 |
 | `like_count` | `num_likes` | 転記 | `derived` | 商品ページに`data-testid="icon-heart-button"`がある。**値は突き合わせていない** |
 
 #### `Seller`
