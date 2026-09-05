@@ -221,6 +221,45 @@ poc/mercapi/.venv/bin/python poc/mercapi/inactive_probe.py \
 このProbeは**意味が確定したかを再確認するために残しています**——Mercariの画面に対応する
 表示が現れたら、そのまま実行すれば分かります。
 
+## 商品画像の枚数と、複数枚表示の速度
+
+検索が1出品あたり何枚の画像URLを返すか、その画像で状態を判断できるか、複数枚出すと画面が
+遅くなるかを、1回の実行でまとめて測ります。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/photos_probe.py
+```
+
+実行は4つを見ます。**判定規則は実行前にコードへ書いてあります**
+（`test_photos_probe.py`が固定しています）。
+
+1. 検索1ページが1出品あたり何枚のURLを返すか（`photos`と`thumbnails`の両方）
+2. 商品詳細は何枚返すか。詳細1回の所要
+3. 画像本体を**デコードして**画素サイズを見る（HTTP 200は「見られる」を意味しない）
+4. 1 Cardあたり1枚 / 4枚 / 全枚数で、**1画面の画像が出そろうまで**を比較する
+
+**描画はCardのCSSを写しています**（`--grid-min: 200px`、`aspect-ratio: 1`、`loading="lazy"`）。
+1画面に入る画像の枚数が実物と違えば意味がありません。**条件ごとに新しいBrowserを起動**し、
+cold cacheで各5回測って中央値で比べます。
+
+**1画面の画像が1枚でもデコードされなかった回は、測定として数えません。**
+1回目の実行で「Request 1件・デコード0件・18秒」という回が出ており、
+これを「遅い」と数えると結論が正反対になります。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/photos_probe.py --skip-details --skip-images
+poc/mercapi/.venv/bin/python poc/mercapi/photos_probe.py --skip-render --skip-pages
+```
+
+結果は[商品画像の枚数と、複数枚表示の速度](photos-result.md)。判定は
+**検索は1出品あたり1枚しか返さない**（120 / 120）、
+**商品詳細は中央値2枚・最大9枚だが3割は1枚のまま**、
+**画像は幅1080pxで状態を判断できる**、
+**描画は4枚で1.2倍（+109ms）にとどまる**でした。
+
+**成立しないのは描画ではなくURLの取得側です。** 一覧120件ぶんの詳細は2秒間隔で240秒になり、
+検索1回20〜30秒の道具に載りません。**利用者が選んだ1件なら243msで載ります。**
+
 ## テスト
 
 ```bash
@@ -248,6 +287,9 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `inactive_probe.py`: `is_inactive`の意味と、買い手に見える対応物の有無を探すランナー
 - `test_inactive_probe.py`: 帯の分割、標本選択、群の中央値、判定規則、対照の数え方の単体テスト
 - `inactive-result.md`: 2026-09-04の`is_inactive`観測結果
+- `photos_probe.py`: 画像の枚数・大きさと、複数枚表示の描画速度を測るランナー
+- `test_photos_probe.py`: 枚数の数え方、見られるかの判定、測定の妥当性、Harnessの単体テスト
+- `photos-result.md`: 2026-09-05の商品画像の枚数と描画速度の観測結果
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証
