@@ -11,8 +11,10 @@
 > 2026-09-03、[使ってみて分かった2件](#使ってみて分かった2件2026-09-04)は2026-09-04、
 > [`is_inactive`](#出品者が生きているかを直接知る2026-09-05に実装)と
 > [安全停止の回復条件](#決めた--時間経過で解除2026-09-05)は2026-09-05に閉じた。
-> [MVP完了条件](../product/mvp-spec.md#mvp完了条件)は**機械が判定できる9件を確認済み**で、
-> 残る1件「人間が見る商品を効率的に絞れる」は**利用者が判定する。**
+> [MVP完了条件](../product/mvp-spec.md#mvp完了条件)は**10件すべて満たした。**
+> 機械が判定できる9件を確認し、残る1件「人間が見る商品を効率的に絞れる」には
+> **利用者が「効率的である」と答えた**（[経緯](#10件目は利用者が答えた2026-09-05)）。
+> この問いは**Phaseごとに立て直す**（[コンセプト §20](../product/concept.md#20-効率的かは利用者にしか答えられない2026-09-05決定)）。
 >
 > **次は[Phase 2](#phase-2--画像解析)だが、まだ何も決めていない。**
 > 決めること4件と、[決める前に測る2件](#決める前に測る2件)を2026-09-05に整理した。
@@ -2271,7 +2273,12 @@ Linear history・force push禁止・deletions禁止が動いていないこと�
 
 # MVP後 — 探索補助
 
-次はMVPへ含めない。MVPの利用結果から優先度を決める。
+**MVPへ含めないと決めた機能候補を、判断の経緯ごと置く。**
+[Phase 1は2026-09-05にクローズした](#phase-1をクローズした2026-09-05)ので、
+「MVP後」はもう来ている。**優先度は使った結果から決める。**
+
+**この節は判断の記録で、生きた作業一覧ではない。**
+着手できる候補は[価格を判断しない探索補助](#価格を判断しない探索補助--使ってみて追加したくなったら)にある。
 
 ## 使ってみて分かった最大の不便 — 相場が分からない（2026-09-03）
 
@@ -2888,6 +2895,26 @@ flowchart TD
 | Keyboard / Mobile | E2Eの`the search runs from the keyboard alone`と、390pxのmobile Project |
 | Database / Cache / 定期Crawl / Playwrightの混入なし | **依存を数えた。** Backendは`mercapi`・`fastapi`・`uvicorn`の3つ、Frontendは`react`・`react-dom`・`react-router`の3つ。`sqlalchemy` / `sqlite` / `redis` / `apscheduler` / `celery` / `playwright`を`card_digger/`から検索して0件 |
 | 利用規約の確認が要る段階へ進んでいない | Local実行のみ。`127.0.0.1`へBind、定期実行なし、公開なし |
+
+### 現在の基準線（2026-09-05）
+
+**[CIとMerge基準 §5](../development/ci-policy.md#基準線の考え方)がここを参照する。**
+Merge基準の「Testの結果が基準線から悪化していない」は、この数と比べる。
+
+| 検査 | 基準線 |
+|---|---|
+| Backend（L1〜L3。`uv run --frozen pytest tests`） | **503 passed / 0 failed** |
+| Frontend（`npm run test`） | **205 passed / 0 failed**（10 files） |
+| E2E受入Flow（`npm run e2e`） | **6 passed**（desktop / mobileで3件ずつ） |
+| `npm run typecheck` / `npm run build` | 成功 |
+| `python3 tools/check_docs_links.py` | 34 files、NG 0件 |
+
+**Card Diggerには既知の赤が無い。** Forkと違い、こちらの基準線は「全Green」である。
+**赤が1件でも出たら悪化**とみなす。
+
+> **数を目標にしない。** Testを増やすこと自体に価値は無く、この表は
+> **消えたことに気付くため**にある。仕様を削って一緒にTestを削るのは正しい変更で、
+> そのときはこの数も同じ変更で直す。
 
 ### 10件目は利用者が答えた（2026-09-05）
 
