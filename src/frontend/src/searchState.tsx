@@ -23,6 +23,7 @@ import {
 } from "react";
 
 import { ApiError, search as requestSearch } from "./api/client";
+import { conditionChoices } from "./searchQuery";
 import {
   EMPTY_FILTER_FORM,
   NO_BAND,
@@ -87,6 +88,24 @@ export type Filters = {
    */
   minUntouchedDays: number | null;
   maxUntouchedDays: number | null;
+  /**
+   * The worst grade still shown, as Mercari's condition number. `null` narrows
+   * nothing.
+   *
+   * **The number runs the other way from the grade**: `1` is 新品、未使用 and
+   * `6` is 全体的に状態が悪い, so keeping "this grade or better" keeps every
+   * item whose number is **less than or equal to** this one. Nothing on screen
+   * shows the number for that reason — the options read as grade names.
+   *
+   * The order comes from Mercari's `itemConditions` master table, which lists
+   * the six in that sequence, and from what the names plainly say. Mercari
+   * does not state that the numbers rank, so nothing here treats an unlisted
+   * number as ranking either: an item the table cannot name is 状態不明 and
+   * **this filter never removes it** (section 5.5). Dropping it would be
+   * deciding that an unknown grade is a bad one, which is the guess
+   * `ITEM_CONDITIONS` refuses to make.
+   */
+  worstCondition: string | null;
 };
 
 export const INITIAL_FILTERS: Filters = {
@@ -95,6 +114,7 @@ export const INITIAL_FILTERS: Filters = {
   saleFormat: "all",
   minUntouchedDays: null,
   maxUntouchedDays: null,
+  worstCondition: null,
 };
 
 export type SearchStatus = "idle" | "loading" | "success" | "error";
@@ -174,6 +194,21 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     try {
       const response = await requestSearch(next, nextBand);
       setResult(response);
+      // The condition options are built from the result, so a grade chosen
+      // against the last one may not exist in this one. Left alone, the
+      // select would fall back to すべて while the filter kept removing
+      // listings — the screen would describe a filter it was not applying,
+      // which is the same failure that keeps `filterForm` out of the route.
+      // Every other field means the same thing whatever came back, so only
+      // this one is let go, and only when its grade is gone.
+      const offered = new Set(
+        conditionChoices(response.items).map((choice) => choice.id),
+      );
+      setFilterForm((form) =>
+        form.worstCondition === "" || offered.has(form.worstCondition)
+          ? form
+          : { ...form, worstCondition: "" },
+      );
       setStatus("success");
     } catch (cause) {
       setError(

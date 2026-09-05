@@ -358,6 +358,126 @@ describe("narrowing", () => {
   });
 });
 
+describe("narrowing by condition", () => {
+  /** The same three listings, at three different grades. */
+  const graded = (
+    id: string,
+    itemCondition: Item["itemCondition"],
+  ): Item => ({
+    ...item(id, "2026-01-01T10:00:00+09:00", "2026-01-01T10:00:00+09:00", 100),
+    itemCondition,
+  });
+
+  const GRADED: SearchResponse = {
+    items: [
+      graded("a", { id: "1", name: "新品、未使用" }),
+      graded("b", { id: "4", name: "やや傷や汚れあり" }),
+      graded("c", null),
+    ],
+    meta: META,
+  };
+
+  const options = () =>
+    within(screen.getByLabelText("商品の状態"))
+      .getAllByRole("option")
+      .map((node) => node.textContent);
+
+  it("offers the grades that came back, best first, and no others", async () => {
+    const user = userEvent.setup();
+    searchMock.mockResolvedValue(GRADED);
+    mount();
+    await searchFor(user, "ポケカ");
+
+    // 目立った傷や汚れなし is in Mercari's table and not in this result.
+    // Offering it would suggest the set contains one.
+    expect(options()).toEqual([
+      "すべて",
+      "新品、未使用以上",
+      "やや傷や汚れあり以上",
+    ]);
+  });
+
+  it("keeps the chosen grade and every better one, without collecting again", async () => {
+    const user = userEvent.setup();
+    searchMock.mockResolvedValue(GRADED);
+    mount();
+    await searchFor(user, "ポケカ");
+
+    await user.selectOptions(screen.getByLabelText("商品の状態"), "新品、未使用以上");
+    await waitFor(() => expect(titles()).toEqual(["a", "c"]));
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した条件に一致: 2件 / 825件",
+    );
+    expect(searchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps 状態不明 whatever is chosen", async () => {
+    // Removing it would settle a grade Mercari never gave. `c` survives the
+    // strictest choice above, and is the reason the count there is 2.
+    const user = userEvent.setup();
+    searchMock.mockResolvedValue(GRADED);
+    mount();
+    await searchFor(user, "ポケカ");
+
+    await user.selectOptions(screen.getByLabelText("商品の状態"), "新品、未使用以上");
+    await waitFor(() => expect(titles()).toContain("c"));
+  });
+
+  it("lets go of a grade the next result does not hold", async () => {
+    // Left in place, the select would fall back to すべて while the filter
+    // kept removing listings, and the screen would describe a filter it was
+    // not applying.
+    const user = userEvent.setup();
+    searchMock.mockResolvedValue(GRADED);
+    mount();
+    await searchFor(user, "ポケカ");
+    await user.selectOptions(screen.getByLabelText("商品の状態"), "新品、未使用以上");
+    await waitFor(() => expect(titles()).toEqual(["a", "c"]));
+
+    searchMock.mockResolvedValue({
+      items: [graded("d", { id: "4", name: "やや傷や汚れあり" })],
+      meta: META,
+    });
+    await user.clear(screen.getByLabelText("キーワード"));
+    await searchFor(user, "ポケカ 引退");
+
+    await waitFor(() => expect(titles()).toEqual(["d"]));
+    expect(screen.getByLabelText("商品の状態")).toHaveValue("");
+  });
+
+  it("keeps a grade the next result still holds", async () => {
+    const user = userEvent.setup();
+    searchMock.mockResolvedValue(GRADED);
+    mount();
+    await searchFor(user, "ポケカ");
+    await user.selectOptions(screen.getByLabelText("商品の状態"), "新品、未使用以上");
+
+    searchMock.mockResolvedValue({
+      items: [
+        graded("d", { id: "1", name: "新品、未使用" }),
+        graded("e", { id: "4", name: "やや傷や汚れあり" }),
+      ],
+      meta: META,
+    });
+    await user.clear(screen.getByLabelText("キーワード"));
+    await searchFor(user, "ポケカ 引退");
+
+    await waitFor(() => expect(titles()).toEqual(["d"]));
+    expect(screen.getByLabelText("商品の状態")).toHaveValue("1");
+  });
+
+  it("offers nothing to choose when no listing came back with a grade", async () => {
+    const user = userEvent.setup();
+    searchMock.mockResolvedValue({ items: [graded("a", null)], meta: META });
+    mount();
+    await searchFor(user, "ポケカ");
+
+    expect(screen.queryByLabelText("商品の状態")).not.toBeInTheDocument();
+    // The grade is still on the card, where it reads 不明.
+    expect(titles()).toEqual(["a"]);
+  });
+});
+
 describe("how far back the search reached", () => {
   it("states the longest a collected listing has gone without an update", async () => {
     const user = userEvent.setup();
