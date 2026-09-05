@@ -140,6 +140,7 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 | [phase-0-f-live-acceptance.md](phase-0/phase-0-f-live-acceptance.md)の実施前確認 | 使い回す |
 | [検証の落とし穴](retrospectives/2026-09-01-verification-pitfalls.md)の指標を疑う問い | 使い回す |
 | [mvp-spec.md](product/mvp-spec.md)のMVP完了条件 | 受入条件 |
+| 各Phaseの「効率的に絞れるか」（[§20](product/concept.md#20-効率的かは利用者にしか答えられない2026-09-05決定)） | 受入条件。**Phaseごとに1つ置き、利用者が答える** |
 | [phase-0-e-selection.md](phase-0/phase-0-e-selection.md)の`[x]` | 受入条件（達成済み） |
 
 **仕様書は「何をTestするか」を定義するが、済んだかどうかは追わない。** それは進捗であり、
