@@ -3,12 +3,12 @@
 ## 文書ステータス
 
 - 決定日: **2026-08-30**
-- 最終更新日: **2026-09-04**（商品の状態の表示と更新日Filterを追加）
-- ステータス: **Phase 1の実装基準として採用**
+- 最終更新日: **2026-09-05**（状態Filter、「非アクティブ」、安全停止からの回復条件）
+- ステータス: **MVPの3画面の正本。**Phase 1はクローズしたが、**この3画面への変更はここへ書く**
 - 前提: [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
 - Auction対応Gate: [Auction情報の追加検証計画](../phase-0/phase-0-f-auction-validation.md)。**[実測結果](../../poc/mercapi/auction-result.md)で合格**
 - Test実施方法: [Test運用規約](../development/test-policy.md)
-- 対象: Search MVP、Seller画面、Seller Knowledge Indicator
+- 対象: Search MVP、Seller画面、Seller Knowledge Indicator。**新しい画面はここへ足さない**（[配置ルール](../README.md#画面が増えたときmvp-specへ足さない)）
 
 この文書はMVPに含める機能、含めない機能、画面挙動、計算方法、完了条件の正本とする。
 実装中に新しい案が出ても、MVPへ自動的に追加しない。追加する場合はこの文書とTODOを先に変更する。

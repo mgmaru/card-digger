@@ -105,17 +105,52 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 ## 配置ルール
 
 - Productの振る舞い・受入条件は`product/`
+- **画面が増えたら、その画面の仕様は`product/<画面>-spec.md`へ分ける**（[下記](#画面が増えたときmvp-specへ足さない)）
 - Phaseをまたぐ計画・進捗は`planning/`
 - Phaseをまたぐ開発・依存・Repositoryの運用手順は`development/`
 - 特定Phaseだけで使う調査・技術判断・実装仕様は`phase-N/`
 - 失敗の経緯と教訓は`retrospectives/`（実装の正本にはしない）
 - PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
+- **検証結果は、それを出したコードの隣に置く**（[下記](#検証結果はそれを出したコードの隣に置く)）
 - `docs/`直下には、このIndex以外の文書を増やさない
 - 同じ決定を複数文書へ複製せず、正本へのLinkを置く
 - **進捗の`- [ ]`は`planning/todo.md`だけに置く**（[下記](#checkboxは3種類ある)）
 - 「何をテストするか」は各仕様書、「どうテストするか」は`development/test-policy.md`
 - 「どんな構造で、どの語が何を指すか」は`development/architecture.md`
 - 「いつ自動実行し、何を満たしたらMergeするか」は`development/ci-policy.md`
+
+### 画面が増えたとき、`mvp-spec`へ足さない
+
+**2026-09-05に決めた。** [mvp-spec.md](product/mvp-spec.md)は自分の対象を
+「Search MVP、Seller画面、Seller Knowledge Indicator」と宣言している。
+**新しい画面をここへ足すと、その1文が言えなくなる。**
+
+| 書くもの | どこ |
+|---|---|
+| **MVPの3画面への変更** | [product/mvp-spec.md](product/mvp-spec.md)。Phase 1クローズ後も、この3画面ならここ |
+| **新しい画面** | **`product/<画面>-spec.md`（新規）** |
+| 画面をまたぐ色・書体・余白 | [product/design-tokens.md](product/design-tokens.md) |
+| 層・Port・依存の向き・外部アクセスの条件 | [development/architecture.md](development/architecture.md) |
+
+**新しいPortを足すのも`architecture.md`である。** 画面の仕様書に層の判断を書かない。
+
+### 検証結果は、それを出したコードの隣に置く
+
+**2026-09-05に明文化した。** それまで実態としてそう置かれていたが、規則がどこにも無く、
+「方式別結果は`poc/`」としか書いていなかった。**`condition-result.md`も`photos-result.md`も
+「方式別結果」ではない**（方式はもう1つに決まっている）ので、規則が答えられていなかった。
+
+| 検証の種類 | 結果の置き場所 | 例 |
+|---|---|---|
+| **`poc/`のProbeが出した** | **そのProbeの隣** | [poc/mercapi/condition-result.md](../poc/mercapi/condition-result.md) |
+| **`src/`を動かして測った**（L4を含む） | **`docs/phase-N/`** | [phase-0-f-live-acceptance-result.md](phase-0/phase-0-f-live-acceptance-result.md) |
+| **コードが無い。利用者が使って測った** | **`docs/phase-N/`** | Phase 2の「説明文に地雷が何割書かれているか」 |
+
+**理由は再実行である。** Probeは何度も走らせるものなので、コードと結果が離れていると
+「どのコードがこの数字を出したか」を毎回探すことになる。
+コードが無い測定にはその相手がいないので、Phaseの文書が引き受ける。
+
+**判断の要約はこれらへ複製しない。** [planning/todo.md](planning/todo.md)と各仕様書からLinkする。
 
 ## checkboxは3種類ある
 
