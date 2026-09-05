@@ -247,7 +247,7 @@ def acceptance_marketplace() -> MockAdapter:
     return MockAdapter(items=SEED, sellers=SELLERS)
 
 
-def _photo(index: int) -> Response:
+def placeholder_photo(index: int) -> Response:
     colour = PHOTO_COLOURS[index % len(PHOTO_COLOURS)]
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">'
@@ -258,6 +258,20 @@ def _photo(index: int) -> Response:
     return Response(content=svg, media_type="image/svg+xml")
 
 
+def serve_placeholder_photos(app: FastAPI) -> None:
+    """Answer the photo URLs the seed points at.
+
+    Public and separate because a second entry point serves the same listings
+    and has to serve them from the same path. `PHOTO_URL` is baked into every
+    seed item, so an app that registered its own route would only have to spell
+    it differently once to show a grid of broken images.
+    """
+
+    @app.get("/acceptance/photo/{index}.svg")
+    async def photo(index: int) -> Response:  # pragma: no cover - trivial
+        return placeholder_photo(index)
+
+
 def create_acceptance_app() -> FastAPI:
     clock = _FrozenClock()
     app = create_app(
@@ -265,17 +279,13 @@ def create_acceptance_app() -> FastAPI:
         clock=clock,
         # No interval: nothing here reaches Mercari, and a browser waiting two
         # seconds per page would be measuring the wrong thing slowly.
-        access=MarketplaceAccess(clock, _NoWait(), min_interval_seconds=0.0),
+        access=MarketplaceAccess(clock, NoWait(), min_interval_seconds=0.0),
     )
-
-    @app.get("/acceptance/photo/{index}.svg")
-    async def photo(index: int) -> Response:  # pragma: no cover - trivial
-        return _photo(index)
-
+    serve_placeholder_photos(app)
     return app
 
 
-class _NoWait:
+class NoWait:
     """A wait that does not. Paired with `min_interval_seconds=0.0`."""
 
     async def sleep(self, seconds: float) -> None:

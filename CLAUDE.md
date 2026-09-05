@@ -51,6 +51,9 @@ cd src/backend && uv run uvicorn --factory card_digger.api.main:create_app --rel
 
 # Backend（Mercariへ通信しない。E2E受入Flowと、画面だけ触りたいとき）
 cd src/backend && uv run uvicorn --factory scripts.acceptance_app:create_acceptance_app --reload
+
+# Backend（Mercariへ通信しない。安全停止を画面で見るとき。3回検索すると止まる）
+cd src/backend && uv run uvicorn --factory scripts.safety_stop_demo:create_safety_stop_demo_app --reload
 ```
 
 CIと同じ検査をローカルで通すとき。
