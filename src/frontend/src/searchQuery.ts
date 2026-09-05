@@ -14,7 +14,7 @@
 import { elapsedDays } from "./elapsed";
 import { startOfDay, startOfNextDay } from "./jst";
 import type { Filters, SortKey } from "./searchState";
-import type { Item } from "./types/api";
+import type { Item, ItemCondition } from "./types/api";
 
 /**
  * The human wording for each sort, from the section 5.5 table.
@@ -84,8 +84,55 @@ export function hasActiveFilter(filters: Filters): boolean {
     filters.createdTo !== null ||
     filters.saleFormat !== "all" ||
     filters.minUntouchedDays !== null ||
-    filters.maxUntouchedDays !== null
+    filters.maxUntouchedDays !== null ||
+    filters.worstCondition !== null
   );
+}
+
+/**
+ * Where a grade sits, or `null` for one that cannot be placed.
+ *
+ * A named condition is one the backend found in Mercari's `itemConditions`
+ * table, so its number is one of the six the table ranks. Anything else —
+ * missing, unnumbered, or a number nobody has a name for — is 状態不明, and
+ * placing it would mean inventing the grade the screen refuses to guess.
+ */
+type Grade = { rank: number; id: string; name: string };
+
+function grade(condition: ItemCondition | null): Grade | null {
+  if (condition === null || condition.id === null || condition.name === null) {
+    return null;
+  }
+  if (!/^\d+$/.test(condition.id)) {
+    return null;
+  }
+  return { rank: Number(condition.id), id: condition.id, name: condition.name };
+}
+
+/**
+ * The grades this result actually holds, best first.
+ *
+ * Built from the items rather than from a copy of Mercari's table, so the
+ * screen never offers a grade nobody collected — number 6 has never been seen
+ * in a search ([observation](../../poc/mercapi/condition-result.md)), and
+ * offering it would suggest the set contains one.
+ *
+ * 状態不明 is not among them. It is not a grade, and this filter never removes
+ * it, so there is nothing to choose.
+ */
+export function conditionChoices(
+  items: readonly Item[],
+): { id: string; name: string }[] {
+  const found = new Map<number, Grade>();
+  for (const item of items) {
+    const seen = grade(item.itemCondition);
+    if (seen !== null && !found.has(seen.rank)) {
+      found.set(seen.rank, seen);
+    }
+  }
+  return [...found.values()]
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ id, name }) => ({ id, name }));
 }
 
 /**
@@ -101,6 +148,10 @@ export function hasActiveFilter(filters: Filters): boolean {
  * long the tab has been open. Both bounds are inclusive: the two answer
  * opposite questions — the neglected listings, and the ones something touched
  * recently — and a reader who names a number means to include it.
+ *
+ * The condition is a ceiling on wear: the chosen grade and every better one
+ * stay. 状態不明 stays whatever is chosen, because removing it would settle a
+ * grade Mercari never gave.
  *
  * **None of this reaches further back.** Filtering removes listings already
  * in hand; it cannot add one that was never collected. The only thing that
@@ -146,6 +197,14 @@ export function filterItems(
         filters.maxUntouchedDays !== null &&
         untouched > filters.maxUntouchedDays
       ) {
+        return false;
+      }
+    }
+    if (filters.worstCondition !== null) {
+      const seen = grade(item.itemCondition);
+      // A grade nobody can place stays. The reader asked to drop the worn
+      // ones, not the ones Mercari said nothing readable about.
+      if (seen !== null && seen.rank > Number(filters.worstCondition)) {
         return false;
       }
     }

@@ -9,9 +9,9 @@
  * (section 5.2). The band belongs on this side: Mercari applies it before
  * ordering and paging, so it decides what can be reached at all.
  *
- * The listing date, the sale format and the days without an update only
- * reorder and hide what is already on screen, so they are judged as they
- * change and a half-typed one simply does not narrow.
+ * The listing date, the sale format, the days without an update and the
+ * condition only reorder and hide what is already on screen, so they are
+ * judged as they change and a half-typed one simply does not narrow.
  *
  * The rules are the specification's. The messages are not: section 9 asks for
  * "対象Fieldの近くに修正方法を表示" without fixing the words, and the sections
@@ -64,6 +64,8 @@ export type FilterFormValues = {
   saleFormat: SaleFormatFilter;
   minUntouchedDays: string;
   maxUntouchedDays: string;
+  /** A condition number, or `""` for every grade. Chosen, so never invalid. */
+  worstCondition: string;
 };
 
 export const EMPTY_FILTER_FORM: FilterFormValues = {
@@ -72,6 +74,7 @@ export const EMPTY_FILTER_FORM: FilterFormValues = {
   saleFormat: "all",
   minUntouchedDays: "",
   maxUntouchedDays: "",
+  worstCondition: "",
 };
 
 /**
@@ -211,6 +214,10 @@ export function validateFilters(values: FilterFormValues): FilterValidation {
       saleFormat: values.saleFormat,
       minUntouchedDays,
       maxUntouchedDays,
+      // Picked from a list built out of the result in hand, like the sale
+      // format, so there is no half-typed state to judge.
+      worstCondition:
+        values.worstCondition === "" ? null : values.worstCondition,
     },
     errors,
   };

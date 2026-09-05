@@ -196,6 +196,7 @@ describe("reporting", () => {
       saleFormat: "all",
       minUntouchedDays: "半年",
       maxUntouchedDays: "ずっと",
+      worstCondition: "",
     });
     expect(Object.keys(errors).sort()).toEqual([
       "createdFrom",
@@ -208,5 +209,15 @@ describe("reporting", () => {
   it("keeps the sale format, which cannot be typed wrong", () => {
     expect(validateFilters(form({ saleFormat: "auction" })).filters.saleFormat)
       .toBe("auction");
+  });
+
+  it("keeps the condition, which is chosen rather than typed", () => {
+    expect(validateFilters(form({ worstCondition: "3" })).filters.worstCondition)
+      .toBe("3");
+  });
+
+  it("reads すべて as narrowing nothing, not as a grade", () => {
+    expect(validateFilters(form({ worstCondition: "" })).filters.worstCondition)
+      .toBeNull();
   });
 });

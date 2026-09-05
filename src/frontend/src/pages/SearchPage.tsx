@@ -15,7 +15,7 @@ import { FailureNotice } from "../components/FailureNotice";
 import { FilterControls } from "../components/FilterControls";
 import { ItemGrid } from "../components/ItemGrid";
 import { SearchForm } from "../components/SearchForm";
-import { hasActiveFilter, visibleItems } from "../searchQuery";
+import { conditionChoices, hasActiveFilter, visibleItems } from "../searchQuery";
 import { useSearchState } from "../searchState";
 import type { ApiFailureKind } from "../api/client";
 import {
@@ -117,6 +117,14 @@ export function SearchPage() {
     [result, filters, sort],
   );
 
+  // Built from what came back, not from a second copy of Mercari's table:
+  // the grade names on the cards and the ones in this list are then always
+  // the same words.
+  const conditions = useMemo(
+    () => (result ? conditionChoices(result.items) : []),
+    [result],
+  );
+
   const narrowed = hasActiveFilter(filters);
   const failure = error ? FAILURES[error.kind] : null;
 
@@ -169,6 +177,7 @@ export function SearchPage() {
             values={filterForm}
             errors={filterErrors}
             sort={sort}
+            conditions={conditions}
             onChange={setFilterForm}
             onSortChange={setSort}
           />

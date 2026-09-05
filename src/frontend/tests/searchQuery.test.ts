@@ -9,8 +9,14 @@
 import { describe, expect, it } from "vitest";
 
 import { INITIAL_FILTERS, type Filters } from "../src/searchState";
-import { filterItems, sortItems, visibleItems } from "../src/searchQuery";
-import type { Item, SaleFormat } from "../src/types/api";
+import {
+  conditionChoices,
+  filterItems,
+  hasActiveFilter,
+  sortItems,
+  visibleItems,
+} from "../src/searchQuery";
+import type { Item, ItemCondition, SaleFormat } from "../src/types/api";
 
 function item(
   id: string,
@@ -47,6 +53,28 @@ const ITEMS: Item[] = [
  * Days without an update, as of this snapshot: a 356, d 255, c 4, b 1.
  */
 const COLLECTED_AT = "2026-09-01T10:00:00+09:00";
+
+/**
+ * The same listing at a chosen grade.
+ *
+ * `id` doubles as the label so a failure names the grade it kept or dropped.
+ */
+function graded(id: string, itemCondition: ItemCondition | null): Item {
+  return {
+    ...item(id, "2026-01-01T10:00:00+09:00", "2026-01-01T10:00:00+09:00", 100),
+    itemCondition,
+  };
+}
+
+const GRADED: Item[] = [
+  graded("new", { id: "1", name: "新品、未使用" }),
+  graded("clean", { id: "3", name: "目立った傷や汚れなし" }),
+  graded("worn", { id: "5", name: "傷や汚れあり" }),
+  // Mercari sent a number nobody has a name for. The card reads 状態不明.
+  graded("unnamed", { id: "9", name: null }),
+  // Mercari sent nothing at all.
+  graded("absent", null),
+];
 
 const ids = (list: Item[]) => list.map((i) => i.id);
 const withFilter = (patch: Partial<Filters>): Filters => ({
@@ -242,5 +270,86 @@ describe("visibleItems", () => {
       "d",
       "a",
     ]);
+  });
+});
+
+describe("filterItems by condition", () => {
+  it("keeps the chosen grade and every better one", () => {
+    // A ceiling on wear, not a match. The number runs the other way from the
+    // grade, so `3` keeps 1 and 3 and drops 5.
+    expect(ids(filterItems(GRADED, withFilter({ worstCondition: "3" }), COLLECTED_AT)))
+      .toEqual(["new", "clean", "unnamed", "absent"]);
+  });
+
+  it("keeps the grade sitting exactly on the threshold", () => {
+    expect(ids(filterItems(GRADED, withFilter({ worstCondition: "1" }), COLLECTED_AT)))
+      .toContain("new");
+  });
+
+  it("never removes a listing whose grade nobody can place", () => {
+    // Dropping these would decide that an unknown grade is a bad one, which
+    // is the guess `ITEM_CONDITIONS` refuses to make. Even the strictest
+    // choice keeps them.
+    const strictest = ids(
+      filterItems(GRADED, withFilter({ worstCondition: "1" }), COLLECTED_AT),
+    );
+
+    expect(strictest).toContain("unnamed");
+    expect(strictest).toContain("absent");
+  });
+
+  it("narrows nothing when no grade is chosen", () => {
+    expect(ids(filterItems(GRADED, INITIAL_FILTERS, COLLECTED_AT))).toEqual(
+      ids(GRADED),
+    );
+  });
+
+  it("counts as narrowing, so the record says the screen is not the whole set", () => {
+    expect(hasActiveFilter(withFilter({ worstCondition: "3" }))).toBe(true);
+    expect(hasActiveFilter(INITIAL_FILTERS)).toBe(false);
+  });
+});
+
+describe("conditionChoices", () => {
+  it("offers the grades this result holds, best first", () => {
+    expect(conditionChoices(GRADED)).toEqual([
+      { id: "1", name: "新品、未使用" },
+      { id: "3", name: "目立った傷や汚れなし" },
+      { id: "5", name: "傷や汚れあり" },
+    ]);
+  });
+
+  it("offers no grade the result does not hold", () => {
+    // Number 6 is in Mercari's table and has never come back from a search.
+    // Offering it would suggest the set contains one.
+    expect(conditionChoices(GRADED).map((choice) => choice.id)).not.toContain("6");
+  });
+
+  it("orders by the number, not by the order items arrived in", () => {
+    const shuffled = [
+      graded("worn", { id: "5", name: "傷や汚れあり" }),
+      graded("new", { id: "1", name: "新品、未使用" }),
+      graded("clean", { id: "3", name: "目立った傷や汚れなし" }),
+    ];
+
+    expect(conditionChoices(shuffled).map((choice) => choice.id)).toEqual([
+      "1",
+      "3",
+      "5",
+    ]);
+  });
+
+  it("offers 状態不明 as nothing, because it is not a grade", () => {
+    expect(conditionChoices([graded("unnamed", { id: "9", name: null })])).toEqual([]);
+    expect(conditionChoices([graded("absent", null)])).toEqual([]);
+  });
+
+  it("offers each grade once however many listings carry it", () => {
+    const many = [
+      graded("x", { id: "3", name: "目立った傷や汚れなし" }),
+      graded("y", { id: "3", name: "目立った傷や汚れなし" }),
+    ];
+
+    expect(conditionChoices(many)).toHaveLength(1);
   });
 });

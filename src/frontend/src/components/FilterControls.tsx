@@ -33,12 +33,15 @@ export function FilterControls({
   values,
   errors,
   sort,
+  conditions,
   onChange,
   onSortChange,
 }: {
   values: FilterFormValues;
   errors: FilterErrors;
   sort: SortKey;
+  /** The grades this result holds, best first. Built by `conditionChoices`. */
+  conditions: { id: string; name: string }[];
   onChange: (values: FilterFormValues) => void;
   onSortChange: (sort: SortKey) => void;
 }) {
@@ -157,6 +160,49 @@ export function FilterControls({
             日以下
           </span>
         </div>
+
+        {/*
+          How worn a listing may be and still be shown. **A ceiling, not a
+          match**: choosing 目立った傷や汚れなし keeps that grade and the two
+          better ones.
+
+          The options read as grade names and never as numbers. Mercari's
+          numbers run the other way from the grades — 1 is 新品、未使用 — so
+          `4以上` on screen would mean the opposite of what it says. 以上 is
+          attached to the name instead, where it reads as "this grade or
+          better".
+
+          Only the grades this result actually holds are offered, so the list
+          never claims the set contains a 全体的に状態が悪い listing that
+          nobody has ever seen come back from a search.
+
+          Listings the table cannot name are 状態不明 and this never removes
+          them (section 5.5): they are absent from the list because there is
+          no grade to choose, not because they are being hidden.
+
+          The worst grade offered removes nothing, being すべて said twice. It
+          is left in rather than special-cased, the way 0日以上 is: the list is
+          then exactly "the grades on the cards", which a reader can check.
+        */}
+        {conditions.length > 0 && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor={field("condition")}>
+              商品の状態
+            </label>
+            <select
+              id={field("condition")}
+              value={values.worstCondition}
+              onChange={(event) => set("worstCondition", event.target.value)}
+            >
+              <option value="">すべて</option>
+              {conditions.map((condition) => (
+                <option key={condition.id} value={condition.id}>
+                  {condition.name}以上
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor={field("format")}>
