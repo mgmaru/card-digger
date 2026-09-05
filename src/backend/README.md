@@ -33,16 +33,17 @@ card_digger/
 
 scripts/
 ├── live_acceptance.py   # ライブ受入検証（L4）。実Mercariへ通信する
-└── acceptance_app.py    # E2E受入Flow用。Mock Adapterで同じApplicationを起動する
+├── acceptance_app.py    # E2E受入Flow用。Mock Adapterで同じApplicationを起動する
+└── safety_stop_demo.py  # 安全停止を画面で見る。断るMarketplaceを被せる。外へ出ない
 ```
 
 `domain`と`application`は`mercapi`をimportしない。この境界は
 `tests/unit/test_layering.py`が静的に検査する。
 
 実Mercariへ接続しうるのは`create_app()`（引数なしの場合）と`scripts/live_acceptance.py`の
-2つだけで、**Testはどちらも通らない。**`scripts/acceptance_app.py`は同じ`create_app()`を
-呼ぶが、**Mock Adapterを渡すので外へ出ない。**それを`tests/unit/test_acceptance_app.py`が
-検査する。
+2つだけで、**Testはどちらも通らない。**`acceptance_app.py`と`safety_stop_demo.py`は
+同じ`create_app()`を呼ぶが、**Mock Adapterを渡すので外へ出ない。**
+それを`tests/unit/test_acceptance_app.py`と`tests/unit/test_safety_stop_demo.py`が検査する。
 
 ## 依存
 
@@ -103,6 +104,52 @@ uv run uvicorn --factory scripts.acceptance_app:create_acceptance_app --reload
 種Dataが満たすべき条件（上限を跨ぐSeller、自力で終端に達する状態、3種の販売形式）は
 `tests/unit/test_acceptance_app.py`が固定する。**Playwright側からは見えない前提**なので、
 崩れたときに遠くで落ちないようにここで押さえる。
+
+### 安全停止を画面で見る
+
+```bash
+uv run uvicorn --factory scripts.safety_stop_demo:create_safety_stop_demo_app --reload
+```
+
+**Port 8000で起動する**（種Dataの画像URLがそのPortを名指しているため）。
+Frontendは`npm run dev`をそのまま隣で動かせばよい。**Mercariへは通信しない。**
+
+**他の2つでは安全停止を見られない。** Mercariは頼んでも断ってくれないし、
+断らせに行くことは[収集Policy](../../docs/product/mvp-spec.md#53-収集範囲)が
+まさに禁じている。Mockは断らない。**だから断る側をここで作る。**
+
+受入用と違うのは2点だけ。
+
+| | 受入用 | 安全停止Demo |
+|---|---|---|
+| Marketplace | `MockAdapter` | **最初の3本を429で断ってから**同じ`MockAdapter`が答える |
+| 時計 | 止めてある | **実時計。**止めると60秒が永遠に経たない |
+
+`ポケカ 引退品`で検索を繰り返すと、こう見える。
+
+| | 画面 | Button |
+|---|---|---|
+| 1〜2回目 | `Mercariが一時的に応答を制限しています` | `検索をやり直す` |
+| 3回目 | `…取得を止めました…` `あと約60秒で再試行できます` | 無し |
+| 待ちの最中 | 上に加えて **`Mercariへは問い合わせていません。`** | 無し |
+| 待ち明け | 残り秒数が消える | `検索をやり直す` |
+| そこで押す | **商品が出る**（4本目は成功する） |  |
+
+外部Requestが何本出たかはBackendのlogに出る。**待ちの最中は増えない。**
+
+環境変数2つで変えられる。
+
+| | 既定 | 用途 |
+|---|---|---|
+| `REFUSE_FIRST` | `3` | 何本断るか。3は安全停止のちょうど閾値 |
+| `SAFETY_STOP_COOLDOWN_SECONDS` | `60` | **画面を直しているとき用。**変えると起動時に警告を出す |
+
+**待ち時間を縮めたまま判断しない。** 60秒が[出所の無い保守的な値](../../docs/planning/todo.md#決めた--時間経過で解除2026-09-05)
+であることと、短くしたものを見て「使える」と判断することは別である。
+
+Demoが機能しなくなる壊れ方（時計を凍らせる、拒否回数を1つずらす）は
+`tests/unit/test_safety_stop_demo.py`が捕まえる。**Demoは黙って壊れる**
+——停止しないDemoは、停止しないApplicationのDemoと見分けがつかない。
 
 ## ライブ受入検証（L4）
 

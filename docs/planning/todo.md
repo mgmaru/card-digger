@@ -1477,6 +1477,19 @@ Frontendは`detail`しか読んでいなかった。**429もChallengeも403も�
 - **`Mercariへは問い合わせていません`を出す。** 待ちの最中に押しても外部へ出ないことは、
   これ以外から読み取れない。**3回目の拒否（実際に出た）には出さない。**出せば嘘になる
 
+#### 画面で見る手段を残した（2026-09-05）
+
+**Demoを使い捨てにせず`scripts/safety_stop_demo.py`へ入れた。**
+断るMarketplaceを受入用の種Dataへ被せたもので、**Mercariへは通信しない。**
+起動方法と見え方は[src/backend/README.md](../../src/backend/README.md#安全停止を画面で見る)。
+
+**他の2つの起動方法では見られない。** Mercariは頼んでも断ってくれず、断らせに行くことは
+[収集Policy](../product/mvp-spec.md#53-収集範囲)がまさに禁じている。Mockは断らない。
+
+**Demoは黙って壊れる。** 停止しないDemoは、停止しないApplicationのDemoと見分けがつかない。
+時計を凍らせる・拒否回数を1つずらす、の2つの壊れ方を
+`tests/unit/test_safety_stop_demo.py`が捕まえることを確認した。
+
 #### 待ちの最中に押しても、残り秒数は60へ戻らない
 
 **戻ったら大きなbugである。** 押すたびに60秒に見えると、待ちがいつまでも終わらない。
@@ -2903,7 +2916,7 @@ Merge基準の「Testの結果が基準線から悪化していない」は、�
 
 | 検査 | 基準線 |
 |---|---|
-| Backend（L1〜L3。`uv run --frozen pytest tests`） | **503 passed / 0 failed** |
+| Backend（L1〜L3。`uv run --frozen pytest tests`） | **513 passed / 0 failed** |
 | Frontend（`npm run test`） | **205 passed / 0 failed**（10 files） |
 | E2E受入Flow（`npm run e2e`） | **6 passed**（desktop / mobileで3件ずつ） |
 | `npm run typecheck` / `npm run build` | 成功 |
