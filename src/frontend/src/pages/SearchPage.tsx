@@ -11,6 +11,7 @@
 import { useMemo, useState } from "react";
 
 import { CollectionRecord } from "../components/CollectionRecord";
+import { FailureNotice } from "../components/FailureNotice";
 import { FilterControls } from "../components/FilterControls";
 import { ItemGrid } from "../components/ItemGrid";
 import { SearchForm } from "../components/SearchForm";
@@ -139,14 +140,14 @@ export function SearchPage() {
       )}
 
       {status === "error" && failure && (
-        <div className={styles.failure} role="alert">
-          <p className={styles.failureMessage}>{failure.message}</p>
-          {failure.retryable && (
-            <button type="button" onClick={submit}>
-              もう一度実行
-            </button>
-          )}
-        </div>
+        <FailureNotice
+          message={failure.message}
+          retryLabel="検索をやり直す"
+          retryable={failure.retryable}
+          reachedMarketplace={error?.reachedMarketplace ?? null}
+          retryAllowedAt={error?.retryAllowedAt ?? null}
+          onRetry={submit}
+        />
       )}
 
       {status === "success" && result && (

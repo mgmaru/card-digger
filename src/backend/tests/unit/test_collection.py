@@ -14,8 +14,11 @@ from conftest import FrozenClock, RecordingSleeper, make_items, make_search_page
 
 from card_digger.application.collection import (
     CONSECUTIVE_REFUSALS_BEFORE_STOP,
+    NEVER,
+    SAFETY_STOP_COOLDOWN_SECONDS,
     CollectionLimits,
     RequestGate,
+    SafetyBrake,
     collect_pages,
     count_older_than,
 )
@@ -238,6 +241,176 @@ class TestSafetyStop:
                 await gate.run(operation, _raises(error(ErrorCode.RATE_LIMITED_429)))
 
         assert gate.stopped is True
+
+
+class TestSafetyStopRecovery:
+    """The wait after the stop, and the one request that ends it.
+
+    Recovery is by time and by nothing else: the wait ending never sends a
+    request, it only stops refusing the next one that is asked for. Whoever
+    changes that has to change section 9 of the MVP specification first, which
+    tells the reader to give it time.
+    """
+
+    async def test_the_stop_holds_for_the_whole_wait(self, clock, sleeper):
+        gate = await _stopped_gate(clock, sleeper)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS - 1)
+        calls = []
+
+        with pytest.raises(SafetyStop):
+            await gate.run(Operation.SEARCH, _records(calls))
+
+        assert calls == []
+        assert gate.stopped is True
+
+    async def test_one_request_is_let_through_once_the_wait_is_over(
+        self, clock, sleeper
+    ):
+        gate = await _stopped_gate(clock, sleeper)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+
+        assert await gate.run(Operation.SEARCH, _returns("ok")) == "ok"
+        assert gate.stopped is False
+
+    async def test_a_request_that_succeeds_clears_the_count(self, clock, sleeper):
+        gate = await _stopped_gate(clock, sleeper)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+        await gate.run(Operation.SEARCH, _returns("ok"))
+
+        # Refused once after that, which is the first refusal and not the
+        # fourth: the road stays open.
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, _raises(error(ErrorCode.RATE_LIMITED_429)))
+
+        assert gate.stopped is False
+        assert gate.consecutive_refusals == 1
+
+    async def test_a_request_that_is_refused_closes_it_again_at_once(
+        self, clock, sleeper
+    ):
+        """Half-open allows one attempt, not three more."""
+        gate = await _stopped_gate(clock, sleeper)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, _raises(error(ErrorCode.RATE_LIMITED_429)))
+
+        assert gate.stopped is True
+        calls = []
+        with pytest.raises(SafetyStop):
+            await gate.run(Operation.SEARCH, _records(calls))
+        assert calls == []
+
+    async def test_the_wait_starts_over_after_a_refused_attempt(self, clock, sleeper):
+        gate = await _stopped_gate(clock, sleeper)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, _raises(error(ErrorCode.RATE_LIMITED_429)))
+
+        # The clock is now well past the first stop, and the second one is
+        # still holding: the wait is measured from the refusal, not from the
+        # first time the road closed.
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS - 1)
+        with pytest.raises(SafetyStop):
+            await gate.run(Operation.SEARCH, _returns("ok"))
+
+    async def test_an_answer_that_is_not_a_refusal_also_clears_it(self, clock, sleeper):
+        """A parse error means we got through, so the road is not closed."""
+        gate = await _stopped_gate(clock, sleeper)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, _raises(error(ErrorCode.PARSE_ERROR)))
+
+        assert gate.stopped is False
+
+
+class TestRetryAfter:
+    """What the screen is told about the wait.
+
+    Driven through the brake rather than through a gate, because these are
+    questions about the brake alone and a gate would only add two seconds of
+    pacing to every arrangement.
+    """
+
+    def test_nothing_is_owed_while_nothing_is_stopped(self, clock):
+        assert SafetyBrake(clock).retry_after_seconds() is None
+
+    def test_nothing_is_owed_before_the_third_refusal(self, clock):
+        brake = _refused(clock, CONSECUTIVE_REFUSALS_BEFORE_STOP - 1)
+        assert brake.retry_after_seconds() is None
+
+    def test_the_whole_wait_is_owed_the_moment_it_starts(self, clock):
+        brake = _refused(clock, CONSECUTIVE_REFUSALS_BEFORE_STOP)
+        assert brake.retry_after_seconds() == SAFETY_STOP_COOLDOWN_SECONDS
+
+    def test_it_counts_down(self, clock):
+        brake = _refused(clock, CONSECUTIVE_REFUSALS_BEFORE_STOP)
+        clock.advance(20)
+        assert brake.retry_after_seconds() == SAFETY_STOP_COOLDOWN_SECONDS - 20
+
+    def test_a_part_second_is_rounded_up(self, clock):
+        """Never a second already gone, and never zero while the answer is no."""
+        brake = _refused(clock, CONSECUTIVE_REFUSALS_BEFORE_STOP)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS - 0.2)
+        assert brake.retry_after_seconds() == 1
+
+    def test_nothing_is_owed_once_the_wait_is_over(self, clock):
+        brake = _refused(clock, CONSECUTIVE_REFUSALS_BEFORE_STOP)
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+        assert brake.retry_after_seconds() is None
+
+
+class TestAStopThatDoesNotEnd:
+    """`NEVER`, which is what the live acceptance run is given.
+
+    Its conditions say the stop halts every further request, so a run that
+    resumed after a minute would stop being the run those conditions describe.
+    """
+
+    def test_it_is_still_holding_a_year_later(self, clock):
+        brake = SafetyBrake(clock, cooldown_seconds=NEVER)
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            brake.record_refusal(error(ErrorCode.RATE_LIMITED_429))
+
+        clock.advance(365 * 24 * 60 * 60)
+
+        assert brake.stopped is True
+        with pytest.raises(SafetyStop):
+            brake.before_request()
+
+    def test_it_offers_no_number_rather_than_an_impossible_one(self, clock):
+        brake = SafetyBrake(clock, cooldown_seconds=NEVER)
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            brake.record_refusal(error(ErrorCode.RATE_LIMITED_429))
+
+        # There is no end to name, and `Retry-After` cannot say "never".
+        assert brake.retry_after_seconds() is None
+
+
+def _refused(clock, times: int) -> SafetyBrake:
+    brake = SafetyBrake(clock)
+    for _ in range(times):
+        brake.record_refusal(error(ErrorCode.RATE_LIMITED_429))
+    return brake
+
+
+async def _stopped_gate(clock, sleeper) -> RequestGate:
+    """A gate that has just been refused three times in a row."""
+    gate = RequestGate(clock, sleeper)
+    for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, _raises(error(ErrorCode.RATE_LIMITED_429)))
+    assert gate.stopped is True
+    return gate
+
+
+def _records(calls: list):
+    async def call():
+        calls.append(1)
+        return "ok"
+
+    return call
 
 
 class TestStopReasons:

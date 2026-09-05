@@ -48,9 +48,11 @@ from card_digger.application.analyze_seller import SellerAnalysis, analyze_selle
 from card_digger.application.collect_search import collect_search
 from card_digger.application.collection import (
     MIN_REQUEST_INTERVAL_SECONDS,
+    NEVER,
     SEARCH_LIMITS,
     SELLER_ITEMS_LIMITS,
     RequestGate,
+    SafetyBrake,
 )
 from card_digger.domain.errors import MarketplaceError, Operation, SafetyStop
 from card_digger.domain.models import ListingStatus, MarketplaceItem, SaleFormat
@@ -854,7 +856,17 @@ async def main(argv: Sequence[str] | None = None) -> int:
     print("Mercariへの取得を開始する。中断はCtrl-C。\n", flush=True)
 
     # No automatic retry: a retry is a request the protocol did not account for.
-    gate = RequestGate(SystemClock(), AsyncSleeper(), max_retries=0)
+    clock = SystemClock()
+    # No retry and no recovery, both because the conditions of this run say so.
+    # The application lets a safety stop go after a minute and tries once more;
+    # a verification run against the real Mercari does not, because "the stop
+    # halts every further request" is one of the conditions being reported.
+    gate = RequestGate(
+        clock,
+        AsyncSleeper(),
+        max_retries=0,
+        brake=SafetyBrake(clock, cooldown_seconds=NEVER),
+    )
     # One client, shared. The adapter answers every acceptance criterion; the
     # runner keeps a handle only for the finished auction follow up, which
     # needs fields the domain type does not carry.

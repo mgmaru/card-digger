@@ -17,7 +17,7 @@ card_digger/
 │   ├── ports.py       # MarketplacePort、Clock、Sleeper
 │   └── errors.py      # 共通Error Code、安全停止
 ├── application/
-│   ├── collection.py       # Page収集、1回だけの再試行、安全停止、RequestPacer
+│   ├── collection.py       # Page収集、1回だけの再試行、RequestPacer、SafetyBrake
 │   ├── access.py           # Process全体で共有する外部アクセス制御
 │   ├── collect_search.py
 │   ├── analyze_seller.py
@@ -77,9 +77,10 @@ uv run uvicorn --factory card_digger.api.main:create_app --reload
 `uvicorn`の既定Bind先は`127.0.0.1`である。**`--host 0.0.0.0`を付けない。** 認証が無いまま
 LANへ公開することになる（[MVP仕様 §10](../../docs/product/mvp-spec.md#10-data取扱い)）。
 
-**`--workers`も付けない。** 「同時実行数1・開始間隔2秒以上・同じ収集を二重に走らせない」は
-`MarketplaceAccess`が1 Processの中で保証している。Processが増えるとそれぞれが自分の分だけを
-見るようになり、Mercariから見た総量の約束が壊れる。
+**`--workers`も付けない。** 「同時実行数1・開始間隔2秒以上・同じ収集を二重に走らせない・
+連続3回拒否で止まる」は`MarketplaceAccess`が1 Processの中で保証している。Processが増えると
+それぞれが自分の分だけを見るようになり、Mercariから見た総量の約束が壊れる。
+**安全停止は2 Processなら6回拒否されるまで止まらない。**
 
 `create_app()`は引数なしで実Mercariへ繋ぐ。Mock Adapterで動かすときは`marketplace=`へ渡す。
 **このコマンドは実Mercariへ通信する。**
@@ -125,7 +126,7 @@ uv run python scripts/live_acceptance.py --confirm   # 実行する
 | 同時実行数 | 1 |
 | Request開始間隔 | 2秒以上 |
 | 自動再試行 | **なし**（`RequestGate(max_retries=0)`） |
-| 安全停止 | 401 / 403 / 429 / Challengeが3回連続で以後の外部アクセスを停止 |
+| 安全停止 | 401 / 403 / 429 / Challengeが3回連続で以後の外部アクセスを停止。**この実行では解除しない**（`SafetyBrake(cooldown_seconds=NEVER)`） |
 
 実測値は`artifacts/live-acceptance.json`へ書き出す（**Git管理外**）。標準出力のMarkdownを
 結果文書へ貼る。結果文書にはSeller名・商品Title・商品URL・商品IDを書かない。

@@ -48,7 +48,7 @@ Fixtureは固定されているため、Mercariが応答形式を変えてもL1�
 | 同時実行数 | 1 | `RequestGate`が直列化する |
 | 外部Request開始間隔 | 2秒以上 | `RequestGate`が待機を入れる |
 | 自動再試行 | **なし** | `RequestGate(max_retries=0)` |
-| 安全停止 | 401 / 403 / 429 / Challengeが3回連続で停止 | `RequestGate`が判定する |
+| 安全停止 | 401 / 403 / 429 / Challengeが3回連続で停止。**この実行では解除しない** | `SafetyBrake(cooldown_seconds=NEVER)`。アプリの既定は60秒後に1回試すが、それはこの条件表と合わない（[アーキテクチャ §5.2](../development/architecture.md#一般名と比べると足りない部分が名前で分かった)） |
 | 回避行為 | **行わない** | 認証・CAPTCHA回避・Proxy切替・複数Accountを使わない |
 
 実行のたびに条件を守れているかを確認するのではなく、**条件を守る実装から実行する。**

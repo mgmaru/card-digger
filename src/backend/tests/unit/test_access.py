@@ -13,7 +13,13 @@ import pytest
 from conftest import FrozenClock, RecordingSleeper
 
 from card_digger.application.access import MarketplaceAccess, search_key, seller_key
-from card_digger.application.collection import RequestGate, RequestPacer
+from card_digger.application.collection import (
+    CONSECUTIVE_REFUSALS_BEFORE_STOP,
+    SAFETY_STOP_COOLDOWN_SECONDS,
+    RequestGate,
+    RequestPacer,
+)
+from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation, SafetyStop
 
 
 @pytest.fixture
@@ -159,6 +165,77 @@ class TestGate:
         await access.gate()._attempt(_nothing)
         await access.gate()._attempt(_nothing)
         assert sleeper.slept == [2.0]
+
+
+class TestSharedSafetyStop:
+    """The refusals belong to Mercari, not to the collection that met them.
+
+    Held per collection this count could never reach three: a collection stops
+    at its first failure. That is why the safety stop was unreachable through
+    the endpoints, and why it is shared here.
+    """
+
+    async def test_refusals_of_separate_collections_add_up(self, access):
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            await _refused_once(access.gate())
+
+        assert access.gate().stopped is True
+
+    async def test_a_later_collection_is_stopped_by_the_earlier_ones(self, access):
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            await _refused_once(access.gate())
+        calls = []
+
+        with pytest.raises(SafetyStop):
+            await access.gate().run(Operation.SELLER_PROFILE, _counting(calls))
+
+        assert calls == []
+
+    async def test_a_success_in_between_starts_the_count_again(self, access):
+        await _refused_once(access.gate())
+        await _refused_once(access.gate())
+        await access.gate().run(Operation.SEARCH, _nothing)
+        await _refused_once(access.gate())
+
+        assert access.gate().stopped is False
+
+    async def test_the_wait_is_shared_too(self, access, clock):
+        for _ in range(CONSECUTIVE_REFUSALS_BEFORE_STOP):
+            await _refused_once(access.gate())
+        assert access.retry_after_seconds() == SAFETY_STOP_COOLDOWN_SECONDS
+
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+
+        assert access.retry_after_seconds() is None
+        assert await access.gate().run(Operation.SEARCH, _nothing) is None
+
+    async def test_the_retry_count_stays_with_its_own_collection(self, access):
+        """The one number that is still about the run, not about Mercari."""
+        gate = access.gate()
+        with pytest.raises(MarketplaceError):
+            await gate.run(Operation.SEARCH, _raising(ErrorCode.TIMEOUT))
+
+        assert gate.retry_count == 1
+        assert access.gate().retry_count == 0
+
+
+async def _refused_once(gate: RequestGate) -> None:
+    with pytest.raises(MarketplaceError):
+        await gate.run(Operation.SEARCH, _raising(ErrorCode.RATE_LIMITED_429))
+
+
+def _raising(code: ErrorCode):
+    async def call():
+        raise MarketplaceError(code, Operation.SEARCH)
+
+    return call
+
+
+def _counting(calls: list):
+    async def call():
+        calls.append(1)
+
+    return call
 
 
 class TestKeys:

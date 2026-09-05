@@ -1,0 +1,22 @@
+/* 両画面が同じ見え方をしていたので1つにした。値は視覚方針 §3 のtokenのまま。 */
+
+/* 外部Errorも「Card Diggerが取れなかった」ことの表明なので、
+   断り書きと同じ朱の縦罫で示す（視覚方針 §3.3）。 */
+.failure {
+  margin: var(--space-6) 0;
+  max-width: var(--measure);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.failureMessage {
+  margin: 0 0 var(--space-3);
+  line-height: var(--leading-dense);
+}
+
+/* 残り秒数は指示ではなく補足なので、断り書きと同じ`--ink-quiet`（視覚方針 §3.2）。 */
+.wait {
+  margin: 0 0 var(--space-3);
+  color: var(--ink-quiet);
+  line-height: var(--leading-dense);
+}

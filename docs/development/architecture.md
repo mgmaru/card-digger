@@ -77,8 +77,16 @@ Interfaceだけに依存させておくと、`MercariAdapter`と`MockAdapter`を
 | 最後にMercariを叩いた時刻 | **Mercariについての事実。** 相手は1つしかない | アプリに1つ |
 | 今いくつ収集が走っているか | **アプリ全体についての事実** | アプリに1つ |
 | どの収集が実行中か | 同上 | アプリに1つ |
+| 連続で拒否された回数 | **Mercariについての事実。** 401/403/429/Challengeは相手がこちらを拒んで
+  いることで、拒む相手は1つしかない | アプリに1つ |
+| 安全停止をいつ始めたか | 同上 | アプリに1つ |
 | 再試行した回数 | **その収集についての事実。** `CollectionMeta`に出る値 | 収集ごと |
-| 連続で拒否された回数 | **その収集についての事実**（「この実行の中で連続」の意味） | 収集ごと |
+
+**「連続で拒否された回数」は2026-09-05に置き場所が変わった。** それまでは「その収集についての事実
+（この実行の中で連続）」と書いてあったが、**その読み方では3に到達できない。** 収集は最初の失敗で
+止まるので、収集ごとに数えると値は最大1にしかならない。数えたかったのは最初から
+「Mercariが**こちらを**拒み続けているか」であり、それはMercariについての事実である。
+経緯は[§5.2](#52-requestgateは3つのpatternを1つにしたもの)。
 
 **約束の対象が1つなら、状態も1つでなければならない。** 「Mercariについての事実」を収集ごとに
 持つと、3つの収集がそれぞれ2秒待ったつもりで、相手から見れば同時に3本届く。
@@ -106,6 +114,12 @@ Interfaceだけに依存させておくと、`MercariAdapter`と`MockAdapter`を
 残り
   安全停止（Circuit Breaker）だけは収集単位のまま。
   一度止まると戻らない状態なので、回復条件（half-open）を決めてからでないと共有できない。
+
+2026-09-05
+  回復条件を「時間経過で解除」と決め、安全停止も SafetyBrake としてアプリに1つにした。
+  ・連続拒否数と停止開始時刻 → SafetyBrake（アプリに1つ）
+  ・再試行回数は「その収集の話」なので RequestGate に残った（これだけになった）
+  → 実測で 3 Request目に stop_reason=safety_stop へ到達。4 Request目はMercariへ出ない。
 ```
 
 **設計で迷って選んだのではない。動いていてTestも緑のまま、測って初めて0.06秒が見えた。**
@@ -118,8 +132,9 @@ Interfaceだけに依存させておくと、`MercariAdapter`と`MockAdapter`を
 | `RequestPacer` | Rate Limiter | 開始間隔2秒以上 |
 | `MarketplaceAccess`のSemaphore | Bulkhead | 同時実行数1 |
 | `MarketplaceAccess`の実行中一覧 | **Single-flight** | 同じ収集を二重に走らせない |
+| `SafetyBrake` | **Circuit Breaker** | 連続3回拒否で止め、60秒後に1回だけ試す |
 
-3つとも`application/access.py`の`MarketplaceAccess`が抱え、`create_app()`で**1つだけ**作る。
+4つとも`application/access.py`の`MarketplaceAccess`が抱え、`create_app()`で**1つだけ**作る。
 
 #### 間違えやすい3点
 
@@ -252,11 +267,12 @@ MVPの実装Policyになっている。
 | `create_app()` | **Composition Root** | 同じ |
 | `Clock` / `Sleeper`の注入 | **Dependency Injection** | 同じ |
 | `Fake Fork Client` | **Fake**（Test Doubleの一種） | 同じ |
-| `RequestGate` | **Retry Policy + Circuit Breaker** | **同じではない**（[§5.2](#52-requestgateは3つのpatternを1つにしたもの)） |
+| `RequestGate` | **Retry Policy** | ほぼ同じ（[§5.2](#52-requestgateは3つのpatternを1つにしたもの)） |
 | `RequestPacer` | **Rate Limiter / Throttler** | ほぼ同じ |
+| `SafetyBrake` | **Circuit Breaker** | 同じ（2026-09-05にhalf-openを入れた。[§5.2](#一般名と比べると足りない部分が名前で分かった)） |
 | `MarketplaceAccess.collect()` | **Single-flight**（Goの`singleflight`が有名） | 同じ |
 | 同時実行数1 | **Bulkhead / Semaphore** | 同じ |
-| 安全停止 | **Circuit Breakerのopen状態** | **半分だけ**（同上） |
+| 安全停止 | **Circuit Breakerのopen状態** | 同じ |
 
 ### 5.2 `RequestGate`は3つのPatternを1つにしたもの
 
@@ -272,15 +288,23 @@ Adapterでもmercapiでも`api/`でもない。
 | Timeout・Network・5xxだけ1回再試行する | **Retry with a bounded budget** |
 | 拒否が3回続いたら以後アクセスしない | **Circuit Breaker** |
 
-**1つ目だけを`RequestPacer`へ分けた。** 寿命が違うためで、判断の規則と経緯は
-[§2.2](#22-状態の寿命--置き場所は何についての事実かで決まる)にある。`RequestGate`は間隔制御を
-手放したのではなく**委譲**しており、結果として`2.0`という値を知らなくなった。
+**3つのうち2つを外へ出した。** どちらも寿命が違ったためで、判断の規則と経緯は
+[§2.2](#22-状態の寿命--置き場所は何についての事実かで決まる)にある。
+
+| 出したもの | 出した先 | いつ |
+|---|---|---|
+| 開始間隔 | `RequestPacer` | 2026-09-02 |
+| 連続拒否と安全停止 | `SafetyBrake` | 2026-09-05 |
+
+`RequestGate`はどちらも手放したのではなく**委譲**しており、`2.0`も`60.0`も知らない。
+**残ったのは1回だけの再試行と、その回数だけ**である。回数は`CollectionMeta`に出る値で、
+その収集の外では意味を持たない。
 
 **なぜApplication層にあるか。** 「2秒空ける」「3回でやめる」はMercariの仕様でもForkの仕様でもなく、
 **Card Diggerが自分で決めたPolicy**だからである。Adapter仕様 §3.1 がこれをForkへ入れないと
 明記している。
 
-#### 一般名と比べると、足りない部分が名前で分かる
+#### 一般名と比べると、足りない部分が名前で分かった
 
 Circuit Breakerは通常3状態を持つ。
 
@@ -290,13 +314,24 @@ closed（通常）  ──失敗が続く──▶  open（遮断）  ──一�
      └──────────────────── 成功したら戻る ─────────────────────────┘
 ```
 
-**`RequestGate`には`half-open`が無い。** `stopped`は一度立つと戻らない。今は
-Requestごとに新しく作られるので実害が出ていないだけで、これは
-「回復条件を決めていない」という未決事項そのものである
-（[TODO](../planning/todo.md#実装中に見つかった1件--2秒間隔と安全停止がrequestをまたがない)）。
+**2026-09-05まで`half-open`が無かった。** `stopped`は一度立つと戻らず、Requestごとに
+新しく作られるので実害が出ていなかっただけである。**同時に、3回連続の拒否にも到達できなかった。**
+1つの収集は最初の失敗で止まるので、収集ごとに数える限り値は最大1にしかならない。
+**「戻らない」と「到達しない」は同じ1つの置き場所の誤りだった。**
 
-> **一般名に当てはめる価値はここにある。** 「Circuit Breakerだ」と言った瞬間に、
+`SafetyBrake`が3状態すべてを持つ。`half-open`はFieldではなく**連続拒否数を`3-1`に置いた状態**
+として表す。もう1回拒否されれば3に届いて閉じ、成功すれば0に戻る。
+**互いに合っていなければならない値を2つ持つと、合わなくなる余地を持つことになる。**
+
+**`half-open`は自分からRequestを出さない。** 待ち時間が終わることは「次に誰かが求めた取得を
+断らなくなる」だけで、背景での再試行はしない。これは
+[MVP仕様 §9](../product/mvp-spec.md#9-ui状態とerror表示)の「自動再試行せず、時間を置くよう表示」
+そのものである。決めた経緯と待ち時間の出所は
+[TODO](../planning/todo.md#決めた--時間経過で解除2026-09-05)。
+
+> **一般名に当てはめる価値はここにあった。** 「Circuit Breakerだ」と言った瞬間に、
 > half-openが無いことが欠落として見える。固有名のままでは、欠けていること自体に気付けない。
+> **欠落が見えたのが2026-09-02、埋めたのが2026-09-05である。**
 
 ### 5.3 一般名を持たない固有語
 
@@ -360,7 +395,7 @@ Yahoo!フリマのような2つ目を足す場合を想定する。
 
 | # | 弱点 | 状態 |
 |---|---|---|
-| 1 | **安全停止（Circuit Breaker）がHTTP Requestをまたがない。** 3回連続拒否へ到達しない | **未決。** half-openの設計が要る。[TODO](../planning/todo.md#実装中に見つかった1件--2秒間隔と安全停止がrequestをまたがない) |
+| 1 | **`uvicorn --workers 2`で、共有している4つが2つずつできる。** 間隔も安全停止も壊れる | **恒久的な限界。** 1 Process前提とし、[src/backend/README.md](../../src/backend/README.md)へ明記した |
 | 2 | `MarketplacePort`の中立性が、実Marketplace1つでしか確かめられていない | 2つ目を足すまで検証不能 |
 | 3 | `created_at`が「出品日時」かを検証する手段が無い | **恒久的な限界。** 画面へ明示する（[TODO](../planning/todo.md#created_atcreated-最優先)） |
 

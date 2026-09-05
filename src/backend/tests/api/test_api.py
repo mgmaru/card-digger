@@ -30,6 +30,7 @@ from fastapi.testclient import TestClient
 
 from card_digger.adapters.mock import MockAdapter
 from card_digger.api.main import create_app, http_status_for
+from card_digger.application.collection import SAFETY_STOP_COOLDOWN_SECONDS
 from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation
 from card_digger.domain.models import (
     CollectionError,
@@ -379,11 +380,10 @@ class TestTheStatusRuleItself:
         )
 
     def test_a_safety_stop_with_nothing_collected_is_unavailable(self):
-        # A safety stop records no error of its own, so this branch has to be
-        # driven by the stop reason. It is checked here rather than through an
-        # endpoint because a request cannot currently reach it: each request
-        # gets a fresh gate, and a collection stops at its first refusal, so
-        # three refusals in a row never accumulate within one request.
+        # A safety stop records no error of its own, so this branch is driven
+        # by the stop reason rather than by a code. Requests do reach it now
+        # that the refusals are counted for the application rather than for
+        # one collection; `TestSafetyStopAcrossRequests` drives that.
         assert http_status_for(0, self.meta(CollectionStopReason.SAFETY_STOP)) == 503
 
     def test_having_collected_something_outranks_every_failure(self):
@@ -398,6 +398,150 @@ class TestTheStatusRuleItself:
 
     def test_an_empty_result_with_no_error_is_not_a_failure(self):
         assert http_status_for(0, self.meta(CollectionStopReason.END_OF_RESULTS)) == 200
+
+
+class TestSafetyStopAcrossRequests:
+    """Three refused requests stop the fourth, and time starts it again.
+
+    This is what could not be tested through the endpoints before: a gate per
+    request counted refusals per request, and a collection stops at its first
+    refusal, so the count never got past one. The refusals are now counted for
+    the application, which is what "three in a row" always meant.
+    """
+
+    def refused(self):
+        clock = FrozenClock()
+        port = failing_search(ErrorCode.RATE_LIMITED_429)
+        return clock, port, client(port, clock)
+
+    def search(self, http):
+        return http.post("/api/search", json={"keyword": "sample"})
+
+    def test_the_first_two_refusals_are_mercari_declining(self):
+        _, _, http = self.refused()
+
+        for _ in range(2):
+            body = self.search(http).json()
+            assert body["meta"]["stopReason"] == "error"
+            assert body["meta"]["errors"] == [
+                {"code": "rate_limited_429", "operation": "search"}
+            ]
+
+    def test_the_third_is_this_application_stopping(self):
+        _, _, http = self.refused()
+        for _ in range(2):
+            self.search(http)
+
+        response = self.search(http)
+
+        assert response.status_code == 503
+        assert response.json()["meta"]["stopReason"] == "safety_stop"
+
+    def test_nothing_is_asked_of_mercari_afterwards(self):
+        _, port, http = self.refused()
+        for _ in range(3):
+            self.search(http)
+        reached = len(port.calls_to("search"))
+
+        response = self.search(http)
+
+        assert len(port.calls_to("search")) == reached
+        assert response.status_code == 503
+        assert response.json()["meta"]["stopReason"] == "safety_stop"
+
+    def test_it_says_how_long_the_wait_is(self):
+        _, _, http = self.refused()
+        for _ in range(2):
+            self.search(http)
+
+        assert self.search(http).headers["retry-after"] == "60"
+
+    def test_the_wait_shortens_as_it_passes(self):
+        clock, _, http = self.refused()
+        for _ in range(3):
+            self.search(http)
+        clock.advance(40)
+
+        assert self.search(http).headers["retry-after"] == "20"
+
+    def test_the_wait_ending_lets_one_request_through(self):
+        clock, port, http = self.refused()
+        for _ in range(3):
+            self.search(http)
+        reached = len(port.calls_to("search"))
+
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+        response = self.search(http)
+
+        assert len(port.calls_to("search")) == reached + 1
+        # Refused again, so the road closed again on that one attempt.
+        assert response.json()["meta"]["stopReason"] == "safety_stop"
+        assert response.headers["retry-after"] == "60"
+
+    def test_a_search_that_works_after_the_wait_clears_the_stop(self):
+        clock = FrozenClock()
+        port = ScriptedPort(
+            search=[
+                MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.SEARCH),
+                MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.SEARCH),
+                MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.SEARCH),
+                make_search_page(make_items(2)),
+            ]
+        )
+        http = client(port, clock)
+        for _ in range(3):
+            self.search(http)
+
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+        response = self.search(http)
+
+        assert response.status_code == 200
+        assert len(response.json()["items"]) == 2
+        assert "retry-after" not in response.headers
+
+    def test_the_browser_is_allowed_to_read_the_wait(self):
+        """Without this the header arrives and the page cannot see it.
+
+        A cross origin response hands the script only the safe-listed headers
+        unless the server names the rest, and `Retry-After` is not one of them.
+        The screen would fall back to "give it time" without saying how much,
+        and nothing would look broken from either side.
+        """
+        _, _, http = self.refused()
+        for _ in range(2):
+            self.search(http)
+
+        response = http.post(
+            "/api/search",
+            json={"keyword": "sample"},
+            headers={"Origin": "http://127.0.0.1:5173"},
+        )
+
+        assert response.headers["retry-after"] == "60"
+        assert "Retry-After" in response.headers["access-control-expose-headers"]
+
+    def test_the_seller_screen_is_stopped_by_the_search_that_was_refused(self):
+        """The count is about Mercari, so it is not per screen either."""
+        clock = FrozenClock()
+        port = ScriptedPort(
+            search=MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.SEARCH),
+            seller=seller(),
+            seller_pages={
+                ListingStatus.ON_SALE: [make_seller_page((), ListingStatus.ON_SALE)],
+                ListingStatus.SOLD_OUT: [make_seller_page((), ListingStatus.SOLD_OUT)],
+            },
+        )
+        http = client(port, clock)
+        for _ in range(3):
+            self.search(http)
+
+        response = http.get(f"/api/sellers/{SELLER_ID}/analysis")
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == {"code": "safety_stop"}
+        assert response.headers["retry-after"] == "60"
+        assert port.calls_to("seller") == []
+
 
 
 class TestSellerAnalysis:
