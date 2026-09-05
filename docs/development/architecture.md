@@ -251,6 +251,47 @@ MVPの実装Policyになっている。
 
 数字を変えるときは、この節と`MIN_REQUEST_INTERVAL_SECONDS`の両方を同じ変更で直す。
 
+### 4.2 2つ目の相手（card-pulse）は、Mercariの条件を継がない（2026-09-05決定）
+
+**[相場データはcard-pulseが持つ](../product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)**ため、
+Card Diggerは**2つ目の外部依存**を持つことになる。実装はまだ無い
+（[商品画面 §3](../product/item-screen-spec.md#段3を含めない理由)で段3を着手に含めていない）。
+**着手前に決まっていることだけをここへ書く。**
+
+#### 決めたこと3件
+
+| # | 決めたこと | 理由 |
+|---|---|---|
+| **1** | **Portの名前は`MarketValuePort`** | §19が「カードが**どの程度の価値を持つか**」をcard-pulseの担当としており、[コンセプトのPhase 3](../product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)も`market-value`である。**語を増やさない** |
+| **2** | **§4.1の2秒はcard-pulseに効かない** | §4.1は「**Mercari**へのアクセス」と書いている。card-pulseはMercariではない。**継がせると、根拠の無い値が根拠なく2つ目へ広がる** |
+| **3** | **Gateは相手ごとに1つ持つ** | 下記 |
+
+#### なぜGateを相手ごとに分けるのか
+
+**1つのGateに2つの相手を混ぜると、安全停止が巻き添えを出す。**
+
+```text
+混ぜた場合   Mercariが3回拒否 → SafetyBrakeがopen
+                              → card-pulseへの問い合わせまで止まる
+                              → 無関係なサービスが、無関係な理由で使えない
+
+分けた場合   Mercariが3回拒否 → Mercariだけ止まる
+                              → 相場はそのまま出る
+```
+
+`Operation`（`domain/errors.py`）が並べているのは`search` / `item` / `seller_*`で、
+**すべてMercariの操作である。** card-pulseの操作をこのenumへ足すと、
+`SafetyBrake`が相手を区別できなくなる。
+
+#### 決めていないこと
+
+**card-pulseへのRequest間隔は決めない。** API・認証・Rate Limitのどれも未定で、
+**決める根拠が無い**（[§19](../product/concept.md#連携の形はまだ決めていない)）。
+
+**「決めていない」と書くのが、ここで唯一正しい。** §4.1の2秒は
+「根拠の無い保守的な値」だと自分で書いており、**それをもう一度やらない。**
+card-pulseへ実際に出すときに、この節へ追記する。
+
 ---
 
 ## 5. 用語集
@@ -263,6 +304,7 @@ MVPの実装Policyになっている。
 | Card Diggerの名前 | 一般的な名前 | 同じか |
 |---|---|---|
 | `MarketplacePort` | **Port**（Ports and Adapters / Hexagonal） | ほぼ同じ |
+| `MarketValuePort` | 同上。**名前だけ決めてある**（[§4.2](#42-2つ目の相手card-pulseはmercariの条件を継がない2026-09-05決定)） | ほぼ同じ |
 | `MercariAdapter` / `MockAdapter` | **Adapter** | 同じ |
 | `create_app()` | **Composition Root** | 同じ |
 | `Clock` / `Sleeper`の注入 | **Dependency Injection** | 同じ |

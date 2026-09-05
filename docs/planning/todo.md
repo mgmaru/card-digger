@@ -3159,20 +3159,26 @@ Phase 2はBを作る計画で、**困っているのはAだった。**
 
 #### A. 設計 — **文書だけ。実装しない**
 
-- [ ] **画面の名前を決める。**`商品詳細`はMercariの**API**を指している
-      （[MVP仕様 §4](../product/mvp-spec.md#4-mvpに含めない機能)）。同じ名前を画面に付けると、
-      `状態`と`商品の状態`で起きた衝突が再発する
-- [ ] 画面の役割を1文で書く（上の原則を仕様側の言葉にする）
-- [ ] 4段の区画と、段3が入る場所を決める
-- [ ] 検索結果からの導線を決める（どのCardのどこを押すと開くか）
-- [ ] **戻ったときに再取得しない**約束を決める（[MVP仕様 §5.2](../product/mvp-spec.md#52-検索開始)がSeller画面へ課しているのと同じ）
-- [ ] **状態の寿命を決める**（Routeに置くか、Providerへ上げるか。[アーキテクチャ §2.2](../development/architecture.md#2-層と依存の向き)）
-- [ ] 取得中・失敗・安全停止の表示を決める（[§9](../product/mvp-spec.md#9-ui状態とerror表示)の状態をこの画面へ写す）
-- [ ] **「写真が1枚だけ」のときの表示を決める。実測で3割がこれ**（20件中6件）
-- [ ] 相場のPort名を決める（`MarketplacePort`の隣。**実装しない**）
-- [ ] **card-pulseへのRequest間隔を決める。**[§4.1](../development/architecture.md#41-外部アクセスの条件と2秒間隔の出所)は
-      「すべての**Mercari** Request」としか書いておらず、card-pulseはMercariではない
-- [ ] 決めたことをMVP仕様へ書く（§5・§6と並ぶ新しい節）
+**2026-09-05に11件すべて決めた。正本は[商品画面 実装仕様](../product/item-screen-spec.md)。**
+
+- [x] **画面の名前を決めた → `商品画面`。**`商品ページ`はMercariのページ、`商品詳細`はMercariのAPI。
+      `◯◯画面`＝Card Digger / `◯◯ページ`＝Mercariは`Seller画面`と`Sellerページ`で既に成立している
+      （[§2](../product/item-screen-spec.md#2-名前)）
+- [x] 画面の役割を1文で書いた（[§1](../product/item-screen-spec.md#1-この画面が引き受けるもの)）
+- [x] 4段の区画と、段3が入る場所を決めた（[§3](../product/item-screen-spec.md#3-画面は4段でできている)、[§5.5](../product/item-screen-spec.md#55-段3が入る場所)）
+- [x] **導線を決めた。商品Cardのタイトルの行き先をMercariから商品画面へ変える**
+      （[§4](../product/item-screen-spec.md#入り方--商品cardのタイトル)。**[MVP仕様 §5.6](../product/mvp-spec.md#56-商品card)の変更にあたる**）
+- [x] 戻ったときの約束を決めた（検索結果は再取得しない。[§4](../product/item-screen-spec.md#戻ったとき)）
+- [x] **状態の寿命を決めた → Route-local。**`useSellerAnalysis`と同じ理由
+      （[§6.2](../product/item-screen-spec.md#62-状態の寿命)）
+- [x] 取得中・失敗・安全停止の表示を決めた（[§7](../product/item-screen-spec.md#7-ui状態とerror表示)）
+- [x] **「写真が1枚だけ」の表示を決めた → `写真はこの1枚だけです`**
+      （[§5.2](../product/item-screen-spec.md#52-写真が1枚だけのとき実測で3割)）
+- [x] **相場のPort名を決めた → `MarketValuePort`**（[アーキテクチャ §4.2](../development/architecture.md#42-2つ目の相手card-pulseはmercariの条件を継がない2026-09-05決定)）
+- [x] **card-pulseへのRequest間隔は「決めない」と決めた。**根拠が無い。
+      あわせて**§4.1の2秒は継がせない**ことと、**Gateは相手ごとに1つ**を決めた（同上）
+- [x] 決めたことを仕様へ書いた（**`mvp-spec`へ足さず、`product/item-screen-spec.md`を新設**。
+      [配置ルール](../README.md#画面が増えたときmvp-specへ足さない)）
 
 #### B. Backend — 段1と段2
 

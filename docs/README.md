@@ -6,17 +6,18 @@
 
 1. [アプリコンセプト](product/concept.md)
 2. [MVP実装仕様](product/mvp-spec.md)
-3. [視覚方針 — 色・書体・余白](product/design-tokens.md)
-4. [開発ロードマップ / TODO](planning/todo.md)
-5. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
-6. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
-7. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
-8. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
-9. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
-10. [アーキテクチャと用語](development/architecture.md)
-11. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
-12. [Test運用規約](development/test-policy.md)
-13. [CIとMerge基準](development/ci-policy.md)
+3. [商品画面 実装仕様](product/item-screen-spec.md)
+4. [視覚方針 — 色・書体・余白](product/design-tokens.md)
+5. [開発ロードマップ / TODO](planning/todo.md)
+6. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
+7. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
+8. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
+9. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
+10. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
+11. [アーキテクチャと用語](development/architecture.md)
+12. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+13. [Test運用規約](development/test-policy.md)
+14. [CIとMerge基準](development/ci-policy.md)
 
 振り返りは実装に必要ではないが、同じ失敗を繰り返さないために残す。
 
@@ -30,6 +31,7 @@ docs/
 ├── product/
 │   ├── concept.md
 │   ├── design-tokens.md
+│   ├── item-screen-spec.md
 │   └── mvp-spec.md
 ├── planning/
 │   └── todo.md
@@ -54,7 +56,9 @@ docs/
 アプリの価値、利用者、MVPの機能・画面・API・完了条件を置く。
 
 - [concept.md](product/concept.md): Productの目的、背景、将来像
-- [mvp-spec.md](product/mvp-spec.md): MVP実装時の機能範囲と受入条件の正本
+- [mvp-spec.md](product/mvp-spec.md): **MVPの3画面**（検索・Seller・Seller Knowledge）の正本
+- [item-screen-spec.md](product/item-screen-spec.md):
+  **商品画面**（商品1件について買うかを決める画面）の振る舞いと受入条件の正本。**2026-09-05設計**
 - [design-tokens.md](product/design-tokens.md):
   色・書体・余白・Badgeの見え方を決めるときの制約と、決めた値。**2026-09-02決定**
 
