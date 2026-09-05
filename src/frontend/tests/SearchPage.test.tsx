@@ -456,7 +456,7 @@ describe("failures", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("時間内に終わりませんでした");
-    expect(within(alert).getByRole("button", { name: "もう一度実行" })).toBeInTheDocument();
+    expect(within(alert).getByRole("button", { name: "検索をやり直す" })).toBeInTheDocument();
   });
 
   it("does not offer a retry after the safety stop", async () => {
@@ -470,6 +470,49 @@ describe("failures", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("時間を置いて");
     expect(within(alert).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows the wait that is left, not the wait that was", async () => {
+    // Pressing 検索 during the wait must not put the countdown back to sixty.
+    // The backend answers with what is left, measured from when it stopped,
+    // and the screen shows that — anywhere else and the number would be a
+    // fresh sixty seconds every time the reader tried.
+    const { ApiError } = await import("../src/api/client");
+    const stopped = (seconds: number) =>
+      new ApiError("safety_stop", {
+        retryAfterSeconds: seconds,
+        reachedMarketplace: false,
+      });
+    searchMock.mockRejectedValueOnce(stopped(60));
+    const user = userEvent.setup();
+    mount();
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("あと約60秒");
+
+    // Time has passed; the backend now says thirty.
+    searchMock.mockRejectedValueOnce(stopped(30));
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("あと約30秒"),
+    );
+  });
+
+  it("passes on how long the safety stop said it would last", async () => {
+    // The countdown itself is FailureNotice's; what is checked here is that
+    // the number survives the trip from the response header to the screen.
+    const { ApiError } = await import("../src/api/client");
+    searchMock.mockRejectedValue(
+      new ApiError("safety_stop", { retryAfterSeconds: 60 }),
+    );
+    const user = userEvent.setup();
+    mount();
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("あと約60秒で再試行できます");
   });
 
   it("never suggests a login or a proxy when Mercari refuses", async () => {

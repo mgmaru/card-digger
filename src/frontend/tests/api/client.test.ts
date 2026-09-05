@@ -10,16 +10,32 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, search, sellerAnalysis } from "../../src/api/client";
 
-function respondWith(status: number, body: unknown): void {
+function respondWith(
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {},
+): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () =>
       new Response(JSON.stringify(body), {
         status,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
       }),
     ),
   );
+}
+
+async function errorFrom(call: () => Promise<unknown>): Promise<ApiError> {
+  try {
+    await call();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return error;
+    }
+    throw error;
+  }
+  throw new Error("no error was thrown");
 }
 
 async function kindOf(call: () => Promise<unknown>): Promise<string> {
@@ -77,6 +93,153 @@ describe("the search request", () => {
 
     await expect(kindOf(() => search("ポケカ"))).resolves.toBe("safety_stop");
   });
+
+  it("reads the collection body, which is the shape a search failure has", async () => {
+    // The search endpoint answers `{items, meta}` and never `{detail}` — the
+    // detail shape belongs to a seller whose profile could not be read. A
+    // client that only looked for `detail` called every 503 from a search a
+    // safety stop, including a rate limit that had stopped nothing.
+    respondWith(503, {
+      items: [],
+      meta: {
+        pageCount: 0,
+        stopReason: "error",
+        partial: true,
+        errors: [{ code: "rate_limited_429", operation: "search" }],
+      },
+    });
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      kind: "rate_limited",
+      code: "rate_limited_429",
+      operation: "search",
+    });
+  });
+
+  it("calls it a safety stop when the collection says the stop is why", async () => {
+    respondWith(
+      503,
+      {
+        items: [],
+        meta: { pageCount: 0, stopReason: "safety_stop", partial: true, errors: [] },
+      },
+      { "Retry-After": "60" },
+    );
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      kind: "safety_stop",
+      retryAfterSeconds: 60,
+    });
+  });
+
+  it("reports that nothing was asked of Mercari when nothing was", async () => {
+    // No page came back and no error was recorded, which between them are the
+    // only two ways a request can be spent.
+    respondWith(
+      503,
+      {
+        items: [],
+        meta: { pageCount: 0, stopReason: "safety_stop", partial: true, errors: [] },
+      },
+      { "Retry-After": "60" },
+    );
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      reachedMarketplace: false,
+    });
+  });
+
+  it("does not claim that about the refusal that started the stop", async () => {
+    // The third refusal did reach Mercari. It is the same 503 to the screen,
+    // and saying "we did not ask" would be false about Mercari.
+    respondWith(
+      503,
+      {
+        items: [],
+        meta: {
+          pageCount: 0,
+          stopReason: "safety_stop",
+          partial: true,
+          errors: [{ code: "rate_limited_429", operation: "search" }],
+        },
+      },
+      { "Retry-After": "60" },
+    );
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      kind: "safety_stop",
+      reachedMarketplace: true,
+    });
+  });
+
+  it("carries how long the safety stop will last", async () => {
+    respondWith(
+      503,
+      { detail: { code: "safety_stop" } },
+      { "Retry-After": "60" },
+    );
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      kind: "safety_stop",
+      retryAfterSeconds: 60,
+    });
+  });
+
+  it("knows the seller profile shape never asked, on a safety stop", async () => {
+    respondWith(503, { detail: { code: "safety_stop" } }, { "Retry-After": "60" });
+
+    await expect(
+      errorFrom(() => sellerAnalysis("100000001")),
+    ).resolves.toMatchObject({ kind: "safety_stop", reachedMarketplace: false });
+  });
+
+  it("knows it did ask when the profile request itself was refused", async () => {
+    respondWith(503, {
+      detail: { code: "rate_limited_429", operation: "seller_profile" },
+    });
+
+    await expect(
+      errorFrom(() => sellerAnalysis("100000001")),
+    ).resolves.toMatchObject({ kind: "rate_limited", reachedMarketplace: true });
+  });
+
+  it("says nothing about a wait it was not told about", async () => {
+    // The header can be missing: a proxy may drop it, and a browser hands the
+    // page nothing unless the backend exposed it. A screen with no number
+    // falls back to asking for time, which is never wrong.
+    respondWith(503, { detail: { code: "safety_stop" } });
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      retryAfterSeconds: null,
+    });
+  });
+
+  it("does not invent a wait for Mercari's own rate limit", async () => {
+    // 429 came from Mercari, which promised nothing about when it will stop.
+    respondWith(
+      503,
+      { detail: { code: "rate_limited_429" } },
+      { "Retry-After": "60" },
+    );
+
+    await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+      kind: "rate_limited",
+      retryAfterSeconds: null,
+    });
+  });
+
+  it.each(["0", "-5", "Wed, 21 Oct 2026 07:28:00 GMT", "soon"])(
+    "ignores a Retry-After of %s",
+    async (header) => {
+      // A date form is legal in the header and this backend never sends one.
+      // Comparing it would mean comparing two clocks that are the same clock.
+      respondWith(503, { detail: { code: "safety_stop" } }, { "Retry-After": header });
+
+      await expect(errorFrom(() => search("ポケカ"))).resolves.toMatchObject({
+        retryAfterSeconds: null,
+      });
+    },
+  );
 
   it("reports a failed connection as a network failure", async () => {
     vi.stubGlobal(

@@ -544,7 +544,7 @@ describe("failures", () => {
     expect(sellerMock).toHaveBeenCalledTimes(1);
 
     sellerMock.mockResolvedValue(analysis());
-    await user.click(within(alert).getByRole("button", { name: "もう一度実行" }));
+    await user.click(within(alert).getByRole("button", { name: "取得をやり直す" }));
     await screen.findByText("ポケカ引退おじさん");
     expect(sellerMock).toHaveBeenCalledTimes(2);
   });
@@ -556,6 +556,16 @@ describe("failures", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("時間を置いて");
     expect(within(alert).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("passes on how long the safety stop said it would last", async () => {
+    const { ApiError } = await import("../src/api/client");
+    sellerMock.mockRejectedValue(
+      new ApiError("safety_stop", { retryAfterSeconds: 60 }),
+    );
+    mount();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("あと約60秒で再試行できます");
   });
 
   it("never suggests a login or a proxy when Mercari refuses", async () => {

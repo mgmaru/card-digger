@@ -12,6 +12,7 @@
 
 import { Link, useParams } from "react-router";
 
+import { FailureNotice } from "../components/FailureNotice";
 import { SellerItems } from "../components/SellerItems";
 import { SellerKnowledgePanel } from "../components/SellerKnowledge";
 import { SellerProfile } from "../components/SellerProfile";
@@ -100,14 +101,14 @@ export function SellerPage() {
       )}
 
       {status === "error" && failure && (
-        <div className={styles.failure} role="alert">
-          <p className={styles.failureMessage}>{failure.message}</p>
-          {failure.retryable && (
-            <button type="button" onClick={retry}>
-              もう一度実行
-            </button>
-          )}
-        </div>
+        <FailureNotice
+          message={failure.message}
+          retryLabel="取得をやり直す"
+          retryable={failure.retryable}
+          reachedMarketplace={error?.reachedMarketplace ?? null}
+          retryAllowedAt={error?.retryAllowedAt ?? null}
+          onRetry={retry}
+        />
       )}
 
       {status === "success" && analysis && (

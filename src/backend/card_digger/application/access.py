@@ -6,7 +6,7 @@ so the state that keeps the promise has to be one thing too. State held per
 collection cannot express it: three collections each certain they waited two
 seconds still put three requests on the wire at once.
 
-Three separate promises, which is why there are three pieces here.
+Four separate promises, which is why there are four pieces here.
 
 - **One collection at a time.** A semaphore.
 - **Two seconds between requests.** A shared pacer. Serialising alone does not
@@ -15,6 +15,10 @@ Three separate promises, which is why there are three pieces here.
 - **The same collection runs once.** A register of what is in flight. A reload
   or a second press joins the collection already running rather than starting
   another one.
+- **Three refusals in a row stop all of it.** A shared brake. Held per
+  collection the count could never reach three, because a collection stops at
+  its first failure — which is why the safety stop was unreachable through the
+  endpoints until this moved here.
 
 **The third is not a cache.** Nothing is stored, nothing expires, and a caller
 that joins receives the result of a collection happening now. The `collectedAt`
@@ -29,8 +33,10 @@ from typing import Awaitable, Callable, TypeVar
 
 from card_digger.application.collection import (
     MIN_REQUEST_INTERVAL_SECONDS,
+    SAFETY_STOP_COOLDOWN_SECONDS,
     RequestGate,
     RequestPacer,
+    SafetyBrake,
 )
 from card_digger.domain.ports import Clock, Sleeper
 
@@ -69,23 +75,37 @@ class MarketplaceAccess:
         sleeper: Sleeper,
         *,
         min_interval_seconds: float = MIN_REQUEST_INTERVAL_SECONDS,
+        safety_stop_cooldown_seconds: float = SAFETY_STOP_COOLDOWN_SECONDS,
     ) -> None:
         self._clock = clock
         self._sleeper = sleeper
         self._pacer = RequestPacer(
             clock, sleeper, min_interval_seconds=min_interval_seconds
         )
+        self._brake = SafetyBrake(clock, cooldown_seconds=safety_stop_cooldown_seconds)
         self._one_at_a_time = asyncio.Semaphore(1)
         self._in_flight: dict[str, asyncio.Task] = {}
 
     def gate(self) -> RequestGate:
-        """A gate for one collection, pacing through the shared pacer.
+        """A gate for one collection, over the shared pacer and brake.
 
-        The gate itself stays per collection. Its other state is a run's own:
-        the retry count is reported for that run, and the refusal count means
-        "in a row, during this run".
+        The gate itself stays per collection, but only one number is left in
+        it: the retry count, which is reported in that collection's metadata
+        and means nothing outside it. The interval and the refusals are facts
+        about Mercari, and there is only one Mercari.
         """
-        return RequestGate(self._clock, self._sleeper, pacer=self._pacer)
+        return RequestGate(
+            self._clock, self._sleeper, pacer=self._pacer, brake=self._brake
+        )
+
+    def retry_after_seconds(self) -> int | None:
+        """Seconds until the safety stop lets a request through, or None.
+
+        Read by the HTTP layer to fill in `Retry-After`. A safety stop is the
+        one refusal this application makes on its own, so it is the one that
+        can say how long it will last.
+        """
+        return self._brake.retry_after_seconds()
 
     def in_flight(self) -> frozenset[str]:
         """Which collections are running. For tests and for reading."""

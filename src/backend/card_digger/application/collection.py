@@ -10,11 +10,14 @@ Two of them matter more than the rest:
   wait is part of the time budget, not something added on top of it.
 - A run that ends on an error or a safety stop says so. A short result that
   looks complete is worse than a result that says it is partial.
+- The safety stop lets go after a while, and the request that follows the wait
+  is the one that finds out whether it should. Nothing retries on its own.
 """
 
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Awaitable, Callable, Iterable, Sequence
@@ -34,8 +37,27 @@ from card_digger.domain.models import (
 from card_digger.domain.ports import Clock, Sleeper
 
 
-#: Refusals in a row before a run stops reaching the marketplace at all.
+#: Refusals in a row before the application stops reaching the marketplace.
 CONSECUTIVE_REFUSALS_BEFORE_STOP = 3
+
+#: How long the safety stop holds before one more request may be tried.
+#:
+#: Nothing measured this. A 429 from Mercari has never been observed and a
+#: challenge has no detection at all, so there is no number to derive one from
+#: and no header to read one out of. Sixty seconds was chosen for the two
+#: things it has to be at once: long enough that a person reads it as the
+#: application having stopped rather than as a hiccup, and short enough that a
+#: tool for one person is still a tool. It stands exactly where the two second
+#: interval stands, and for the same reason: safe, unmeasured, with no case for
+#: shortening it. Whoever finds a real figure should replace this and say where
+#: it came from.
+SAFETY_STOP_COOLDOWN_SECONDS = 60.0
+
+#: A safety stop that never lets go. Live acceptance verification uses it: its
+#: conditions say the stop halts every further request, and a run against the
+#: real Mercari that quietly resumed a minute later would no longer be the run
+#: those conditions describe.
+NEVER = math.inf
 
 #: Minimum gap between the start of one outside request and the next.
 #:
@@ -113,17 +135,115 @@ class RequestPacer:
             self._last_started_at = self._clock.now()
 
 
+class SafetyBrake:
+    """Stops reaching the marketplace after three refusals, and lets go later.
+
+    Refusals are a fact about **the marketplace**, not about one collection:
+    401, 403, 429 and a challenge are the other side declining to deal with
+    this application, and it declines to all of it at once. So the count is
+    kept here, once, the same way `RequestPacer` keeps one timestamp — a count
+    per collection could never reach three, because a collection stops at its
+    first failure.
+
+    Three states, which are the ordinary ones for a circuit breaker.
+
+        closed  ──three refusals──▶  open  ──after the wait──▶  half-open
+           ▲                                                        │
+           └──────────────── the next request succeeds ─────────────┘
+
+    Half-open is not a fourth field. It is the count left one short of the
+    stop: one further refusal reaches three again and the road closes, one
+    success clears it. Two pieces of state that must agree with each other
+    would be two pieces of state that can disagree.
+
+    **Nothing here retries by itself.** The wait ending does not send a
+    request; it only stops refusing the next one somebody asks for. That is
+    what section 9 of the MVP specification means by "no automatic retry, show
+    that time should be given".
+    """
+
+    def __init__(
+        self,
+        clock: Clock,
+        *,
+        cooldown_seconds: float = SAFETY_STOP_COOLDOWN_SECONDS,
+    ) -> None:
+        self._clock = clock
+        self._cooldown = cooldown_seconds
+        self.consecutive_refusals = 0
+        # When the stop began, or None while requests may be made. The two
+        # are the same statement, so there is only ever one of them to read.
+        self._opened_at: datetime | None = None
+
+    @property
+    def stopped(self) -> bool:
+        """Whether the marketplace is being refused at this moment."""
+        return self._remaining_seconds() > 0
+
+    def retry_after_seconds(self) -> int | None:
+        """Whole seconds until a request may be tried, or None if there is none.
+
+        Rounded up, so a screen never says zero while the answer is still no,
+        and never says a second that has already gone.
+
+        None covers two cases and deliberately does not tell them apart: a
+        request may be made now, or the stop does not end (`NEVER`). Neither
+        has a figure that could be put in `Retry-After` — the first is already
+        over and the second has no end to name — and the only caller that
+        would meet the second has no HTTP surface at all.
+        """
+        remaining = self._remaining_seconds()
+        if remaining <= 0 or not math.isfinite(remaining):
+            return None
+        return math.ceil(remaining)
+
+    def before_request(self) -> None:
+        """Raise unless the marketplace may be reached right now."""
+        if self._opened_at is None:
+            return
+        if self._remaining_seconds() > 0:
+            raise SafetyStop(self.consecutive_refusals)
+        # The wait is over. This request is the trial, and it is the only one
+        # that gets to be: the count stays one short of the stop, so being
+        # refused closes the road again immediately.
+        self._opened_at = None
+        self.consecutive_refusals = CONSECUTIVE_REFUSALS_BEFORE_STOP - 1
+
+    def record_success(self) -> None:
+        self.consecutive_refusals = 0
+
+    def record_refusal(self, error: MarketplaceError) -> None:
+        if not error.triggers_safety_stop:
+            # A parse failure or a timeout is the marketplace answering badly,
+            # not refusing us. It does not count towards the stop.
+            self.consecutive_refusals = 0
+            return
+        self.consecutive_refusals += 1
+        if self.consecutive_refusals >= CONSECUTIVE_REFUSALS_BEFORE_STOP:
+            self._opened_at = self._clock.now()
+
+    def _remaining_seconds(self) -> float:
+        if self._opened_at is None:
+            return 0.0
+        elapsed = (self._clock.now() - self._opened_at).total_seconds()
+        return max(0.0, self._cooldown - elapsed)
+
+
 class RequestGate:
-    """Retries once, and stops when refused. Paces through a `RequestPacer`.
+    """Retries once. Paces and stops through things that outlive the run.
 
-    One gate per run. It is shared by every operation of that run, because
-    "three refusals in a row" counts refusals from the run, not from one
-    operation: a seller page that is rate limited after a search that was
-    already rate limited twice is the third refusal, not the first.
+    One gate per run, and only the run's own numbers are kept here. The retry
+    count is one of them: it is reported in that collection's `CollectionMeta`
+    and means nothing outside it.
 
-    Pacing is the one part that must outlive the run, so it is delegated. A
-    gate given no pacer makes a private one and behaves exactly as it did
-    before, which is what a test of a single collection wants.
+    The other two were both statements about the marketplace rather than about
+    a run, so both are delegated — the interval to a `RequestPacer`, the
+    refusals to a `SafetyBrake`. "Three refusals in a row" could never be
+    counted here in the first place: a collection stops at its first failure,
+    so a gate that owned the count would see at most one.
+
+    A gate given neither makes private ones and behaves as a single collection
+    on its own, which is what a test of one collection wants.
     """
 
     def __init__(
@@ -134,6 +254,7 @@ class RequestGate:
         min_interval_seconds: float = MIN_REQUEST_INTERVAL_SECONDS,
         max_retries: int = DEFAULT_MAX_RETRIES,
         pacer: RequestPacer | None = None,
+        brake: SafetyBrake | None = None,
     ) -> None:
         if max_retries < 0:
             raise ValueError("max_retries cannot be negative")
@@ -142,26 +263,33 @@ class RequestGate:
         self._pacer = pacer or RequestPacer(
             clock, sleeper, min_interval_seconds=min_interval_seconds
         )
+        self._brake = brake or SafetyBrake(clock)
         self._max_retries = max_retries
         self.retry_count = 0
-        self.consecutive_refusals = 0
-        self.stopped = False
 
     @property
     def max_retries(self) -> int:
         """Further attempts allowed after a transient failure."""
         return self._max_retries
 
+    @property
+    def stopped(self) -> bool:
+        """Whether the marketplace is being refused at this moment."""
+        return self._brake.stopped
+
+    @property
+    def consecutive_refusals(self) -> int:
+        return self._brake.consecutive_refusals
+
     async def run(self, operation: Operation, call: Callable[[], Awaitable]):
         """Make one request, with at most one further attempt."""
-        if self.stopped:
-            raise SafetyStop(self.consecutive_refusals)
+        self._brake.before_request()
 
         try:
             result = await self._attempt(call)
         except MarketplaceError as error:
             if not error.retryable or self._max_retries < 1:
-                self._record_refusal(error)
+                self._brake.record_refusal(error)
                 raise
             # One more attempt, no further. The pacing below keeps it at least
             # two seconds after the attempt that failed.
@@ -169,25 +297,15 @@ class RequestGate:
             try:
                 result = await self._attempt(call)
             except MarketplaceError as retried:
-                self._record_refusal(retried)
+                self._brake.record_refusal(retried)
                 raise
 
-        self.consecutive_refusals = 0
+        self._brake.record_success()
         return result
 
     async def _attempt(self, call: Callable[[], Awaitable]):
         await self._pacer.claim_slot()
         return await call()
-
-    def _record_refusal(self, error: MarketplaceError) -> None:
-        if not error.triggers_safety_stop:
-            # A parse failure or a timeout is the marketplace answering badly,
-            # not refusing us. It does not count towards the stop.
-            self.consecutive_refusals = 0
-            return
-        self.consecutive_refusals += 1
-        if self.consecutive_refusals >= CONSECUTIVE_REFUSALS_BEFORE_STOP:
-            self.stopped = True
 
 
 @dataclass(frozen=True)
