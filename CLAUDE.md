@@ -15,6 +15,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 | 色・書体・余白 | [docs/product/design-tokens.md](docs/product/design-tokens.md) |
 | 層・依存の向き・固有語 | [docs/development/architecture.md](docs/development/architecture.md) |
 | CI・PR・Merge・Branch | [docs/development/ci-policy.md](docs/development/ci-policy.md) |
+| card-pulseとの役割分担 | [docs/product/concept.md §19](docs/product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定) |
 | Testの層と運用 | [docs/development/test-policy.md](docs/development/test-policy.md) |
 
 ## 破りやすい約束
@@ -31,6 +32,9 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
   （[§4.1](docs/development/architecture.md#41-外部アクセスの条件と2秒間隔の出所)）
 - **L4（ライブ受入検証）だけが実Mercariへ接続する。** 手動・低頻度。CIから絶対に呼ばない
 - **`uvicorn`に`--workers`も`--host 0.0.0.0`も付けない**（[src/backend/README.md](src/backend/README.md)）
+- **相場データをCard Diggerで作らない。** カードの相場も、Mercariの成約価格の分布も
+  [card-pulse](https://github.com/mgmaru/card-pulse)の担当。Card Diggerは受け取って表示する側
+  （[§19](docs/product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)）
 
 ## 動かす
 
