@@ -5,7 +5,7 @@
 利用者が出した問いと答えをまとめる。
 
 > **2026-11-08時点で、案Bは未実装である。**この文書は案Bを採ったときの姿を説明する。
-> 今の開発構成との違いは[Q7](#q7-今の開発構成と何が違うのか)にまとめた。
+> 今の開発構成との違いは[Q8](#q8-今の開発構成と何が違うのか)にまとめた。
 
 | # | 問い |
 |---|---|
@@ -14,8 +14,9 @@
 | Q3 | [`/api/search`は`dist/`の中のファイルか](#q3-apisearchはdistの中のファイルか) |
 | Q4 | [FastAPIは届いた要求をどう振り分けるのか](#q4-fastapiは届いた要求をどう振り分けるのか) |
 | Q5 | [画面にデータを埋め込むのはuvicornか、Browserか](#q5-画面にデータを埋め込むのはuvicornかbrowserか) |
-| Q6 | [`/sellers/abc123`で再読み込みすると、何が起きるのか](#q6-sellersabc123で再読み込みすると何が起きるのか) |
-| Q7 | [今の開発構成と何が違うのか](#q7-今の開発構成と何が違うのか) |
+| Q6 | [Browserは何をしているのか。パスは誰が作るのか](#q6-browserは何をしているのかパスは誰が作るのか) |
+| Q7 | [`/sellers/abc123`で再読み込みすると、何が起きるのか](#q7-sellersabc123で再読み込みすると何が起きるのか) |
+| Q8 | [今の開発構成と何が違うのか](#q8-今の開発構成と何が違うのか) |
 
 ## Q1. uvicornとは何か
 
@@ -197,7 +198,7 @@ flowchart TD
 | `GET /assets/index-3f9a1c.js` | ② | そのJSファイル |
 | `POST /api/search` | ① | `search()`の結果（JSON） |
 | `GET /api/sellers/abc123/analysis` | ① | `seller_analysis()`の結果（JSON） |
-| `GET /sellers/abc123` | ③ | `index.html`（[Q6](#q6-sellersabc123で再読み込みすると何が起きるのか)） |
+| `GET /sellers/abc123` | ③ | `index.html`（[Q7](#q7-sellersabc123で再読み込みすると何が起きるのか)） |
 | `GET /api/xxx`（存在しない） | ① | **JSONの404。**③へ落とさない |
 | `GET /../secret.txt` | ③ | `index.html`。**`dist/`の外のファイルは返さない** |
 
@@ -219,7 +220,7 @@ sequenceDiagram
     participant U as uvicorn + FastAPI<br/>（Windows 127.0.0.1:8000）
     participant M as Mercari
 
-    User->>B: https://<PC名>.ts.net を開く
+    User->>B: https://（PC名）.ts.net を開く
     B->>T: GET /
     T->>U: GET /
     U-->>B: dist/index.html（毎回同じファイル）
@@ -243,6 +244,9 @@ sequenceDiagram
     U-->>B: JSON（Seller分析）
     Note over B: ReactがSeller画面を描く
 ```
+
+この図ではSafariを1本の線にまとめた。Safariの中でJSとBrowser本体が何を分担しているかは
+[Q6](#q6-browserは何をしているのかパスは誰が作るのか)で分ける。
 
 uvicorn＋FastAPIが返すものは2種類しかない。
 
@@ -279,7 +283,87 @@ flowchart LR
     end
 ```
 
-## Q6. `/sellers/abc123`で再読み込みすると、何が起きるのか
+## Q6. Browserは何をしているのか。パスは誰が作るのか
+
+**パスを作るのは、利用者・Build時のVite・FrontendのJSの3者である。**Browser本体はそれを
+HTTPのバイト列にして送り、返事を受け取ってJSへ渡し、JSが書き換えた画面を描く。
+
+### パスの出どころ
+
+| 要求 | パスを作ったのは | どこで | サーバーへ送るか |
+|---|---|---|---|
+| `GET /` | **利用者** | URL欄・ブックマーク | 送る |
+| `GET /assets/index-3f9a1c.js` | **Vite（Build時）** | `dist/index.html`の`<script src>`。元の`index.html`の`/src/main.tsx`をBuildが書き換える | 送る |
+| `POST /api/search` | **FrontendのJS** | `src/frontend/src/api/client.ts`の`search()`が`"/api/search"`を渡す | 送る |
+| `GET /api/sellers/{id}/analysis` | **FrontendのJS** | 同`sellerAnalysis()`が`` `/api/sellers/${encodeURIComponent(sellerId)}/analysis` ``を組み立てる | 送る |
+| `/sellers/abc123`（画面の切り替え） | **FrontendのJS** | `src/frontend/src/components/ItemCard.tsx`の`<Link to={`/sellers/…`}>` | **送らない。**URL欄を書き換えるだけ |
+| `GET /sellers/abc123`（再読み込み） | **利用者** | 再読み込み・ブックマーク | 送る（[Q7](#q7-sellersabc123で再読み込みすると何が起きるのか)） |
+
+`encodeURIComponent`は、Seller IDに`/`や空白が入っていてもパスの区切りと混ざらないようにする
+（`a b/c`→`a%20b%2Fc`。`src/frontend/tests/api/client.test.ts`が固定している）。
+
+### Browserの5つの仕事
+
+Browserは「画面を見せるアプリ」だが、中では5つの役を兼ねている。
+
+| 役 | やること | Card Diggerでの例 |
+|---|---|---|
+| **JSの実行環境** | 受け取ったJSを動かす。Reactはこの上で動く | `dist/assets/index-…js`を実行する |
+| **HTTPクライアント** | JSの`fetch()`を、HTTPのバイト列にして送る。返事を読み解いてJSへ渡す | `client.ts`の`fetch(`${baseUrl()}${path}`, …)` |
+| **URLの補完** | 相対パスを「今開いているページのOrigin」で補う | `/api/search`→`https://<PC名>.ts.net/api/search` |
+| **画面の描画** | JSが書き換えたDOMを描く。`<img src>`を見つけたら画像を取りに行く | 商品画像はMercariから直接もらう |
+| **番人** | 別Originへの要求を確かめる（CORS）。HTTPSかどうかでSecure Contextを決める。Cookieを付けるか決める | 案Bでは同じOriginなのでCORSの確認が起きない。`credentials: "omit"`でCookieを送らない |
+
+URL欄の書き換え（`/sellers/abc123`）も、Browserの履歴機能（History API）をJSが呼んでいる。
+React Routerの`<Link>`はこれを使うので、サーバーへ要求が飛ばない。
+
+### 検索1回の中で、JSとBrowser本体は何を分担しているか
+
+[Q5](#q5-画面にデータを埋め込むのはuvicornかbrowserか)の図で「Safari」とまとめた線を、
+**Card DiggerのJS**と**Browser本体**に分ける。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 利用者
+    participant JS as Card DiggerのJS<br/>（React・client.ts）
+    participant B as Browser本体
+    participant U as uvicorn<br/>（tailscale serve経由）
+    participant F as FastAPIのアプリ
+    participant M as Mercari
+
+    User->>B: 検索欄に入力し、ボタンを押す
+    B->>JS: クリックの通知（イベント）
+    Note over JS: search()がパス "/api/search" と<br/>JSONの本文 {"keyword": …} を用意する
+    JS->>B: fetch("/api/search", {method: "POST",<br/>Content-Type: application/json, 本文,<br/>credentials: "omit", timeout})
+    Note over B: ① 相対パスを補う<br/>→ https://（PC名）.ts.net/api/search<br/>② 同じOriginなのでCORSの確認は不要<br/>③ 名前解決・TLS・TCP（接続は使い回す）<br/>④ Host・Origin・User-Agentなどを付けて<br/>HTTPのバイト列にする
+    B->>U: HTTPのバイト列
+    U->>F: app(辞書, 読む口, 書く口)
+    F-->>U: 状態コード・ヘッダー・JSON
+    U-->>B: HTTPのバイト列
+    Note over B: HTTPを読み解き、Responseにする
+    B-->>JS: Response（fetchの約束が果たされる）
+    Note over JS: response.json()で商品の一覧を取り出し<br/>Reactの状態を更新する
+    JS->>B: DOMを書き換える（商品カードを並べる）
+    Note over B: 画面を描く<br/>商品カードのimg要素を見つける
+    B->>M: 商品画像を取りに行く（JSもuvicornも通らない）
+    M-->>B: 画像
+```
+
+| 段階 | 主役 | 中身 |
+|---|---|---|
+| パスと本文を決める | **JS** | 何を頼むか。`/api/search`と検索語 |
+| 届け先を決めて送る | **Browser本体** | どこへ・どうやって。Origin、TLS、ヘッダー、バイト列 |
+| 答える | **uvicorn＋FastAPI** | [Q2](#q2-uvicornとfastapiの境目はどこか)のとおり |
+| 受け取る | **Browser本体** | バイト列を読み解き、JSへ渡す |
+| 画面に反映する | **JS** | JSONを読み、DOMを書き換える |
+| 描く・画像を取る | **Browser本体** | 書き換わったDOMを描き、`<img>`を取りに行く |
+
+**JSは「何を頼むか」と「どう見せるか」だけを書く。**「どこへ・どうやって運ぶか」と
+「どう描くか」はBrowser本体が受け持つ。案Bで`client.ts`の既定値を空文字にするだけで
+iPhoneから動くようになるのは、**届け先を決める仕事（URLの補完）がBrowser本体にあるから**である。
+
+## Q7. `/sellers/abc123`で再読み込みすると、何が起きるのか
 
 **サーバーには`index.html`を返させ、どの画面かはBrowserのJSが決める。**
 
@@ -308,7 +392,7 @@ sequenceDiagram
 ③が無いと、1で404が返り、画面が出ない。この「見つからなければ`index.html`」を
 **SPA fallback**と呼ぶ。
 
-## Q7. 今の開発構成と何が違うのか
+## Q8. 今の開発構成と何が違うのか
 
 **窓口が2つから1つになる。**
 
