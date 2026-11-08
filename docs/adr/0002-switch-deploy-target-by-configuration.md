@@ -74,30 +74,90 @@ https://PC名.ts.net:443/api/search?keyword=ポケカ
 
 ### 選択肢
 
-| | A. 別Origin（URLを埋め込む） | B. 同じOrigin（FastAPIが画面も返す） | C. 同じOrigin（前段のProxyが振り分ける） |
-|---|---|---|---|
-| 中身 | Build時に`VITE_API_BASE_URL`へAPIのURLを入れる。画面は別の場所から配る | `npm run build`の`dist/`をFastAPIが返す。JSは`/api/...`を相対パスで呼ぶ | nginx・Caddyなどが`/api/*`をuvicornへ、それ以外を`dist/`へ振り分ける。JSは相対パス |
-| デプロイ先を替えるとき | **Buildし直す**（URLが焼き込まれる）。CORSの許可も変える | **何もしない** | Proxyの設定を書き直す |
-| 1つのBuildが全端末で動くか | 動かない。Windows本体用とTailnet用でBuildが分かれる | **動く** | **動く** |
-| CORS | 必要 | 不要 | 不要 |
-| 動かすProcess | uvicorn＋画面の配り手 | **uvicornだけ** | uvicorn＋Proxy |
-| 開発時 | 今と同じ | Viteに`/api`の中継（`server.proxy`）を足す | Bと同じ |
-| `src/`の変更 | `client.ts`は変えなくてよい | `client.ts`（相対パス化）、`main.py`（`dist/`配信） | `client.ts`（相対パス化）だけ |
-| 向いている場面 | 画面をCDN（Vercel・Netlifyなど）で配る。APIを複数のClientが使う | 画面とAPIを一緒に運用する、小〜中規模 | 静的ファイルを大量に配る。Proxyが既にある |
+| | A. 別Origin（URLを埋め込む） | B. 同じOrigin（FastAPIが画面も返す） | B′. 同じOrigin（同じProcessの中で、APIと画面の配信を分ける） | C. 同じOrigin（前段のProxyが振り分ける） |
+|---|---|---|---|---|
+| 中身 | Build時に`VITE_API_BASE_URL`へAPIのURLを入れる。画面は別の場所から配る | `npm run build`の`dist/`を、**APIのアプリ（`create_app()`）が**返す。JSは`/api/...`を相対パスで呼ぶ | APIのアプリと画面の配信アプリを**別々に作り**、起動の入口で`/api`と`/`に束ねる（FastAPIの`mount`）。JSは相対パス | nginx・Caddy・`tailscale serve`などが`/api/*`をuvicornへ、それ以外を`dist/`へ振り分ける。JSは相対パス |
+| デプロイ先を替えるとき | **Buildし直す**（URLが焼き込まれる）。CORSの許可も変える | **何もしない** | **何もしない** | Proxyの設定を書き直す。**SPA fallbackもデプロイ先ごとに解き直す** |
+| 1つのBuildが全端末で動くか | 動かない。Windows本体用とTailnet用でBuildが分かれる | **動く** | **動く** | **動く** |
+| CORS | 必要 | 不要 | 不要 | 不要 |
+| 動かすProcess | uvicorn＋画面の配り手 | **uvicornだけ** | **uvicornだけ** | uvicorn＋Proxy（`tailscale serve`で済めば増えない） |
+| APIのコードがFrontendを知るか | 知らない | **知る**（下の「Bの問題」） | **知らない。**両方を知るのは起動の入口だけ | 知らない |
+| 開発時 | 今と同じ | Viteに`/api`の中継（`server.proxy`）を足す | Bと同じ | Bと同じ |
+| `src/`の変更 | `client.ts`は変えなくてよい | `client.ts`（相対パス化）、`main.py`（`dist/`配信） | `client.ts`（相対パス化）、画面の配信を別のmoduleに、起動の入口 | `client.ts`（相対パス化）だけ |
+| 向いている場面 | 画面をCDN（Vercel・Netlifyなど）で配る。APIを複数のClientが使う | 画面とAPIを一緒に運用する、小〜中規模 | Bと同じ。責務を分けておきたいとき | 静的ファイルを大量に配る。Proxyが既にある |
 
-**メリット・デメリット**
+### Bの問題 — APIがFrontendの事情を知ってしまう（レビューで出た指摘）
+
+> APIサーバーの責務を考えた時に、フロントエンドの`dist/`の構成まで知っているのはおかしい
+
+**指摘のとおりである。**Bでは、APIのアプリ（`create_app()`の対応表）が次の4つを知る。
+
+| # | APIが知ってしまうこと | 本来の持ち主 |
+|---|---|---|
+| 1 | `dist/`というBuild成果物の場所 | デプロイ先（環境変数で外へ出せる） |
+| 2 | `index.html`が入口であること | Vite（Buildツール） |
+| 3 | **`/sellers/abc123`のようなURLに`index.html`を返すべきこと**（SPA fallback） | **Frontendのルーティング方式**（`BrowserRouter`を選んだこと） |
+| 4 | `/api/`以外のパスはFrontendのものであること | 画面とAPIの間のURLの分け方 |
+
+1は環境変数で外に出せるが、**2〜4はFrontendの事情**であり、APIの対応表に入るのは責務として不自然である。
+
+### 同じOriginにする選択肢（B・B′・C）に共通するデメリット
+
+Bの問題（責務）とは別に、**画面をBuild済みのファイルとして配る限り、どの選択肢にも残るもの。**
+
+| # | デメリット | 重さ | 何で扱うか |
+|---|---|---|---|
+| 1 | **開発と本番で、画面の届き方が違う。**開発はViteの中継、本番は`dist/`の配信。**E2Eは開発の道しか通らない**ので、本番の道（SPA fallback、静的ファイル配信）が壊れても自動Testで気づけない | **大** | Build済みの`dist/`を使ってE2Eを1本流す仕組みを足す |
+| 2 | **キャッシュ。**Browserが`index.html`を古いまま使うと、デプロイ後も古いJSが動く。`index.html`は毎回確認させ、ハッシュ付きの`assets/`は長く使わせる、という**Viteの出力の性質を知った設定**が要る | 中 | 画面の配り手（B′なら配信アプリ、Cならproxy）に閉じ込める。**Bだとこの知識もAPIに入る** |
+| 3 | **画面だけ直しても、uvicornの再起動が要る**（B・B′）。再起動すると`MarketplaceAccess`の状態（安全停止の待ち時間など）も消える | 小 | 利用者1人なら困らない。代わりに画面とAPIの版がずれない |
+| 4 | ファイルを配るので、パスの細工（`/../`）で`dist/`の外を読ませない対策が要る | 小 | Starletteの`StaticFiles`が対策を持つ。Testで固定する |
+| 5 | Pythonで静的ファイルを配るのは、nginxやCDNより遅い（B・B′） | 無視できる | 利用者1人 |
+
+### Cの補足 — `tailscale serve`で振り分けられるか
+
+Windowsでは、入口の`tailscale serve`自身が、パスごとに「ディレクトリを配る」「8000番へ渡す」を
+振り分けられる**可能性がある。**それならProcessは増えない。ただし次は**未確認**である。
+
+- `/sellers/abc123`の再読み込みに`index.html`を返せるか（SPA fallback）。できなければ404になる
+- `/api`へ渡すときにパスの先頭を削るか
+
+**クラウドにはこの振り分け役が無い。**Cloud Runなどでは、コンテナの中にnginxを足す
+（Processが2つになる）か、ロードバランサーと静的ファイル置き場を組む（費用と設定が増える）。
+**デプロイ先ごとに同じ問題を解き直す**ことになる。
+
+### D. ルーティングを`HashRouter`にして、SPA fallbackを無くす（B′・Cと組み合わせる）
+
+Bの問題の3と、Cの未確認点は、Frontendが`BrowserRouter`を使っていることから生じる。
+`HashRouter`に変えると、URLは`/#/sellers/abc123`になる。**`#`より後ろはサーバーへ送られない**ので、
+再読み込みしてもサーバーへの要求は`GET /`だけになり、**サーバーは普通の静的ファイル配信で済む。**
+
+| | `BrowserRouter`のまま | D. `HashRouter`にする |
+|---|---|---|
+| URL | `/sellers/abc123` | `/#/sellers/abc123` |
+| 再読み込みでサーバーへ行く要求 | `GET /sellers/abc123` | `GET /` |
+| サーバーに要るもの | SPA fallback | **静的ファイル配信だけ** |
+| どの配り手でも動くか | SPA fallbackができる配り手に限る | **どれでも動く**（`StaticFiles`、`tailscale serve`、CDN） |
+
+D単独では選択肢にならない（画面を誰が配るかは別に決める）。**B′かCと組み合わせる。**
+
+### メリット・デメリット
 
 | | メリット | デメリット |
 |---|---|---|
 | A | `src/`の変更が最小。画面とAPIを別々の場所に置ける | **方針に反する。**デプロイ先のURLがBuild成果物に入るので、替えるたびにBuildし直す。CORSの許可も替える。Windows本体からとTailnetからで別Buildになる |
-| B | 1つのBuildがどこでも動く。Processが1つなので契約1（1 Process）とも素直に合う。CORSが要らない | FastAPIに静的ファイル配信とSPA fallback（`/sellers/abc123`の再読み込みに`index.html`を返す）を足す。その分Testが要る |
-| C | アプリは相対パスにするだけ。静的ファイル配信はProxyの得意分野 | **動かす部品が増える**（Windowsにnginxを常駐させる、など）。Proxyの設定がデプロイ先ごとに要る。利用者1人の規模には過剰 |
+| B | 1つのBuildがどこでも動く。Processが1つなので契約1（1 Process）とも素直に合う。CORSが要らない | **APIがFrontendの事情（`dist/`、`index.html`、SPA fallback、キャッシュ）を知る。**加えて共通のデメリット1〜5 |
+| B′ | Bの利点をすべて保つ。**APIのコードはFrontendを知らない。**両方を知るのは起動の入口（もともと「部品を組み立てる唯一の場所」）だけ | 部品が1つ増える（画面の配信アプリ）。共通のデメリット1〜5（2は配信アプリに閉じ込められる） |
+| C | 責務の分離が最もきれい。アプリは相対パスにするだけ。静的ファイル配信はProxyの得意分野 | **動かす部品か設定が、デプロイ先ごとに要る。**クラウドではProcessか費用が増える。`tailscale serve`で済むかは未確認。共通のデメリット1・2・4 |
+| D | SPA fallbackが不要になり、配り手を選ばない。サーバー側の知識が「ファイルを配る」だけになる | **URLに`#`が入る。**ルーティング方式は2026-09のFrontend基盤（#11）で決めたもので、その判断を開き直す。既存のLinkやTestの書き換えが要る |
 
-**推奨はB。**方針（設定だけで替える）を満たし、動かす部品も増えない。
+**推奨はB′（2026-11-08にBから変えた）。**レビューで出た責務の指摘は、Processを分けなくても
+**コードの境界**で解ける。Bの利点（1つのBuildがどこでも動く、Processが1つ、デプロイ先を替えても
+`src/`を触らない）はそのまま残る。共通のデメリット1（本番の道をTestできない）は、
+どれを選んでも別に手当てが要る。Dは、URLの`#`を許せるかという利用者の判断になるので、推奨しない。
 
 ## 論点2 — デプロイ先固有の値を、どう渡すか
 
-渡す値は、論点1でBを選んだ場合、次の3つになる。
+渡す値は、論点1でBかB′を選んだ場合、次の3つになる。
 
 | 値 | 例（Windows） | 例（Cloud Run） |
 |---|---|---|
@@ -143,7 +203,7 @@ https://PC名.ts.net:443/api/search?keyword=ポケカ
 | ii | **どこでも同じ成果物。**クラウドへ移るのが最も小さい。Windows固有の問題が消える | Docker Desktopの導入・常駐・メモリ。Windowsの起動時に自動で上げる設定が要る。コンテナの中では`--host 0.0.0.0`になる（下の補足） |
 | iii | Buildが1か所（CI）に集まる。Windowsが軽くなる | **ci-policy §7「Deploy / Release Pipeline」「Secretsを要するJob」をやらない、を開き直す**ことになる |
 
-**推奨はi（今）、クラウドへ移る時にii。**論点1でB・論点2でa＋cを選べば、Dockerfileは
+**推奨はi（今）、クラウドへ移る時にii。**論点1でB′・論点2でa＋cを選べば、Dockerfileは
 **後から足しても`src/`を変えない。**ただし、iiの「Windowsで動くかを気にしなくてよい」は
 大きな利点で、手間を払ってでも先に揃える理由になりうる。
 
@@ -174,7 +234,7 @@ https://PC名.ts.net:443/api/search?keyword=ポケカ
 
 ## 論点5 — `VITE_API_BASE_URL`を残すか
 
-論点1でBまたはCを選んだ場合だけの論点である。2026-11-08に調べた時点で、この変数を読むのは
+論点1でB・B′・Cのどれかを選んだ場合だけの論点である。2026-11-08に調べた時点で、この変数を読むのは
 `src/frontend/src/api/client.ts`だけで、`.env`・CI・文書のどこからも設定されていない。
 2026-09のFrontend基盤（#11）で入ってから使われていない。
 
@@ -189,7 +249,7 @@ https://PC名.ts.net:443/api/search?keyword=ポケカ
 
 | 論点 | 推奨 |
 |---|---|
-| 1 | B（FastAPIが画面も返す） |
+| 1 | B′（同じProcessの中で、APIと画面の配信を分ける） |
 | 2 | uvicorn自身の値は起動コマンドの引数、アプリの値は環境変数 |
 | 3 | 今はソースを置いてBuild。クラウドへ移る時にコンテナ |
 | 4 | `deploy/<デプロイ先>/` |
