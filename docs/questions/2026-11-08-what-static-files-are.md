@@ -10,6 +10,9 @@
 | Q3 | [CSRなら、画面の配信とAPIは分けるべきか](#q3-csrなら画面の配信とapiは分けるべきか) |
 | Q4 | [配られた時点では何も入っておらず、BrowserでJSを実行して初めて画面ができるのか](#q4-配られた時点では何も入っておらずbrowserでjsを実行して初めて画面ができるのか) |
 | Q5 | [Card Diggerには、何種類の通信があるのか](#q5-card-diggerには何種類の通信があるのか) |
+| Q6 | [入口のProxyは、`/api`の要求にもファイルを返すのか](#q6-入口のproxyはapiの要求にもファイルを返すのか) |
+| Q7 | [`/api`の返事はJSONだけか。JSは返らないのか](#q7-apiの返事はjsonだけかjsは返らないのか) |
+| Q8 | [JS・CSSは最初に1回だけ届き、その後は同じJSで画面を作るのか](#q8-js・cssは最初に1回だけ届きその後は同じjsで画面を作るのか) |
 
 ## Q1. 静的ファイルとは、Mercariへのリクエストが飛ばないファイルのことか
 
@@ -162,3 +165,164 @@ flowchart LR
 | 4 | Browser → Mercariの画像 | 商品画像 | 静的（Mercari側の） | Mercariの画像サーバー。**Card Diggerを通らない**（[mvp-spec §10](../product/mvp-spec.md#10-data取扱い)） |
 
 **Browserから見れば、Card DiggerのAPIの先にMercariがあるかどうかは見えない。**3はAPIの内側の話である。
+
+## Q6. 入口のProxyは、`/api`の要求にもファイルを返すのか
+
+**返さない。**画面とAPIの前に入口（Proxy）を置く構成では、入口はパスによって**まったく違う2つの動き**をする。
+
+| パス | 入口の動き | 返すもの |
+|---|---|---|
+| `/api`で始まる | **uvicornへ要求を渡す（転送）。**返事を待ち、それをBrowserへ渡す | uvicorn＋FastAPIが**その場で計算したJSON。**ディスク上のファイルではない |
+| それ以外 | **ディスクの`dist/`からファイルを読んで返す** | `index.html`、`assets/index-….js`などの**ファイルそのもの** |
+
+```mermaid
+flowchart LR
+    B["Browser"] --> P{"入口（Proxy）<br/>パスは /api で始まる？"}
+    P -- "はい：転送" --> U["uvicorn＋FastAPI<br/>その場で計算"]
+    U --> J["JSON"]
+    P -- "いいえ：ファイル" --> D["dist/ から読む"]
+    D --> F["index.html・JS・CSS"]
+```
+
+1つずつ見ると、こうなる。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant P as 入口（Proxy）
+    participant D as dist/（ディスク）
+    participant U as uvicorn＋FastAPI
+
+    B->>P: GET /assets/index-3f9a1c.js
+    P->>D: ファイルを読む
+    D-->>P: ファイルの中身
+    P-->>B: JS（uvicornは関わらない）
+
+    B->>P: POST /api/search
+    P->>U: 同じ要求を 127.0.0.1:8000 へ渡す
+    Note over U: search()がMercariへ問い合わせ、<br/>結果をその場で組み立てる
+    U-->>P: JSON
+    P-->>B: JSON（dist/は関わらない）
+```
+
+### 「`/api`以外」の振り分け
+
+入口は**より長く一致する方を優先する。**
+
+| 要求 | `/api`に一致するか | 行き先 |
+|---|---|---|
+| `/` | しない | ファイル（`dist/index.html`） |
+| `/assets/index-3f9a1c.js` | しない | ファイル |
+| `/sellers/abc123` | しない | ファイル（SPA fallbackで`index.html`を返せる入口なら） |
+| `/api/search` | **する** | **転送** |
+| `/api/sellers/abc123/analysis` | **する** | **転送** |
+
+たとえると、入口は**受付カウンター**である。パンフレット（静的ファイル）を求められたら棚から出して渡し、
+個別の相談（API）なら奥の担当者（uvicorn）に取り次いで、担当者が作った回答を渡す。
+**受付が自分で回答を作ることも、棚にある回答を渡すことも無い。**
+
+## Q7. `/api`の返事はJSONだけか。JSは返らないのか
+
+**JSONだけである。JSは返らない。**
+
+### 実際の返事を比べた（2026-11-09）
+
+Mercariへ通信しない受入用アプリ（`src/backend/scripts/acceptance_app.py`）で`POST /api/search`を呼び、
+手元のBuild済みファイルと大きさを比べた。
+
+| 要求 | 返事の種類（`Content-Type`） | 大きさ | 中身 |
+|---|---|---|---|
+| `GET /assets/index-DzBczMP1.js` | JavaScript | 263,322バイト | 画面の作り方すべて |
+| `GET /assets/index-CdmTlwaY.css` | CSS | 11,848バイト | 見た目 |
+| `POST /api/search`（`ポケカ 引退品`） | **`application/json`** | **5,217バイト** | **商品のデータだけ** |
+
+返事の先頭はこうなっている。値の一覧だけで、画面の作り方は1行も入っていない。
+
+```json
+{"items":[{"id":"m000000000001","title":"ポケカ 引退品 まとめ売り SR多数","priceYen":4800,
+"url":"https://jp.mercari.com/item/m000000000001", … ,"listingStatus":"on_sale", …
+```
+
+### うまくいかないときもJSONだけ
+
+| 場面 | 状態コード | 返るもの |
+|---|---|---|
+| 検索できた | 200 | 商品データのJSON |
+| 安全停止中 | 503 | `{"code": "safety_stop"}`のようなJSONと、`Retry-After`ヘッダー |
+| Sellerが見つからない | 404 | エラー内容のJSON |
+
+**「あと約60秒で再試行できます」のような文言は、APIは返さない。**すでに届いているJSが、状態コードと
+`Retry-After`を見て、自分の持っている文言から選んで表示する。**データと見せ方は、ここでも分かれている。**
+
+## Q8. JS・CSSは最初に1回だけ届き、その後は同じJSで画面を作るのか
+
+**そのとおりである。**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser（メモリ）
+    participant S as Card Digger
+
+    rect rgba(128, 128, 128, 0.12)
+    Note over B,S: ページを開く（1回だけ）
+    B->>S: GET /
+    S-->>B: index.html
+    B->>S: GET /assets/…js と …css
+    S-->>B: JS（263KB）と CSS
+    Note over B: JSがメモリに残る
+    end
+
+    B->>S: POST /api/search（検索1回目）
+    S-->>B: JSON（約5KB）
+    Note over B: 同じJSが描く
+    B->>S: POST /api/search（検索2回目）
+    S-->>B: JSON
+    Note over B: 同じJSが描く
+    Note over B: Sellerをタップ。URLを書き換えるのも同じJS
+    B->>S: GET /api/sellers/…/analysis
+    S-->>B: JSON
+    Note over B: 同じJSがSeller画面を描く
+
+    Note over B: 再読み込み・タブを閉じる → JSは消える。<br/>次に開いたら、また1から
+```
+
+| | いつ届くか | 何回届くか | 中身 |
+|---|---|---|---|
+| `index.html`・JS・CSS | ページを開いたとき | **1回** | 画面の作り方 |
+| JSON | 検索・Sellerを開くたび | **毎回** | データ |
+| 商品画像 | JSが`<img>`を置いたとき | 画像ごと | **Mercariから直接**届く。JSONに入っているのは画像のURLだけ |
+
+検索1回あたりの通信は数KBで済む。ページ全体を取り直すSSRとの違いである（[Q3](#q3-csrなら画面の配信とapiは分けるべきか)）。
+
+### 補足1：次に開いたとき、JSを取り直さないこともある
+
+再読み込みすると、JSは**実行し直し**になる。ただ、ファイルそのものはBrowserのキャッシュ（ディスクの
+一時保存）に残っていれば、通信せずにそれを使うことがある。
+
+| ファイル | 名前 | 古いキャッシュを使い続ける心配 |
+|---|---|---|
+| `assets/index-DzBczMP1.js`など | **ハッシュ付き。**中身が変わるとBuildで名前も変わる | 無い |
+| `index.html` | **変わらない** | **ある。**古い`index.html`は古いJSの名前を指したまま。配る側で「毎回確認させる」設定が要る |
+
+### 補足2：デプロイ後も、開いたままのタブは古いJSで動く
+
+JSが最初に1回だけ届く仕組みから、運用上の注意が1つ出てくる。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant I as iPhone（開いたまま）
+    participant W as Windows
+
+    Note over I: 古いJSがメモリに残っている
+    Note over W: 新しい版をデプロイ<br/>dist/ と API が新しくなる
+    I->>W: POST /api/search（古いJSが呼ぶ）
+    W-->>I: 新しいAPIのJSON
+    Note over I: JSONの形が変わっていれば、<br/>古いJSが読み違える
+```
+
+APIのJSONの形を変える変更（項目名を変えるなど）をデプロイしたときは、**再読み込みするまで、古いJSが
+新しいJSONを読み違えることがある。**利用者1人なら「デプロイしたら各端末で再読み込みする」で足りる。
+デプロイ手順に1行書いておく。
