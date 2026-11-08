@@ -224,7 +224,7 @@ Card Diggerが参照中のcommitを到達不能にしないことを最優先と
 | **L4のCI実行** | アクセス頻度条件を守れない |
 | Coverage率のGate | [Test運用規約 §11](test-policy.md#11-やらないこと)で除外済み |
 | 定期実行（cron） | 外部通信や無人実行を常態化させない |
-| Deploy / Release Pipeline | 公開Serviceではなく、単一利用者のLocal実行を前提とする |
+| Deploy / Release Pipeline | 公開Serviceではなく、単一利用者が家のWindowsで動かす。取り込みは手動のScriptで行う（[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)） |
 | PRの承認必須化 | 1人開発では機能しない |
 | CIからの自動Merge | 判断を機械へ委ねない |
 | Secretsを要するJob | 現時点で必要な秘密情報がない |

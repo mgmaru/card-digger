@@ -1241,6 +1241,7 @@ Buttonが消えて理由が分からないことより良い。
 
 - Cookie、DPoP、秘密Token、Request Header、生ResponseをFrontendへ返さない
 - Backendは既定で`127.0.0.1`へBindし、認証なしの状態でLAN・Internetへ公開しない
+- 他の端末からは`tailscale serve`を経由してTailnet内だけで使う（[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)）
 - CORSは実際に使用するLocal Frontend Originだけを許可する
 - 商品・Seller情報をDatabaseへ保存しない
 - 画像はMercariのHTTPS URLをBrowserで表示し、Backendに保存しない
