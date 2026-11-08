@@ -116,7 +116,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [2026-11-08-what-binding-to-0000-means.md](questions/2026-11-08-what-binding-to-0000-means.md):
   `0.0.0.0`にBindすると何が届くのか。Bindの単位、OSが渡すもの、ファイアウォールとの2枚の扉、`ping`との無関係
 - [2026-11-08-what-wireguard-and-tls-protect.md](questions/2026-11-08-what-wireguard-and-tls-protect.md):
-  WireGuardとTLSは何を守るのか。包む層と暗号化される範囲の違い、回線の上で何が見えるか、二重にする利点
+  WireGuardとTLSは何を守るのか。包む層と暗号化される範囲の違い、回線の上で何が見えるか、二重にする利点、
+  VPNの本質（トンネリング）と「安全」の4つの中身
 
 書き方の約束。
 
