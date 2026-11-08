@@ -13,6 +13,7 @@
 | Q5 | [`127.0.0.1`のままにすると、何が守られて何が守られないのか](#q5-127001のままにすると何が守られて何が守られないのか) |
 | Q6 | [`tailscale serve`のHTTPSで、暗号化は増えるのか](#q6-tailscale-serveのhttpsで暗号化は増えるのか) |
 | Q7 | [なぜInstanceが自動で増える基盤では駄目なのか](#q7-なぜinstanceが自動で増える基盤では駄目なのか) |
+| Q8 | [`ping`はなぜポートを指定せず、どこを通って誰が返事をするのか](#q8-pingはなぜポートを指定せずどこを通って誰が返事をするのか) |
 
 ## Q1. なぜiPhoneから開くと`127.0.0.1:8000`では動かないのか
 
@@ -135,3 +136,69 @@ Processが2つになると、それぞれが自分の分しか数えない。
 Cloud Runの既定やLambdaは、Requestが増えるとInstanceを自動で増やす。同じ理由で、
 uvicornに`--workers`を付けない（[src/backend/README.md](../../src/backend/README.md#起動)）。
 **家のWindowsで1 Processとして動かせば、何も変えずに守れる。**
+
+## Q8. `ping`はなぜポートを指定せず、どこを通って誰が返事をするのか
+
+### ポートはTCP/UDPの概念である
+
+| 層 | プロトコル | 宛先の指定 |
+|---|---|---|
+| ネットワーク層（L3） | IP、**ICMP**（`ping`はこれ） | **IPアドレスだけ** |
+| トランスポート層（L4） | TCP、UDP | IPアドレス＋**ポート番号** |
+
+ポートは、TCP/UDPが「同じPCの中のどのアプリへ渡すか」を区別する番号である。`ping`が送る
+ICMP Echo RequestはTCP/UDPを使わないので、ポートを持たない。
+
+### 返事をするのはOSで、アプリではない
+
+```text
+[送信側] ping ──> OS(IP層) ──> 物理NIC ══(LAN)══> 物理NIC ──> OS(IP層) ─┐
+                                                                      │ ICMP Echo Request
+[送信側] <─────────────────────────────── 物理NIC <── OS(IP層) <─────────┘ Echo Replyを返す
+```
+
+NICはパケットをOSへ渡すだけで、返事を決めるのはOSのネットワークスタックである。
+**uvicornはこの経路に出てこない。**したがって、
+
+- uvicornのBind先が`127.0.0.1`でも`0.0.0.0`でも、`ping`の結果は変わらない。止まっていても返事は来る
+- 「`ping`が通る」は「そのPCまで届く」であって「アプリに繋がる」ではない
+- 逆に、Windowsファイアウォールが受信ICMPを止めていると、**`ping`は通らないのにHTTPは繋がる**ことがある
+
+### Tailscale経由ではNICを2回通る
+
+Windows側で`100.x.y.z`宛ての`ping`を受けるとき。
+
+```text
+物理NIC ──> OS(UDP) ──> tailscaled ──(復号)──> 仮想NIC(Wintun) ──> OS(IP層) ─┐
+  ↑   WireGuardで暗号化されたUDPパケット                                    │ 100.x.y.z宛てのICMP
+  │                                                                       │
+物理NIC <── OS(UDP) <── tailscaled <──(暗号化)── 仮想NIC(Wintun) <── OS(IP層) ┘ Echo Reply
+```
+
+1. 物理NICに届く時点では、ICMPは**WireGuardで暗号化され、UDPに包まれている。**外側にはUDPの
+   ポート番号（Tailscaleの既定は41641番）がある。**ICMP自体にポートは無いが、運ぶ包みにはある**
+2. OSはそのUDPを`tailscaled`へ渡し、`tailscaled`が復号する
+3. 復号したICMPを仮想NIC（WindowsではWintun）から、外から届いたものとしてOSへ入れ直す
+4. OSが自分宛てと判断して返事をする。帰りは逆順。**ファイアウォールが落とすのはこの段階**
+
+Tailscaleを「ユーザー空間ネットワーク」モードで動かすと、`tailscaled`自身が返事をするので
+3〜4が変わる。WindowsのTailscaleアプリは通常、上の仮想NICの構成で動く。
+
+### `127.0.0.1`はどのNICも通らない
+
+ループバックはOSの中だけにあるソフトウェアの口で、`ping 127.0.0.1`は物理NICにも仮想NICにも
+触れずにOS内で折り返す。**どのNICからもこの口へは入れない。**uvicornを`127.0.0.1`へBindすると
+外から届かない（[Q4](#q4-127001にbindしたままなぜ外から使えるのか)）のは、このためである。
+
+### 何を確かめたいかでコマンドを選ぶ
+
+| 確かめたいこと | コマンド |
+|---|---|
+| Tailnet経由でそのPCに届くか | `tailscale ping <PC名>` |
+| アプリまで届くか（他の端末から） | `curl https://<PC名>.<tailnet>.ts.net/api/health` |
+| 特定のTCPポートが開いているか（Windows） | `Test-NetConnection <IP> -Port 8000` |
+
+この構成では、他の端末からの`Test-NetConnection 100.x.y.z -Port 8000`は**失敗するのが正しい。**
+uvicornは`127.0.0.1`でしか待っておらず、外から届くのは`tailscale serve`が待つ443番だけである。
+[Q5](#q5-127001のままにすると何が守られて何が守られないのか)の「LANの口で待っていない」を
+自分で確かめる手段になる。

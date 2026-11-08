@@ -110,7 +110,7 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 
 - [2026-11-08-reaching-home-server-from-devices.md](questions/2026-11-08-reaching-home-server-from-devices.md):
   家のPCのアプリへ他の端末から繋ぐ。`127.0.0.1`とBind、Origin・CORS、`tailscale serve`、
-  HTTPSとWireGuard、Processが増えると壊れる約束
+  HTTPSとWireGuard、Processが増えると壊れる約束、`ping`とポート・NIC
 
 書き方の約束。
 
