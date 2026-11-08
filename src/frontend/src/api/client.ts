@@ -161,16 +161,6 @@ function retryAfterSeconds(response: Response): number | null {
   return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
 }
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
-
-function baseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL;
-  return (typeof configured === "string" && configured.length > 0
-    ? configured
-    : DEFAULT_BASE_URL
-  ).replace(/\/$/, "");
-}
-
 async function failureBody(response: Response): Promise<FailureBody> {
   let body: unknown;
   try {
@@ -275,7 +265,14 @@ async function request<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${baseUrl()}${path}`, {
+    // A path, never an origin. The browser resolves it against the page it
+    // loaded the screen from, so the same build reaches the backend from the
+    // development server (which forwards /api), from Windows itself and from
+    // a phone on the tailnet, without knowing where any of them is. The
+    // leading slash matters: without it the path would be resolved against
+    // the current page, and /sellers/x would ask /sellers/api/....
+    // ADR 0002, issue 5.
+    response = await fetch(path, {
       ...init,
       // No cookie is ever sent. The backend allows no credentials, and there
       // is no session to carry.
