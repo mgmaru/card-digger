@@ -45,7 +45,8 @@ docs/
 ├── questions/
 │   ├── 2026-11-08-reaching-home-server-from-devices.md
 │   ├── 2026-11-08-what-binding-to-0000-means.md
-│   └── 2026-11-08-what-wireguard-and-tls-protect.md
+│   ├── 2026-11-08-what-wireguard-and-tls-protect.md
+│   └── 2026-11-09-what-a-reverse-proxy-is.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -118,6 +119,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [2026-11-08-what-wireguard-and-tls-protect.md](questions/2026-11-08-what-wireguard-and-tls-protect.md):
   WireGuardとTLSは何を守るのか。包む層と暗号化される範囲の違い、回線の上で何が見えるか、二重にする利点、
   VPNの本質（トンネリング）と「安全」の4つの中身
+- [2026-11-09-what-a-reverse-proxy-is.md](questions/2026-11-09-what-a-reverse-proxy-is.md):
+  リバースプロキシとは何か。`tailscale serve`の役割、TLS終端、フォワードとリバースの違いと入れる理由
 
 書き方の約束。
 
