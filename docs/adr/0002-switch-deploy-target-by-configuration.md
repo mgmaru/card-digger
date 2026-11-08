@@ -402,7 +402,7 @@ const configured = "https://PC名.ts.net";
 | `src/frontend/tests/api/client.test.ts` | 期待値を`"/api/sellers/a%20b%2Fc/analysis"`（Originなし）にする。絶対URLを書き戻すと落ちる |
 | E2E | 変更なし。5173番を開いて検索するので、中継が切れれば落ちる |
 
-この変更はB′でもCでも同じなので、**論点1の検証を待たずに入れられる。**
+この変更はB′でもCでも同じなので、**論点1の検証を待たずに入れられる。****2026-11-09に#46でマージした。**手元で、Build結果のJSに`127.0.0.1:8000`が含まれないこと、E2Eが通ること、`server.proxy`を外すとE2Eが落ちることを確かめた。
 
 ### 選ばなかった方（残す）
 
@@ -441,7 +441,7 @@ const configured = "https://PC名.ts.net";
 ## 決めた後に直すもの
 
 - [論点1の検証](#決める前の検証windows15分ほどmercariへは通信しない)の結果を書き込む
-- 論点5の変更（`client.ts`、`vite.config.ts`、Test）をPRにする。論点1を待たずに入れられる
+- ~~論点5の変更（`client.ts`、`vite.config.ts`、Test）をPRにする~~ **済み（2026-11-09、#46）**
 - この文書の状態を「決定」にし、選ばなかった選択肢に理由を残す
 - [ADR 0001の未決](0001-run-on-home-windows-via-tailscale.md#未決--frontendが127001を見に行く問題)を閉じる
 - [architecture §8.3](../development/architecture.md#83-今この方針に反しているもの)の表を更新する

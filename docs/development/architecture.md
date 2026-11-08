@@ -482,7 +482,7 @@ Yahoo!フリマのような2つ目を足す場合を想定する。
 
 | # | どこ | 何がデプロイ先に依存しているか | 扱い |
 |---|---|---|---|
-| 1 | `src/frontend/src/api/client.ts`の`DEFAULT_BASE_URL` | `http://127.0.0.1:8000`は、**画面を開いた端末とBackendが同じ機械にある**ときしか正しくない。開発環境の値が、そのままBuildに入る [ADR 0002 論点5](../adr/0002-switch-deploy-target-by-configuration.md#論点5--vite_api_base_urlを残すか)で**消すと決めた**（2026-11-09）。相対パス化とViteの中継を同じPRで入れる（**未実装**） |
+| 1 | `src/frontend/src/api/client.ts`の`DEFAULT_BASE_URL` | `http://127.0.0.1:8000`は、**画面を開いた端末とBackendが同じ機械にある**ときしか正しくない。開発環境の値が、そのままBuildに入る | **解消した（2026-11-09、#46）。**[ADR 0002 論点5](../adr/0002-switch-deploy-target-by-configuration.md#論点5--vite_api_base_urlを残すか)の決定に従い、`VITE_API_BASE_URL`・`DEFAULT_BASE_URL`・`baseUrl()`を消し、`/api/...`のパスで呼ぶ。開発ではViteが中継する（[§8.4](#84-開発とデプロイ先で入口は替わるがfrontendは同じ2026-11-09)） |
 | 2 | `src/backend/card_digger/api/main.py`の`DEFAULT_ALLOWED_ORIGINS` | 開発用のViteのOriginをCORSで許可している | 開発環境の値で、デプロイ先へは漏れない。ADR 0002の選び方によっては不要になる |
 
 ### 8.4 開発とデプロイ先で、入口は替わるがFrontendは同じ（2026-11-09）
