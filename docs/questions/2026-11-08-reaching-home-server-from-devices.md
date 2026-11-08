@@ -110,17 +110,11 @@ iPhone ──(Tailnet / WireGuard)──> [Windows] tailscaled ──(PC内で�
 
 ## Q6. `tailscale serve`のHTTPSで、暗号化は増えるのか
 
-**増えない。**Tailnet内の通信は、端末間ですでにWireGuardで暗号化されている。HTTPSは、
-その中にTLSをもう1枚重ねるだけである。
+**暗号化の層は増えるが、守られる範囲はほぼ増えない。**WireGuardもTLSも、Windowsの
+tailscaledで終わるからである。HTTPSにする実益は、BrowserがSecure Contextとして扱うことにある。
 
-増えるのは2つ。
-
-- **BrowserがSecure Contextとして扱う。**iPhoneのSafariで「安全ではない」と出ない
-- **`https://<PC名>.<tailnet>.ts.net`という名前で開ける**
-
-**払うもの。**証明書はLet's Encryptが発行するので、**ホスト名が公開の証明書透明性Log
-（Certificate Transparency Log）に載る。**名前が知られてもTailnetの外からは届かないが、
-PC名に個人情報を入れない。使うには、管理画面でMagicDNSとHTTPS証明書を有効にしておく必要がある。
+**最初は「増えない」と答えたが、不正確だった。**WireGuardとTLSがそれぞれ何を守るか、
+回線の上で何が見えるかは[別の問答](2026-11-08-what-wireguard-and-tls-protect.md)にまとめた。
 
 ## Q7. なぜInstanceが自動で増える基盤では駄目なのか
 

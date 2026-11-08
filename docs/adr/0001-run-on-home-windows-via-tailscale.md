@@ -83,8 +83,9 @@ Phase 1の時点で、すでに使える状態になっている。**使いな�
 再起動してもTailscaleのサービスと一緒に戻る。
 
 **払うもの。**HTTPSの証明書のため、**ホスト名が公開の証明書透明性Logに載る。**
-PC名に個人情報を入れない。HTTPSで暗号化が増えるわけではない
-（[問答 Q6](../questions/2026-11-08-reaching-home-server-from-devices.md#q6-tailscale-serveのhttpsで暗号化は増えるのか)）。
+PC名に個人情報を入れない。HTTPSにしても、守られる範囲はほとんど増えない。
+得るのはBrowserがSecure Contextとして扱うことである
+（[WireGuardとTLSの問答](../questions/2026-11-08-what-wireguard-and-tls-protect.md)）。
 `127.0.0.1`のままで何が守られ何が守られないかは
 [問答 Q4・Q5](../questions/2026-11-08-reaching-home-server-from-devices.md#q4-127001にbindしたままなぜ外から使えるのか)。
 
