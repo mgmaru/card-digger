@@ -46,6 +46,7 @@ docs/
 │   ├── 2026-11-08-reaching-home-server-from-devices.md
 │   ├── 2026-11-08-what-binding-to-0000-means.md
 │   ├── 2026-11-08-what-cors-is-for.md
+│   ├── 2026-11-08-what-static-files-are.md
 │   ├── 2026-11-08-what-wireguard-and-tls-protect.md
 │   └── 2026-11-08-who-builds-the-screen.md
 ├── retrospectives/
@@ -119,6 +120,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   `0.0.0.0`にBindすると何が届くのか。Bindの単位、OSが渡すもの、ファイアウォールとの2枚の扉、`ping`との無関係
 - [2026-11-08-what-cors-is-for.md](questions/2026-11-08-what-cors-is-for.md):
   CORSは何のためにあるのか。同一Originポリシー、事前確認、CORSが守らないもの、Card Diggerの設定と、CORSで止まらない要求
+- [2026-11-08-what-static-files-are.md](questions/2026-11-08-what-static-files-are.md):
+  静的ファイルとは何か。静的と動的の違い、ファイル配信とAPIの違い、CSRだと分けられる理由、配られた時点で何が入っているか
 - [2026-11-08-what-wireguard-and-tls-protect.md](questions/2026-11-08-what-wireguard-and-tls-protect.md):
   WireGuardとTLSは何を守るのか。包む層と暗号化される範囲の違い、回線の上で何が見えるか、二重にする利点、
   VPNの本質（トンネリング）と「安全」の4つの中身
