@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, search, sellerAnalysis } from "../../src/api/client";
+import { ApiError, health, search, sellerAnalysis } from "../../src/api/client";
 
 function respondWith(
   status: number,
@@ -305,8 +305,31 @@ describe("the seller analysis request", () => {
 
     await sellerAnalysis("a b/c");
 
-    expect(requested).toBe(
-      "http://127.0.0.1:8000/api/sellers/a%20b%2Fc/analysis",
+    expect(requested).toBe("/api/sellers/a%20b%2Fc/analysis");
+  });
+
+  // The client must not name where the backend is. An origin written here
+  // would be right on one machine and wrong on every other one: it is what
+  // kept the screen from working on a phone (ADR 0002, issue 5).
+  it.each([
+    ["search", () => search("ポケカ")],
+    ["sellerAnalysis", () => sellerAnalysis("100000001")],
+    ["health", () => health()],
+  ])("%s asks by a root path, without an origin", async (_name, call) => {
+    let requested: string | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        requested = String(input);
+        return new Response("{}", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
     );
+
+    await call();
+
+    expect(requested).toMatch(/^\/api\//);
   });
 });

@@ -9,11 +9,16 @@ export default defineConfig({
   plugins: [react()],
   server: {
     // Loopback only. The MVP has no authentication, so nothing here is meant
-    // to be reachable from the LAN. `card_digger.api.main` allows exactly
-    // this origin, and 127.0.0.1 on the same port, through CORS.
+    // to be reachable from the LAN.
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
+    // The client calls the backend by path alone (`/api/...`), so during
+    // development the screen and the API must look like one origin. This
+    // forwards /api to the backend; the browser never talks to port 8000.
+    // Development only: `server` is not part of the build, and a deployment
+    // puts its own entrance in front instead (ADR 0002, issue 1).
+    proxy: { "/api": "http://127.0.0.1:8000" },
   },
   test: {
     environment: "jsdom",
