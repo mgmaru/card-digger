@@ -5,7 +5,7 @@
 - 決定日: **2026-09-02**
 - ステータス: **層・依存の向き・固有語の正本**
 - 対象: 層、import方向、外部依存、Card Digger固有語と一般名の対応、Marketplace追加時に触る場所、
-  **デプロイ先との境界**（[§8](#8-デプロイ先をソースコードに持たない2026-11-08決定)、2026-11-08追加）
+  **デプロイ先との境界**（[§8](#8-デプロイ先をソースコードに持たない2026-11-08決定)、2026-11-08追加。開発とデプロイ先の入口の使い分けは[§8.4](#84-開発とデプロイ先で入口は替わるがfrontendは同じ2026-11-09)）
 - 前提: [MVP実装仕様](../product/mvp-spec.md) / [Mercari Adapter実装仕様](../phase-0/phase-0-f-adapter-spec.md)
 
 ## 1. この文書がある理由
@@ -484,6 +484,46 @@ Yahoo!フリマのような2つ目を足す場合を想定する。
 |---|---|---|---|
 | 1 | `src/frontend/src/api/client.ts`の`DEFAULT_BASE_URL` | `http://127.0.0.1:8000`は、**画面を開いた端末とBackendが同じ機械にある**ときしか正しくない。開発環境の値が、そのままBuildに入る [ADR 0002 論点5](../adr/0002-switch-deploy-target-by-configuration.md#論点5--vite_api_base_urlを残すか)で**消すと決めた**（2026-11-09）。相対パス化とViteの中継を同じPRで入れる（**未実装**） |
 | 2 | `src/backend/card_digger/api/main.py`の`DEFAULT_ALLOWED_ORIGINS` | 開発用のViteのOriginをCORSで許可している | 開発環境の値で、デプロイ先へは漏れない。ADR 0002の選び方によっては不要になる |
+
+### 8.4 開発とデプロイ先で、入口は替わるがFrontendは同じ（2026-11-09）
+
+**Browserが話す相手（入口）は、開発ではVite、デプロイ先では入口のProxyになる。**どちらも
+「画面を配り、`/api`をuvicornへ渡す」という同じ役を引き受けるので、**Frontendのコードは1行も変えずに
+両方で動く。**JSはAPIを`/api/...`のパスだけで呼び、どこにあるかを知らない
+（[ADR 0002 論点5](../adr/0002-switch-deploy-target-by-configuration.md#論点5--vite_api_base_urlを残すか)）。
+
+```text
+開発          Browser ──> Vite（127.0.0.1:5173）─┬─ /api/… → [リバースプロキシ] ──> uvicorn 127.0.0.1:8000
+                                                └─ それ以外 → [開発サーバー] ソースをその場で変換して返す
+
+デプロイ先     Browser ──> 入口（Windowsでは tailscale serve）─┬─ /api/… → [転送] ──> uvicorn 127.0.0.1:8000
+                                                             └─ それ以外 → dist/ の固めたファイルを返す
+```
+
+| | 開発（手元） | デプロイ先（ADR 0002のC） |
+|---|---|---|
+| Browserが話す相手 | **Vite**（`npm run dev`） | **入口のProxy**（Windowsでは`tailscale serve`） |
+| `/api`の転送 | Viteの`server.proxy`（`src/frontend/vite.config.ts`） | 入口の設定（`deploy/<デプロイ先>/`に置く予定） |
+| 画面 | ソースを**その場で変換**する。ホットリロードが効く | `npm run build`で**固めた`dist/`**を配る |
+| TLS終端 | しない（`http`） | する（`https`） |
+| uvicornのBind先 | `127.0.0.1:8000` | `127.0.0.1:8000`（クラウドではデプロイ先が決める） |
+| Frontendのコード | **同じ** | **同じ** |
+
+守ること。
+
+| # | 約束 | 理由 |
+|---|---|---|
+| 1 | **JSにOriginを書かない。**パスは`/`から始める | 書いたOriginは1つの場面でしか正しくない。`/`が無いと今いるページのパスを基準にする |
+| 2 | **Viteの開発サーバーをデプロイ先で使わない** | 開発用で、本番向けの最適化が無い。ホットリロードはコードを書き換えない場所では要らない |
+| 3 | **`server.proxy`はデプロイ先の代わりにならない** | `server`の設定はBuildに入らない。デプロイ先の転送は入口が持つ |
+| 4 | 入口の振り分け（`/api`と、それ以外）を、開発とデプロイ先で揃える | 揃っていないと、開発で動いてデプロイ先で動かない |
+
+**確かめ方が2つの道で違う。**開発の道はE2E（Playwright）が毎回通る。`server.proxy`を外すとE2Eが
+落ちることを2026-11-09に確かめた。デプロイ先の道はCIが通らないので、デプロイのたびに手で確かめる
+（[ADR 0002の共通のデメリット1](../adr/0002-switch-deploy-target-by-configuration.md#同じoriginにする選択肢b・b・cに共通するデメリット)）。
+
+仕組みの説明は[リバースプロキシの問答](../questions/2026-11-09-what-a-reverse-proxy-is.md)と
+[静的ファイルの問答](../questions/2026-11-08-what-static-files-are.md)にある。
 
 **実現の仕方（画面とAPIのOrigin、設定の渡し方、成果物の形など）は[ADR 0002](../adr/0002-switch-deploy-target-by-configuration.md)が扱う。**
 この節は方針と契約だけを持ち、選択肢を複製しない。
