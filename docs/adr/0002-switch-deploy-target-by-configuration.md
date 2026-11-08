@@ -35,6 +35,45 @@ iPhoneから開くとiPhone自身へ向かい、動かない。
 
 ## 論点1 — 画面とAPIを、同じOriginから返すか
 
+### Originとは何か（レビューで出た問い）
+
+> 別Originにするというのは、フロントエンドとバックエンドでURLを変えるということか
+
+**URL全体ではなく、URLのうちOriginの部分（スキーム・ホスト・ポート）が違うことを指す。**
+パスが違うだけでは別Originにならない。
+
+```text
+https://PC名.ts.net:443/api/search?keyword=ポケカ
+└─┬──┘ └────┬────┘└┬┘└────┬────┘└──────┬──────┘
+スキーム   ホスト    ポート    パス         クエリ
+└────────── Origin ──────────┘
+```
+
+**3つが全部同じなら同じOrigin、1つでも違えば別Originである。**
+
+| 画面のURL | APIのURL | 違う部分 | 判定 |
+|---|---|---|---|
+| `https://PC名.ts.net/` | `https://PC名.ts.net/api/search` | パスだけ | **同じOrigin**（B・C） |
+| `http://127.0.0.1:5173/` | `http://127.0.0.1:8000/api/search` | **ポート** | **別Origin（今の開発構成）** |
+| `https://card-digger.vercel.app/` | `https://PC名.ts.net/api/search` | **ホスト** | 別Origin（Aの典型） |
+| `https://example.com/` | `https://api.example.com/search` | **ホスト**（サブドメインも別扱い） | 別Origin |
+| `http://PC名.ts.net/` | `https://PC名.ts.net/api/search` | **スキーム**（とポート） | 別Origin |
+
+**今の開発構成は、すでにポート違いの別Originである。**`src/backend/card_digger/api/main.py`の
+`DEFAULT_ALLOWED_ORIGINS`がViteの5173番をCORSで許可しているのは、そのためである。
+
+別Originかどうかで、次の2つが決まる。
+
+| | 同じOrigin | 別Origin |
+|---|---|---|
+| JSがAPIの場所を書く必要 | **無い。**パスだけ書けば、Browserが今のページのOriginを補う | **ある。**Browserは補えないので、Originまで含めた絶対URLが要る（`VITE_API_BASE_URL`など） |
+| CORS | 不要 | **必要。**APIのサーバーが「このOriginからの呼び出しを許す」と返さないと、BrowserはJSに結果を渡さない |
+
+**Aが[方針](../development/architecture.md#8-デプロイ先をソースコードに持たない2026-11-08決定)に反するのは、
+左の行による。**別Originでは、デプロイ先のURLをどこかに書く必要があり、それがBuild成果物に入る。
+
+### 選択肢
+
 | | A. 別Origin（URLを埋め込む） | B. 同じOrigin（FastAPIが画面も返す） | C. 同じOrigin（前段のProxyが振り分ける） |
 |---|---|---|---|
 | 中身 | Build時に`VITE_API_BASE_URL`へAPIのURLを入れる。画面は別の場所から配る | `npm run build`の`dist/`をFastAPIが返す。JSは`/api/...`を相対パスで呼ぶ | nginx・Caddyなどが`/api/*`をuvicornへ、それ以外を`dist/`へ振り分ける。JSは相対パス |
