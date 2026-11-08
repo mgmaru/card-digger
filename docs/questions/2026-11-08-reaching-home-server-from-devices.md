@@ -70,7 +70,8 @@ iPhoneからの`ts.net`でも、相対パスなので同じBuildがそのまま�
 | `127.0.0.1` | **同じPCの中から**来た接続だけ |
 | `0.0.0.0` | そのPCのすべての口（有線LAN、Wi-Fi、Tailscaleの仮想NIC…）から来た接続 |
 
-普通に外へ出すなら`0.0.0.0`が要る。`tailscale serve`はこう繋ぐので要らない。
+普通に外へ出すなら`0.0.0.0`が要る。`0.0.0.0`で何が届くかは
+[別の問答](2026-11-08-what-binding-to-0000-means.md)にまとめた。`tailscale serve`はこう繋ぐので要らない。
 
 ```text
 iPhone ──(Tailnet / WireGuard)──> [Windows] tailscaled ──(PC内で新しく接続)──> 127.0.0.1:8000 uvicorn

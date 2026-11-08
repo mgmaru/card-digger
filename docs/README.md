@@ -43,7 +43,8 @@ docs/
 ├── adr/
 │   └── 0001-run-on-home-windows-via-tailscale.md
 ├── questions/
-│   └── 2026-11-08-reaching-home-server-from-devices.md
+│   ├── 2026-11-08-reaching-home-server-from-devices.md
+│   └── 2026-11-08-what-binding-to-0000-means.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -111,6 +112,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [2026-11-08-reaching-home-server-from-devices.md](questions/2026-11-08-reaching-home-server-from-devices.md):
   家のPCのアプリへ他の端末から繋ぐ。`127.0.0.1`とBind、Origin・CORS、`tailscale serve`、
   HTTPSとWireGuard、Processが増えると壊れる約束、`ping`とポート・NIC
+- [2026-11-08-what-binding-to-0000-means.md](questions/2026-11-08-what-binding-to-0000-means.md):
+  `0.0.0.0`にBindすると何が届くのか。Bindの単位、OSが渡すもの、ファイアウォールとの2枚の扉、`ping`との無関係
 
 書き方の約束。
 
