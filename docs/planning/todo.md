@@ -3445,7 +3445,7 @@ Marketplace
 
 - [ ] Windowsで`uv run --frozen pytest tests`と`npm run test`が通るか確かめる（CIはLinuxだけ）
 - [ ] Frontendが`127.0.0.1:8000`を見に行く問題の直し方を決める
-  （[ADR 0001 未決](../adr/0001-run-on-home-windows-via-tailscale.md#未決--frontendが127001を見に行く問題)。Bを推す）
+  （[ADR 0002](../adr/0002-switch-deploy-target-by-configuration.md)の5論点。**保留**）
 - [ ] 決めた直し方をPRにする
 - [ ] Tailscaleの管理画面でMagicDNSとHTTPS証明書を有効にし、`tailscale serve --bg 8000`を設定する
 - [ ] uvicornを起動時に立ち上がるようにする（タスクスケジューラーかNSSM）。`--workers`は付けない

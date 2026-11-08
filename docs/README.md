@@ -41,7 +41,8 @@ docs/
 │   ├── mercapi-fork-operations.md
 │   └── test-policy.md
 ├── adr/
-│   └── 0001-run-on-home-windows-via-tailscale.md
+│   ├── 0001-run-on-home-windows-via-tailscale.md
+│   └── 0002-switch-deploy-target-by-configuration.md
 ├── questions/
 │   ├── 2026-11-08-reaching-home-server-from-devices.md
 │   ├── 2026-11-08-what-binding-to-0000-means.md
@@ -80,7 +81,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 
 - [architecture.md](development/architecture.md):
   層とimportの向き、**状態の寿命（どこに置くかは何についての事実かで決まる）**、外部依存と
-  2秒間隔の出所、Card Digger固有語と一般名の対応、Marketplace追加時に触る場所
+  2秒間隔の出所、Card Digger固有語と一般名の対応、Marketplace追加時に触る場所、
+  **デプロイ先をソースコードに持たない方針とデプロイ先への契約**
 - [mercapi-fork-operations.md](development/mercapi-fork-operations.md):
   Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
 - [test-policy.md](development/test-policy.md):
@@ -95,6 +97,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 
 - [0001-run-on-home-windows-via-tailscale.md](adr/0001-run-on-home-windows-via-tailscale.md):
   家のWindowsで動かし、3台からTailscale（`tailscale serve`）で繋ぐ。**2026-11-08決定**
+- [0002-switch-deploy-target-by-configuration.md](adr/0002-switch-deploy-target-by-configuration.md):
+  デプロイ先を設定だけで切り替えられる形にする。5論点の選択肢とメリット・デメリット。**保留**
 
 書き方の約束。
 
