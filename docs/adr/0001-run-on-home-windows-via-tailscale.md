@@ -82,20 +82,11 @@ Phase 1の時点で、すでに使える状態になっている。**使いな�
 触れずに済む。**Firewall規則が要らず、Tailnetの外へは届かない。`--bg`で設定が残るので、
 再起動してもTailscaleのサービスと一緒に戻る。
 
-### HTTPSで何が増えるか
-
-**暗号化は増えない。**Tailnet内の通信は、端末間ですでにWireGuardで暗号化されている。
-`tailscale serve`のHTTPSは、その中にTLSをもう1枚重ねるだけである。
-
-増えるのは2つ。
-
-- **BrowserがSecure Contextとして扱う。**iPhoneのSafariで「安全ではない」と出ない
-- **`https://<PC名>.<tailnet>.ts.net`という名前で開ける。**IPを覚えなくてよい
-
-**払うもの。**証明書はLet's Encryptが発行するため、**`<PC名>.<tailnet>.ts.net`という名前が
-公開の証明書透明性Log（Certificate Transparency Log）に載る。**名前が知られても
-Tailnetの外からは届かないが、PC名に個人情報を入れない。
-有効にするには、Tailscaleの管理画面でMagicDNSとHTTPS証明書を有効にしておく必要がある。
+**払うもの。**HTTPSの証明書のため、**ホスト名が公開の証明書透明性Logに載る。**
+PC名に個人情報を入れない。HTTPSで暗号化が増えるわけではない
+（[問答 Q6](../questions/2026-11-08-reaching-home-server-from-devices.md#q6-tailscale-serveのhttpsで暗号化は増えるのか)）。
+`127.0.0.1`のままで何が守られ何が守られないかは
+[問答 Q4・Q5](../questions/2026-11-08-reaching-home-server-from-devices.md#q4-127001にbindしたままなぜ外から使えるのか)。
 
 ## この決定で変わらないこと
 
