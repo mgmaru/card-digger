@@ -40,6 +40,8 @@ docs/
 │   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
 │   └── test-policy.md
+├── adr/
+│   └── 0001-run-on-home-windows-via-tailscale.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -82,6 +84,23 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [ci-policy.md](development/ci-policy.md):
   CIで実行する範囲、PR運用、Merge基準、Branch保護
 
+### `adr/`
+
+**1つの仕様書に収まらない決定**の、選択肢と選んだ理由を置く（Architecture Decision Record）。
+2026-11-08に作った。
+
+- [0001-run-on-home-windows-via-tailscale.md](adr/0001-run-on-home-windows-via-tailscale.md):
+  家のWindowsで動かし、3台からTailscale（`tailscale serve`）で繋ぐ。**2026-11-08決定**
+
+書き方の約束。
+
+- **番号は通し番号で、振り直さない。**覆すときは新しいADRを書き、古い方の状態欄に「NNNNで置き換え」と書く
+- 選択肢を表で並べ、**採用しなかった理由も書く。**値には出所と確認日を添える
+- **進捗の`- [ ]`を書かない。**残作業は[planning/todo.md](planning/todo.md)へ置き、ADRからLinkする
+- 影響を受ける仕様書には要約を複製せず、ADRへのLinkを1行置く
+- **これまでの決定（[concept.md §19](product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)など）は移さない。**
+  1つの仕様書の中で閉じる決定は、引き続きその仕様書が持つ
+
 ### `retrospectives/`
 
 うまくいかなかったことと、そこから何を学んだかを置く。**実装のための文書ではない。**
@@ -114,6 +133,7 @@ Mercari取得方式の技術検証、選定、Adapter設計を置く。
 - Phaseをまたぐ開発・依存・Repositoryの運用手順は`development/`
 - 特定Phaseだけで使う調査・技術判断・実装仕様は`phase-N/`
 - 失敗の経緯と教訓は`retrospectives/`（実装の正本にはしない）
+- 1つの仕様書に収まらない決定の選択肢と理由は`adr/`
 - PoCの実行コードと方式別結果は引き続きRepository直下の`poc/`
 - **検証結果は、それを出したコードの隣に置く**（[下記](#検証結果はそれを出したコードの隣に置く)）
 - `docs/`直下には、このIndex以外の文書を増やさない

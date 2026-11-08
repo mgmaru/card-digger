@@ -3438,6 +3438,25 @@ Marketplace
 
 ---
 
+# 自宅Windowsで使う（2026-11-08決定）
+
+**家のWindowsデスクトップで動かし、Windows・Mac・iPhoneからTailscale経由で使う。**
+選択肢と理由は[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)が正本。
+
+- [ ] Windowsで`uv run --frozen pytest tests`と`npm run test`が通るか確かめる（CIはLinuxだけ）
+- [ ] Frontendが`127.0.0.1:8000`を見に行く問題の直し方を決める
+  （[ADR 0001 未決](../adr/0001-run-on-home-windows-via-tailscale.md#未決--frontendが127001を見に行く問題)。Bを推す）
+- [ ] 決めた直し方をPRにする
+- [ ] Tailscaleの管理画面でMagicDNSとHTTPS証明書を有効にし、`tailscale serve --bg 8000`を設定する
+- [ ] uvicornを起動時に立ち上がるようにする（タスクスケジューラーかNSSM）。`--workers`は付けない
+- [ ] 変更を取り込むPowerShell Scriptを書く。**Buildが失敗したら再起動しない**
+- [ ] Windowsデスクトップのスリープを無効にする
+- [ ] 消費電力を測る
+- [ ] 常時使い始める前に[利用規約・運用上の確認](#利用規約・運用上の確認)を済ませる
+- [ ] 3台（Windows・Mac・iPhone）から検索してSeller画面まで開けることを確かめる
+
+---
+
 # 利用規約・運用上の確認
 
 技術的に取得可能でも、公開サービス化・商用化・大量アクセスが許容されるとは限らない。
