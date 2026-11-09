@@ -3450,6 +3450,11 @@ Marketplace
 - [ ] Tailscaleの管理画面でMagicDNSとHTTPS証明書を有効にし、`tailscale serve --bg 8000`を設定する
 - [ ] uvicornを起動時に立ち上がるようにする（タスクスケジューラーかNSSM）。`--workers`は付けない
 - [ ] 変更を取り込むPowerShell Scriptを書く。**Buildが失敗したら再起動しない**
+  （方法は[ADR 0003](../adr/0003-deploy-changes-to-the-target.md)。論点1〜4は2026-11-09に決定）
+- [ ] CIでBackendのテストをWindowsでも流す（`time.tzset()`の手当てを含む。ADR 0003 論点3）
+- [ ] CIでFrontendを1回だけビルドし、`dist/`を保存する（ADR 0003 論点2）
+- [ ] `/api/health`に安全停止と実行中の収集の状態を足す（ADR 0003 論点6。保留）
+- [ ] 初回のデプロイで、Backendを含む変更の停止時間を実測して記録する（ADR 0003 論点4）
 - [ ] Windowsデスクトップのスリープを無効にする
 - [ ] 消費電力を測る
 - [ ] 常時使い始める前に[利用規約・運用上の確認](#利用規約・運用上の確認)を済ませる
