@@ -102,7 +102,7 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [0001-run-on-home-windows-via-tailscale.md](adr/0001-run-on-home-windows-via-tailscale.md):
   家のWindowsで動かし、3台からTailscale（`tailscale serve`）で繋ぐ。**2026-11-08決定**
 - [0003-deploy-changes-to-the-target.md](adr/0003-deploy-changes-to-the-target.md):
-  変更をデプロイ先へ反映する方法。きっかけ・成果物・CIでの検査・可用性の目標は**2026-11-09決定**、切り替え方などは保留
+  変更をデプロイ先へ反映する方法。きっかけ・成果物・CIでの検査・可用性の目標・遠隔実行は**2026-11-09決定**、切り替え方などは保留
 
 書き方の約束。
 

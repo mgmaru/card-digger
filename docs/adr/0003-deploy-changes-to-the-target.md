@@ -2,10 +2,10 @@
 
 | 項目 | 内容 |
 |---|---|
-| 状態 | **一部決定（2026-11-09）。**論点1〜4は決定、論点5〜7は保留（提案者の推奨あり） |
+| 状態 | **一部決定（2026-11-09）。**論点1〜4と論点7の遠隔実行は決定、論点5・6と論点7の残りは保留（提案者の推奨あり） |
 | 決める人 | 利用者 |
 | 前提 | [ADR 0001](0001-run-on-home-windows-via-tailscale.md)（家のWindowsで動かし、Tailscaleで繋ぐ）。ADR 0002（デプロイ先を設定だけで切り替えられる形にする。PR #42でレビュー中） |
-| 仕組みの説明 | 問答「Pythonのバックエンドは、何をデプロイするのか」（PR #47でレビュー中） |
+| 仕組みの説明 | [Pythonのバックエンドは、何をデプロイするのか](../questions/2026-11-09-what-a-python-backend-deploys.md) |
 
 ## 背景
 
@@ -36,7 +36,7 @@ ADR 0001・0002で「どこで・どう動かすか」は決まりつつある�
 | 4 | [可用性の目標](#論点4--可用性の目標) | **決定** | Backendを含む変更では数秒止まってよい。Mercariへの約束を優先する |
 | 5 | [切り替え方](#論点5--切り替え方) | 保留 | 版ごとのフォルダー、確認、失敗したら自動で戻す。Blue-Greenは採らない |
 | 6 | [デプロイ前に確かめること](#論点6--デプロイ前に確かめること) | 保留 | CIが緑、安全停止中でない、実行中の検索が無い。**`src/`の小さな変更が要る** |
-| 7 | [細部](#論点7--細部) | 保留 | 1つのファイルにまとめるか、`--frozen`か`--locked`か、出所証明、遠隔実行 |
+| 7 | [細部](#論点7--細部) | **一部決定** | **WindowsからもMacからも実行する（決定）。**1つのファイルにまとめるか、`--frozen`か`--locked`か、出所証明は保留 |
 
 ## 論点1 — きっかけ
 
@@ -222,7 +222,63 @@ flowchart TD
 | 成果物の取り方 | 3つを別々に取る（`dist/`はActions、ソースはリポジトリ、パッケージはPyPI）／CIで`dist/`とソースを**1つのファイル**にまとめる | **1つのファイルにまとめる。**デプロイの単位が1つになり、インフラとして分かりやすい。依存パッケージはどちらでもPyPIから入れる |
 | `uv sync`の指定 | `--frozen`（`uv.lock`をそのまま使う）／`--locked`（`uv.lock`が`pyproject.toml`と食い違っていたらエラー） | **`--locked`。**デプロイでは食い違いを見逃さない方が安全 |
 | 成果物の出所の証明 | 使わない／GitHubのartifact attestation（「このリポジトリのこのWorkflowが、このcommitから作った」をWindowsで`gh attestation verify`で確かめる） | 最初は使わない。**慣れてから足す**（インフラの練習として価値がある） |
-| 遠隔実行 | Windowsの前で実行／MacからTailnet経由でWindowsのOpenSSHへ入って実行 | **利用者に確かめる**（2026-11-09時点で未回答） |
+| 遠隔実行 | Windowsの前で実行／MacからTailnet経由でWindowsのOpenSSHへ入って実行 | **決定（下）** |
+
+### 決定（2026-11-09）— WindowsからもMacからも実行する
+
+**利用者が決めた。**「デプロイはWindowsでもMacでも実行したい」。
+
+**Scriptが動くのは、どちらの場合もWindowsである。**Macは、Tailnet経由でWindowsに入って
+同じScriptを実行させるだけで、Mac自身はデプロイの中身を何も持たない。
+
+```mermaid
+flowchart LR
+    subgraph WIN["Windows（デプロイ先）"]
+        S["deploy.ps1<br/>（ここだけで動く）"]
+        G["gh のログイン<br/>（成果物を取るため）"]
+        R["releases/SHA/"]
+        S --> R
+        G --> S
+    end
+    U1["Windowsの前で実行"] --> S
+    M["Mac"] -- "ssh（Tailnetの中だけ）" --> O["WindowsのOpenSSHサーバー"]
+    O --> S
+```
+
+| 決めたこと | 理由 |
+|---|---|
+| **Scriptは1つで、Windowsにだけ置く** | どこから実行しても同じ手順になる。Macに別の手順を持たせると、2つが食い違う |
+| **GitHubへのログイン（`gh`）はWindowsだけが持つ** | 成果物を取るのはWindowsである。認証情報を置く場所を1つにする |
+| **MacからはSSHで入る** | 下の「入り方」 |
+
+#### Macからの入り方（推奨。保留）
+
+| 選択肢 | 内容 | 判定 |
+|---|---|---|
+| Tailscale SSH | Tailscaleが自分のSSHサーバーを持つ機能 | **Windowsでは使えない見込み。**第三者の記述では「Windowsはサーバーとして非対応」。**公式ドキュメントでは確かめられていない**（2026-11-09） |
+| **Windows標準のOpenSSHサーバー** | Windowsの機能として入れられるSSHサーバー | **推奨** |
+
+OpenSSHサーバーを入れると、**Windowsに新しい入口がもう1つできる。**uvicornを`127.0.0.1`に閉じたのと同じ考えで、
+次の3つで絞る。
+
+| # | 絞り方 | 理由 |
+|---|---|---|
+| 1 | **Windowsファイアウォールで、受け付ける相手をTailnetのアドレス（`100.64.0.0/10`）だけにする** | 家のLANから入れないようにする（[0.0.0.0の問答](../questions/2026-11-08-what-binding-to-0000-means.md)のQ3、2枚の扉） |
+| 2 | **鍵認証だけにし、パスワード認証を切る** | パスワードを当てられて入られる道を無くす |
+| 3 | 入れる利用者を、デプロイに使う1人に限る | 入った後にできることを狭める |
+
+#### 2か所から実行できるので、同時に走らせない
+
+WindowsとMacの両方から実行できると、**2つのデプロイが同時に走る**ことがありうる。片方が旧版を止め、
+もう片方が別の版を起動する、といった壊れ方をする。
+
+| 仕掛け | 内容 |
+|---|---|
+| **デプロイの鍵（lock）** | Scriptは始めに`C:\card-digger\deploy.lock`を作る。既にあれば、誰がいつ始めたかを表示して**止まる** |
+| 鍵の後始末 | 終わったら（失敗しても）鍵を消す。異常終了で残った鍵は、表示を見て手で消す |
+
+出所：[Tailscale Setup（第三者。Windowsのサーバー非対応の記述）](https://ac-training-lab.readthedocs.io/en/latest/tailscale-setup.html)、
+[Supported Windows versions（公式。クライアントの要件）](https://tailscale.com/docs/reference/troubleshooting/windows/supported-windows-versions.md)。
 
 ## 決めた後・実装するときに直すもの
 
@@ -233,4 +289,4 @@ flowchart TD
 | [ci-policy §4](../development/ci-policy.md#4-pr運用)、`CLAUDE.md` | `deploy/`もPRを経由する（ADR 0002の論点4で`deploy/`を選んだ場合） | Scriptを置くPR |
 | `src/backend/tests/unit/test_normalization.py` | `time.tzset()`をWindowsで手当てする | 論点3を実装するPR |
 | [todo](../planning/todo.md#自宅windowsで使う2026-11-08決定) | 実装の項目 | このADRと同じPR |
-| このADR | 論点5〜7の決定、初回デプロイで実測した停止時間 | 決めた時・測った時 |
+| このADR | 論点5・6と論点7の残りの決定、初回デプロイで実測した停止時間 | 決めた時・測った時 |
