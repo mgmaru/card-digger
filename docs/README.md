@@ -49,6 +49,7 @@ docs/
 │   ├── 2026-11-08-what-static-files-are.md
 │   ├── 2026-11-08-what-wireguard-and-tls-protect.md
 │   ├── 2026-11-08-who-builds-the-screen.md
+│   ├── 2026-11-09-how-ssh-keys-prove-who-you-are.md
 │   ├── 2026-11-09-what-a-python-backend-deploys.md
 │   └── 2026-11-09-what-a-reverse-proxy-is.md
 ├── retrospectives/
@@ -133,6 +134,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   リバースプロキシとは何か。`tailscale serve`の役割、TLS終端、フォワードとリバースの違いと入れる理由
 - [2026-11-09-what-a-python-backend-deploys.md](questions/2026-11-09-what-a-python-backend-deploys.md):
   Pythonのバックエンドは何をデプロイするのか。OSの差の判断、ビルドが無い理由、`uv.lock`と`uv sync --frozen`、デプロイ先が受け取るもの
+- [2026-11-09-how-ssh-keys-prove-who-you-are.md](questions/2026-11-09-how-ssh-keys-prove-who-you-are.md):
+  SSHの鍵はどうやって本人だと証明するのか。南京錠のたとえ、パスワードより安全な理由、公開鍵が漏れても大丈夫な理由、まずいこと
 
 書き方の約束。
 
