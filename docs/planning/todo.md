@@ -3452,8 +3452,9 @@ Marketplace
 - [ ] 変更を取り込むPowerShell Scriptを書く。**Buildが失敗したら再起動しない**
   （方法は[ADR 0003](../adr/0003-deploy-changes-to-the-target.md)。論点1〜4は2026-11-09に決定）
 - [ ] CIでBackendのテストをWindowsでも流す（`time.tzset()`の手当てを含む。ADR 0003 論点3）
-- [ ] CIでFrontendを1回だけビルドし、`dist/`を保存する（ADR 0003 論点2）
-- [ ] `/api/health`に安全停止と実行中の収集の状態を足す（ADR 0003 論点6。保留）
+- [ ] CIでFrontendを1回だけビルドし、`dist/`とBackendのソース・`uv.lock`を1つのファイルにまとめて保存する（ADR 0003 論点2・7）
+- [ ] `/api/health`に安全停止と実行中の収集の状態を足す（ADR 0003 論点6。2026-11-09決定）
+- [ ] `deploy/windows-tailscale/`にデプロイScriptを置く（版ごとのフォルダー、確認、自動で戻す、デプロイの鍵。ADR 0003 論点5・7）
 - [ ] 初回のデプロイで、Backendを含む変更の停止時間を実測して記録する（ADR 0003 論点4）
 - [x] Windowsの既存のSSHサーバーの状態を確かめる（2026-11-09。すべての口で待ち、家のLANから届き、パスワードで入れた）
 - [ ] WindowsのSSHを鍵認証だけにする。**鍵で入れることを確かめてから**パスワードを切る（ADR 0003 論点7、B。2026-11-09決定）
