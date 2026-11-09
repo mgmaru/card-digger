@@ -50,7 +50,8 @@ docs/
 │   ├── 2026-11-08-what-wireguard-and-tls-protect.md
 │   ├── 2026-11-08-who-builds-the-screen.md
 │   ├── 2026-11-09-what-a-python-backend-deploys.md
-│   └── 2026-11-09-what-a-reverse-proxy-is.md
+│   ├── 2026-11-09-what-a-reverse-proxy-is.md
+│   └── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -133,6 +134,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   リバースプロキシとは何か。`tailscale serve`の役割、TLS終端、フォワードとリバースの違いと入れる理由
 - [2026-11-09-what-a-python-backend-deploys.md](questions/2026-11-09-what-a-python-backend-deploys.md):
   Pythonのバックエンドは何をデプロイするのか。OSの差の判断、ビルドが無い理由、`uv.lock`と`uv sync --frozen`、デプロイ先が受け取るもの
+- [2026-11-09-why-ssh-on-all-addresses-is-risky.md](questions/2026-11-09-why-ssh-on-all-addresses-is-risky.md):
+  SSHサーバーが`0.0.0.0:22`で待つと、なぜ家のLANから入れて、なぜ危ないのか。2枚の扉、どちらを閉めるか、家のLANから入りたいとき
 
 書き方の約束。
 
