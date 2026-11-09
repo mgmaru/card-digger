@@ -25,7 +25,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 
 - **進捗の`- [ ]`は`docs/planning/todo.md`だけに置く。** 仕様書は「何をやるか」を定義し、
   済んだかは追わない（[配置ルール](docs/README.md#checkboxは3種類ある)）
-- **`src/` `poc/` `tools/` `.github/`はPull Requestを経由する。** `docs/`と`README.md`は
+- **`src/` `poc/` `tools/` `.github/` `deploy/`はPull Requestを経由する。** `docs/`と`README.md`は
   `main`へ直接pushしてよい（[§4](docs/development/ci-policy.md#4-pr運用)）
 - **Merge後もBranchを消さない。** Squashで潰れる前のcommitはBranchにしか残らない
   （[§5](docs/development/ci-policy.md#5-merge基準)）

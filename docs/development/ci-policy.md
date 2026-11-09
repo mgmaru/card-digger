@@ -127,7 +127,7 @@ upstream由来の`.github/workflows/check.yaml`をそのまま使う。**新規�
 
 | 変更対象 | 運用 |
 |---|---|
-| `src/`、`poc/`、`tools/`、`.github/` | **Pull Requestを経由する** |
+| `src/`、`poc/`、`tools/`、`.github/`、`deploy/` | **Pull Requestを経由する**（`deploy/`は2026-11-09に追加。[ADR 0002 論点4](../adr/0002-switch-deploy-target-by-configuration.md#論点4--デプロイ先ごとのファイルをどこに置くか)） |
 | `docs/`、`README.md`、`CLAUDE.md` | `main`への直接pushを許容する |
 | Fork（`mgmaru/mercapi`） | 目的ごとにBranchを分け、`--no-ff`で`main`へMergeする |
 
