@@ -39,6 +39,7 @@ docs/
 │   ├── architecture.md
 │   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
+│   ├── ssh-key-setup.md
 │   └── test-policy.md
 ├── adr/
 │   └── 0001-run-on-home-windows-via-tailscale.md
@@ -94,6 +95,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   用語、Testの目的と役割、Test層、Framework、配置、Fixtureの匿名化規則、実行時期、完了判定
 - [ci-policy.md](development/ci-policy.md):
   CIで実行する範囲、PR運用、Merge基準、Branch保護
+- [ssh-key-setup.md](development/ssh-key-setup.md):
+  Macから家のWindowsへ、SSHの鍵で入る手順。鍵の作り方、Windowsの棚への登録、パスワードを切る順番。
+  **デプロイ先固有の手順だが、利用者の判断で`deploy/`ではなくここに置いた**（2026-11-09）
 
 ### `adr/`
 
