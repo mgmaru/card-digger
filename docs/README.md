@@ -50,6 +50,7 @@ docs/
 │   ├── 2026-11-08-what-static-files-are.md
 │   ├── 2026-11-08-what-wireguard-and-tls-protect.md
 │   ├── 2026-11-08-who-builds-the-screen.md
+│   ├── 2026-11-09-what-a-python-backend-deploys.md
 │   └── 2026-11-09-what-a-reverse-proxy-is.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
@@ -133,6 +134,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   画面とAPIは誰がどこで組み立てるのか。uvicornとFastAPIの境目（ASGI）、要求の振り分け、SSRとCSR、SPA fallback
 - [2026-11-09-what-a-reverse-proxy-is.md](questions/2026-11-09-what-a-reverse-proxy-is.md):
   リバースプロキシとは何か。`tailscale serve`の役割、TLS終端、フォワードとリバースの違いと入れる理由
+- [2026-11-09-what-a-python-backend-deploys.md](questions/2026-11-09-what-a-python-backend-deploys.md):
+  Pythonのバックエンドは何をデプロイするのか。OSの差の判断、ビルドが無い理由、`uv.lock`と`uv sync --frozen`、デプロイ先が受け取るもの
 
 書き方の約束。
 
