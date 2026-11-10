@@ -3448,6 +3448,8 @@ Marketplace
   （[ADR 0002](../adr/0002-switch-deploy-target-by-configuration.md)の5論点。**論点5は2026-11-09に決定（消す）、論点1は2026-11-11にCに決定。`tailscale serve`だけで足りるかはWindowsでの検証待ち**）
 - [x] ADR 0002 論点5の変更（`client.ts`の相対パス化、Viteの中継、Test）をPRにする（2026-11-09、#46でマージ）
 - [ ] ADR 0002 論点1の検証をWindowsで行う（`tailscale serve`のディレクトリ配信、`/api`のパス、SPA fallback、`current\dist`のジャンクションを通して配れるか）
+  （2026-11-11に途中まで。1・2・4はできた（2は渡し先をパスつきにして）、3は404。**残りは`current`の向け直し（手順書の6）と片付け（7）**。[手順書](../development/windows-tailscale-serve-checks.md#途中で止めた2026-11-11)）
+- [ ] SPA fallbackが無いことの手当てを選ぶ：C＋D（`HashRouter`）かC＋Caddy（[ADR 0002 検証の結果](../adr/0002-switch-deploy-target-by-configuration.md#検証の結果2026-11-11途中)。提案者はC＋Dを推す）
 - [ ] 決めた直し方をPRにする
 - [ ] Tailscaleの管理画面でMagicDNSとHTTPS証明書を有効にし、`tailscale serve --bg 8000`を設定する
 - [ ] uvicornを起動時に立ち上がるようにする（**タスクスケジューラー**。2026-11-10に仮のサーバーで、ログインしていなくても起動することを確かめた）。`--workers`は付けない
@@ -3474,6 +3476,11 @@ Marketplace
 - [ ] 消費電力を測る
 - [ ] 常時使い始める前に[利用規約・運用上の確認](#利用規約・運用上の確認)を済ませる
 - [ ] 3台（Windows・Mac・iPhone）から検索してSeller画面まで開けることを確かめる
+- [ ] ネットワークとサーバーの設定がすべて済んだら、家のWindowsで動かす構成図を設計書に書く（2026-11-11に利用者が依頼）。
+  描くもの：3台の端末とTailnet、入口の`tailscale serve`（`/`と`/api`の振り分け）、uvicornのタスクとデプロイ用のタスク、
+  `releases\`と`current`、SSHの入口と2つのアカウント（デプロイ用・管理者の踏み台）、CIの成果物がWindowsへ届く流れ。
+  置き場所は[architecture §8](../development/architecture.md#8-デプロイ先をソースコードに持たない2026-11-08決定)を候補に、
+  書くときに[文書の役割](../README.md)で決める
 
 ---
 
