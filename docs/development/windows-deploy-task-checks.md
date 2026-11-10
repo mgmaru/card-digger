@@ -8,7 +8,7 @@
   （準備と切り替えはタスクの中で行い、SSHからはそのタスクを起動するだけにする）が、実際のWindowsで成り立つかを、デプロイScriptを書く前に確かめる
 - 根拠: ADR 0003 論点5の「まだ確かめていないこと」
 - 前提: [前回の確かめの手順書](windows-deploy-checks.md)が済んでいる（デプロイ用ユーザーに「バッチ ジョブとしてログオン」の権利があり、uvが入り、Run unattendedが有効）
-- 状態: **2026-11-10に実行中。**1-1は済んだ（`git`はあった）
+- 状態: **2026-11-10に実行中。**1〜3-3は済んだ（1回目のデプロイは`RESULT: OK`）
 
 **前回の手順書の書き方をそのまま使う。**伏せ字（`<デプロイ用ユーザー>`など）、[どこで誰として打つか](windows-deploy-checks.md#どこで誰として打つか)、
 [コマンドの貼り方](windows-deploy-checks.md#コマンドの貼り方)、[長い結果をMacへ送る方法](windows-deploy-checks.md#結果が長いとき--ファイルにしてmacへ送る)は、前回の手順書にある。
@@ -262,6 +262,22 @@ Get-Content C:\card-digger-check\deploy-check.log
 
 記録が長くて読みにくいときは、[Macへ送る方法](windows-deploy-checks.md#結果が長いとき--ファイルにしてmacへ送る)で送る
 （`C:\card-digger-check\deploy-check.log`はデプロイ用ユーザーのファイルなので、そのまま`scp`で取れる）。
+
+**2026-11-10の結果（1回目）。`RESULT: OK`。始めから終わりまで23秒だった。**
+
+| 記録の行（時刻） | 確かめ |
+|---|---|
+| `whoami: <ホスト名>\<デプロイ用ユーザー>`（23:47:17） | タスクがデプロイ用ユーザーとして動いた |
+| `request: eb3d802…`（23:47:17） | **F：SSHから書いた版の名前を、タスクが読めた** |
+| `git: git version 2.44.0.windows.1` | タスクから`git`が使えた |
+| `download: exit 0`、`release: …`（23:47:19〜24） | タスクの中からGitHubへ取りに行けた |
+| `uv> Using CPython 3.11.18`、`Creating virtual environment at: .venv`、`Updating https://github.com/mgmaru/mercapi.git`、`Installed 27 packages` | **D：タスクの中で`.venv`を作り、`mercapi`をgitで取り、`uv sync --locked`が通った**（`uv sync: exit 0`、23:47:31） |
+| `uvicorn before: …準備完了`、`stop uvicorn: exit 0` | uvicornは動いていなかった。**動いていなくても`schtasks /end`は`exit 0`を返す**（下） |
+| `junction: current -> …releases\eb3d802…`（23:47:33） | タスクが`current`を作った |
+| `start uvicorn: exit 0`、`health: 200`（23:47:40） | **`current`を通してuvicornが起動し、7秒以内に応答した。**タスクが作ったジャンクションを、別のタスクがたどれた |
+
+**`schtasks /end`の`exit 0`は、止めた証拠にならない。**動いていないタスクに対しても`0`を返した。
+4で「止めた」ことを確かめるには、uvicornのタスクの`前回の実行時刻`が新しくなったかを見る。
 
 ### 3-4. SSHからも応答を見る
 
