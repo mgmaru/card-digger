@@ -201,6 +201,23 @@ export type SellerAnalysisResponse = {
   sellerIsInactive: boolean | null;
 };
 
+/** Whether the safety stop is holding, and for how long. */
+export type SafetyStopStatus = {
+  active: boolean;
+  /** Seconds until a request may be made again. `null` when not stopped. */
+  retryAfterSeconds: number | null;
+};
+
+/**
+ * Whether the process is up, and what a restart would throw away.
+ *
+ * The screen does not read the last two fields. They are for the deploy,
+ * which must not restart the process during a safety stop or a collection
+ * (ADR 0003 issue 6).
+ */
 export type HealthResponse = {
   status: string;
+  safetyStop: SafetyStopStatus;
+  /** How many collections are running or queued. A count, never what for. */
+  collectionsInFlight: number;
 };

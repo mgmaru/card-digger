@@ -326,5 +326,30 @@ class SellerAnalysisResponse(CamelModel):
     seller_is_inactive: bool | None = None
 
 
+class SafetyStopStatusResponse(CamelModel):
+    """Whether the safety stop is holding, and for how long.
+
+    `active` is said outright although `retry_after_seconds` implies it, so a
+    deploy script reads one boolean rather than knowing that null means no.
+    """
+
+    active: bool
+    retry_after_seconds: int | None = None
+
+
 class HealthResponse(CamelModel):
+    """Whether the process is up, and whether restarting it now would cost.
+
+    Read before a deploy (ADR 0003 issue 6). Restarting clears the safety stop,
+    which lives only in this process's memory, and cuts off a collection that
+    is running. Both are reported as facts. Whether to deploy is the deploy
+    script's decision, because it also weighs what this process cannot see,
+    such as whether CI passed for the commit.
+    """
+
     status: str = Field(default="ok")
+    safety_stop: SafetyStopStatusResponse
+    #: How many collections are running or queued. A count and nothing else:
+    #: what they are for — a keyword, a seller — is nobody's business but the
+    #: screen that asked.
+    collections_in_flight: int

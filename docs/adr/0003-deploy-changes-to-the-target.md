@@ -285,6 +285,7 @@ Mercariへ通信しない受入用のアプリを`current`を通して起動し�
 | 3 | **実行中の検索が無い** | 止めると検索が途中で切れる | **できない**（旧版を止めるときに終わるのを待つことはできる） |
 
 **2と3は、今のAPIでは外から知る手段が無い。**`/api/health`は「起きているか」しか返さない。
+（**2026-11-10に足した。**`safetyStop`と`collectionsInFlight`を返す。形は[MVP仕様](../product/mvp-spec.md#get-apihealth)にある。）
 `/api/health`に安全停止と実行中の収集の状態を足すなど、**`src/`の小さな変更が要る。**
 これはデプロイ先固有の値ではなく、アプリの状態を外へ見せる変更なので、「デプロイ先を`src/`に持たない」
 方針には反しない。
@@ -536,7 +537,7 @@ SSHで入ったデプロイ用ユーザーは`NT AUTHORITY\NETWORK`として扱�
 | [ci-policy §4](../development/ci-policy.md#4-pr運用)、`CLAUDE.md` | `deploy/`もPRを経由する | **ADR 0002の論点4で決め、PR #42で直した** |
 | `src/backend/tests/unit/test_normalization.py` | `time.tzset()`をWindowsで手当てする | 論点3を実装するPR |
 | [todo](../planning/todo.md#自宅windowsで使う2026-11-08決定) | 実装の項目 | このADRと同じPR |
-| `src/backend/card_digger/api/`（`/api/health`） | 安全停止と実行中の収集の状態を返す（論点6） | 論点6を実装するPR |
+| `src/backend/card_digger/api/`（`/api/health`） | 安全停止と実行中の収集の状態を返す（論点6） | **2026-11-10に実装した。**応答の形は[MVP仕様](../product/mvp-spec.md#get-apihealth)が持つ |
 | [SSHの鍵の手順書](../development/ssh-key-setup.md) | デプロイ用の一般ユーザーを作り、その人の棚に鍵を置く手順 | **PR #51で直した** |
 | [タスクの中で確かめる手順書](../development/windows-deploy-task-checks.md) | 論点5の見直しで確かめること（タスクの中の`uv sync`など）の手順 | **2026-11-10に作り、実行した** |
 | このADR | 初回デプロイで実測した停止時間、成果物のテストの決定 | 測った時・ADR 0002の論点1が決まった時 |

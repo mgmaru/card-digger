@@ -3455,7 +3455,7 @@ Marketplace
   （方法は[ADR 0003](../adr/0003-deploy-changes-to-the-target.md)。論点1〜4は2026-11-09に決定）
 - [ ] CIでBackendのテストをWindowsでも流す（`time.tzset()`の手当てを含む。ADR 0003 論点3）
 - [ ] CIでFrontendを1回だけビルドし、`dist/`とBackendのソース・`uv.lock`を1つのファイルにまとめて保存する（ADR 0003 論点2・7）
-- [ ] `/api/health`に安全停止と実行中の収集の状態を足す（ADR 0003 論点6。2026-11-09決定）
+- [x] `/api/health`に安全停止と実行中の収集の状態を足す（2026-11-10。`safetyStop`と`collectionsInFlight`。ADR 0003 論点6）
 - [x] タスクの中で`uv venv`・`uv sync --locked`が通るか確かめる（2026-11-10。通った。[タスクの中で確かめる手順書](../development/windows-deploy-task-checks.md)。ADR 0003 論点5の見直し）
 - [x] デプロイ用のタスクから、uvicornのタスクを止めて起動できるか確かめる（2026-11-10。できた。ADR 0003 論点5の見直し）
 - [x] 版の名前をデプロイ用のタスクへ渡す形を決める（2026-11-10。ファイルで渡せた。ADR 0003 論点5の見直し）
