@@ -75,6 +75,18 @@ jobs:
         working-directory: src/frontend
         run: npm run build
 
+      # Handed to the package job, which is the only one that reads it. This is
+      # the one build the deploy uses: the package does not build again
+      # (ADR 0003 issue 2, build once).
+      - name: Keep the build for the package
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: src/frontend/dist/
+          retention-days: 1
+          if-no-files-found: error
+
   backend:
     name: Backend unit and contract tests
     runs-on: ubuntu-latest
@@ -161,3 +173,49 @@ jobs:
           name: playwright-traces
           path: src/frontend/test-results/
           retention-days: 7
+
+  package:
+    name: Deploy package
+    # What the deploy on the Windows machine takes (ADR 0003 issues 2 and 7):
+    # the frontend build, the backend source and uv.lock of one commit, in one
+    # file with one hash. It needs every other job, so a package exists only
+    # for a commit CI passed. It deploys nothing: the Windows machine fetches
+    # it, by hand, when its owner runs the deploy.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [docs, poc, frontend, backend, backend-windows, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Take the frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: Assemble the package
+        run: |
+          name="card-digger-${GITHUB_SHA}"
+          mkdir -p "out/${name}"
+          # Only what git tracks, at this commit. Nothing the runner made.
+          git archive --format=tar HEAD src/backend | tar -x -C "out/${name}"
+          cp -R frontend-dist "out/${name}/dist"
+          printf '{"commit":"%s","runId":"%s","builtAt":"%s"}\n' \
+            "${GITHUB_SHA}" "${GITHUB_RUN_ID}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > "out/${name}/manifest.json"
+          (cd out && zip -qr "${name}.zip" "${name}")
+          (cd out && sha256sum "${name}.zip" > "${name}.zip.sha256")
+          cat "out/${name}.zip.sha256"
+
+      - name: Keep the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-package-${{ github.sha }}
+          path: |
+            out/card-digger-${{ github.sha }}.zip
+            out/card-digger-${{ github.sha }}.zip.sha256
+          retention-days: 90
+          # Already a zip. Compressing it again buys nothing.
+          compression-level: 0
+          if-no-files-found: error
+
