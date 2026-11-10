@@ -739,10 +739,32 @@ Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, Path
 
 ### 4-1. Tailscaleを無人で動かす設定（Windowsの前で、管理者）
 
-**WindowsのTailscaleは、既定では、ログインしている人が居るときだけつながる。**誰もログインしていないと、
-uvicornが動いていても、iPhoneやMacから届かない。**「無人で動かす」（Run unattended）**を有効にする。
+#### Run unattendedとは
 
-まず今の設定を見る（管理者のPowerShellで）。
+**Windowsに誰もログインしていないときでも、Tailscaleをつないだままにする設定**である。
+WindowsのTailscaleは、既定では**ログインしている人のために**動く。
+
+| 状況 | Run unattendedが無い（既定） | Run unattendedが有る |
+|---|---|---|
+| Windowsの前でログインしている | つながる | つながる |
+| **再起動した後、まだ誰もログインしていない** | **つながらない** | **つながる** |
+| ログインしていた人がサインアウトした | 切れる | つながったまま |
+
+**無いと困ること。**Windows Updateなどで再起動すると、誰かがWindowsの前でログインするまでTailscaleがつながらない。
+uvicornがタスクで動いていても（[バッチ ジョブとしてログオンの権利](#バッチ-ジョブとしてログオンの権利)で動くようになった）、iPhoneやMacからは届かない。
+**Bでは、uvicornと、そこへの道（Tailscale）の両方が、ログインしていなくても揃うかを見る。**
+
+| 何が変わるか | |
+|---|---|
+| 変わる | 誰もログインしていなくても、Windowsがtailnetにつながったままになる |
+| 変わらない | 届く相手。**tailnetに入っている自分の端末からだけ**届くのは同じ（[ADR 0001 決定2](../adr/0001-run-on-home-windows-via-tailscale.md#決定2--端末からはtailscaleで繋ぐ)）。Tailscaleにログインしているアカウントも変わらない |
+
+#### 確かめ方
+
+**画面で見るのが確実である。**タスクバーの右の通知領域（時計の近く。`^`の中に隠れていることがある）にあるTailscaleのアイコンを右クリックし、
+**Preferences**（設定）の中の**Run unattended**にチェックが入っているかを見る。入っていなければ、チェックを入れる。
+
+コマンドでも確かめられる（管理者のPowerShell）。
 
 ```powershell
 & "C:\Program Files\Tailscale\tailscale.exe" debug prefs | Select-String ForceDaemon
@@ -750,16 +772,10 @@ uvicornが動いていても、iPhoneやMacから届かない。**「無人で�
 
 | 結果 | 意味 |
 |---|---|
-| `"ForceDaemon": true` | 既に無人で動く設定。4-2へ |
-| `"ForceDaemon": false` | 無人で動かない。下で有効にする |
+| `"ForceDaemon": true` | 無人で動く設定になっている。4-2へ |
+| **何も出ない** | **無効。**無効のときは、この項目そのものが書かれない（2026-11-10に確かめた） |
 
-**有効にする。**タスクバーの右のTailscaleのアイコンを右クリックし、**Preferences**（または「設定」）の中の
-**Run unattended**にチェックを入れる。もう一度上のコマンドで`true`になったことを確かめる。
-
-| 何が変わるか | |
-|---|---|
-| 変わる | 誰もログインしていなくても、Windowsがtailnetにつながったままになる |
-| 変わらない | 届く相手。**tailnetに入っている自分の端末からだけ**届くのは同じ（[ADR 0001 決定2](../adr/0001-run-on-home-windows-via-tailscale.md#決定2--端末からはtailscaleで繋ぐ)） |
+**2026-11-10の結果。**最初は何も出ず、画面ではチェックが入っていなかった。チェックを入れると`"ForceDaemon": true`と出た。
 
 ### 4-2. 再起動する
 
@@ -889,7 +905,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<ホスト名>:8080/
 | 確かめ | 記録すること |
 |---|---|
 | A | 3-1・3-2・3-3それぞれ、できたか。**3-3で子のPythonが残ったか** |
-| B | 4-1の`ForceDaemon`の最初の値。4-3の`offline`の有無。4-4の`前回の結果`の番号 |
+| B | 4-1のRun unattendedの最初の状態。4-3の`offline`の有無。4-4の`前回の結果`の番号 |
 | C | 5-2が通ったか。通らなかったら**エラーの文** |
 
 結果でADRのどこを直すか。
