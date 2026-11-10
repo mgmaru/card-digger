@@ -163,6 +163,16 @@ New-Item -ItemType Directory C:\card-digger-check | Out-Null
 | `C:\card-digger-check\` | 確かめるためだけのフォルダー。**本番の`C:\card-digger\`とは分ける**。最後に消す |
 | `uv venv --python 3.11` | Pythonの環境（`.venv`）を作る。Card Diggerと同じ3.11（`src/backend/.python-version`）。無ければuvがPythonを取ってくる |
 
+**2026-11-10、SSHから実行すると`uv venv`が失敗した。**
+
+```text
+error: Failed to create Python minor version link directory
+  cause: 信頼されていないマウントポイントが含まれているため、パスをスキャンできません。 (os error 448)
+```
+
+uvはPythonを入れるとき、`3.11`という名前で実際の版のフォルダーを指すジャンクションを作る。そこで、Windowsがジャンクションをたどるのを断った。
+**SSHから入ったときだけ起きるかは、まだ確かめていない。**論点5の`current`もジャンクションなので、原因が分かるまで先へ進まない。
+
 **なぜ`.venv`のPythonで動かすのか。**本番のuvicornは、版ごとのフォルダーの`.venv`のPythonで動く（ADR 0003 論点5）。
 **Windowsの`.venv\Scripts\python.exe`は、本物のPythonを子として起動する中継役である。**
 タスクを止めたとき、中継役だけが止まって**子（本物のPython）が8000番を握ったまま残る**ことがありうる。
