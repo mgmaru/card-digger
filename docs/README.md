@@ -40,7 +40,8 @@ docs/
 │   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
 │   ├── ssh-key-setup.md
-│   └── test-policy.md
+│   ├── test-policy.md
+│   └── windows-deploy-checks.md
 ├── adr/
 │   └── 0001-run-on-home-windows-via-tailscale.md
 ├── questions/
@@ -98,6 +99,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [ssh-key-setup.md](development/ssh-key-setup.md):
   Macから家のWindowsへ、SSHの鍵で入る手順。鍵の作り方、Windowsの棚への登録、パスワードを切る順番。
   **デプロイ先固有の手順だが、利用者の判断で`deploy/`ではなくここに置いた**（2026-11-09）
+- [windows-deploy-checks.md](development/windows-deploy-checks.md):
+  デプロイScriptを書く前に、家のWindowsで、一般ユーザーがuvicornのタスクを止めて起動できるか、
+  ログインせずに動くか、`tailscale serve`を変えられるかを確かめる手順。`ssh-key-setup.md`と同じ理由でここに置く
 
 ### `adr/`
 
