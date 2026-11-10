@@ -76,6 +76,15 @@ SSHで入るのはデプロイ用ユーザーだけである。
 
 **SSHのPowerShellは、Windowsの前で操作している間も切らずに残しておく。**
 
+**Windowsの前の、管理者のPowerShellの開き方。**
+
+1. Windowsのスタートボタンを押し、そのままキーボードで`powershell`と打つ
+2. 出てきた「Windows PowerShell」を**右クリック**し、「**管理者として実行**」を押す
+3. 「このアプリがデバイスに変更を加えることを許可しますか？」に「はい」
+4. **ウィンドウのタイトルが「管理者: Windows PowerShell」になっていれば正しい**
+
+貼るときは、PowerShellの中で**右クリック**する（PowerShellでは右クリックが貼り付け）。
+
 ### コマンドの貼り方
 
 - **枠の中は、そのままコピーして貼れる。**`<…>`がある枠だけ、書き換えてから貼る
@@ -540,9 +549,15 @@ curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:8000/
 **2026-11-10の結果：`LastRunTime`は`1999/11/30`のまま、`curl.exe`は`000`。管理者が頼んでも動かなかった。**
 デプロイ用ユーザーの権限の問題ではなく、**タスクそのものが起動されていない。**
 
-#### 3-2-2. Windowsに理由を聞く（Windowsの前で、管理者のPowerShell）
+#### 3-2-2. Windowsに理由を聞く（Windowsの前で、管理者のPowerShell → Mac）
 
-**推測で設定を変える前に、タスクスケジューラーの記録から理由を読む。**記録（履歴）は既定で止まっているので、先に有効にする。
+**推測で設定を変える前に、タスクスケジューラーの記録から理由を読む。**
+結果が長いので、画面では読まず、ファイルに書いてMacへ送る（[結果が長いとき](#結果が長いとき--ファイルにしてmacへ送る)）。
+**①〜③はWindowsの前の管理者のPowerShell、④〜⑥はMacのターミナルで、上から順に1つずつ貼る。**
+
+**① 記録を有効にする（Windows・管理者）**
+
+記録（履歴）は既定で止まっている。
 
 ```powershell
 wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true
@@ -552,32 +567,16 @@ wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true
 |---|---|
 | `wevtutil set-log … /enabled:true` | タスクスケジューラーの記録を有効にする。**記録を残し始めるだけ**で、タスクの動きは変えない。タスクスケジューラーの画面の「すべてのタスク履歴を有効にする」と同じ |
 
-もう一度起動を頼み、記録を読む。
+**② 起動を頼み、3秒待つ（Windows・管理者）**
+
+①より前に頼んだ起動は記録に残っていないので、もう一度頼む。
 
 ```powershell
 Start-ScheduledTask -TaskName card-digger-check
 Start-Sleep 3
-Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message
 ```
 
-| 部分 | 何をしているか |
-|---|---|
-| `Get-WinEvent … -MaxEvents 10` | 記録の新しいものから10件を、時刻・番号・文で出す |
-
-**同時に、電池で動いていると見なされていないかを見る。**2で電源の条件を指定しなかったので、既定の「電池では開始しない」が残っている。
-
-```powershell
-Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus
-(Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries
-```
-
-| 部分 | 何をしているか |
-|---|---|
-| `Win32_Battery` | Windowsが電池（UPSを含む）を認識しているか。**何も出なければ電池は無い** |
-| `DisallowStartIfOnBatteries` | `True`なら、電池で動いているときは開始しない |
-
-**結果が長いときは、まとめてファイルにする**（[結果が長いとき](#結果が長いとき--ファイルにしてmacへ送る)）。
-`Start-ScheduledTask`は既に頼んだので、記録を読む行と電池の2行だけを1つにまとめる。
+**③ 記録と電池の情報をファイルに書く（Windows・管理者）**
 
 ```powershell
 & { Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message; Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus; (Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries } | Out-File -Encoding utf8 C:\Users\Public\task-check.txt
@@ -585,22 +584,40 @@ Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus
 
 | 部分 | 何をしているか |
 |---|---|
-| `& { …; …; … }` | 3つのコマンドを続けて実行し、出力を1つにまとめる |
+| `Get-WinEvent … -MaxEvents 10` | 記録の新しいものから10件を、時刻・番号・文で出す。**起動しなかった理由はここに出る** |
+| `Win32_Battery` | Windowsが電池（UPSを含む）を認識しているか。**何も出なければ電池は無い** |
+| `DisallowStartIfOnBatteries` | `True`なら、電池で動いているときは開始しない。2で電源の条件を指定しなかったので、既定の`True`が残っているはず |
+| `& { …; …; … }` | 3つを続けて実行し、出力を1つにまとめる |
+| `Out-File -Encoding utf8 …` | 画面に出さず、誰でも読める`C:\Users\Public\`にファイルとして書く |
 
-**何も表示されずに次のプロンプトが出れば書けている。**赤い文字が出たら書けていない。
-`Get-WinEvent`がエラーになるときは、この節の最初の`wevtutil …`を打っていないか、記録がまだ無い。最初の枠から順に貼り直す。
+| 結果 | 意味 |
+|---|---|
+| **何も表示されずに次のプロンプトが出る** | 書けた。④へ |
+| 赤い文字が出る | 書けていない。`Get-WinEvent`のエラーなら、①を打っていない。①から順に貼り直す |
 
-Macで、ファイルがあるかを見てから取ってくる（[結果が長いとき](#結果が長いとき--ファイルにしてmacへ送る)の2・3）。
+**④ ファイルがあるかを見る（Mac）**
 
 ```bash
 ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" 2>&1 | iconv -f cp932 -t utf-8
 ```
+
+`task-check.txt`が出ればよい。`ファイルが見つかりません`なら、③が実行されていない（2026-11-10に起きた。①〜③をMacで待っている間に、Windowsの前で打っていなかった）。
+
+**⑤ 取ってくる（Mac）**
 
 ```bash
 scp <ホスト名>-deploy:/C:/Users/Public/task-check.txt /tmp/task-check.txt
 ```
 
 取れなければ、`/C:/`を`C:/`にして試す。
+
+**⑥ Windowsのファイルを消す（Mac）**
+
+読み終えてから消す。
+
+```bash
+ssh <ホスト名>-deploy "del C:\Users\Public\task-check.txt"
+```
 
 ### 3-3. 止める
 
