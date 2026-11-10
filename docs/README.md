@@ -44,7 +44,8 @@ docs/
 │   └── windows-deploy-checks.md
 ├── adr/
 │   ├── 0001-run-on-home-windows-via-tailscale.md
-│   └── 0002-switch-deploy-target-by-configuration.md
+│   ├── 0002-switch-deploy-target-by-configuration.md
+│   └── 0003-deploy-changes-to-the-target.md
 ├── questions/
 │   ├── 2026-11-08-reaching-home-server-from-devices.md
 │   ├── 2026-11-08-what-binding-to-0000-means.md
@@ -116,6 +117,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   家のWindowsで動かし、3台からTailscale（`tailscale serve`）で繋ぐ。**2026-11-08決定**
 - [0002-switch-deploy-target-by-configuration.md](adr/0002-switch-deploy-target-by-configuration.md):
   デプロイ先を設定だけで切り替えられる形にする。5論点の選択肢とメリット・デメリット。**保留**
+- [0003-deploy-changes-to-the-target.md](adr/0003-deploy-changes-to-the-target.md):
+  変更をデプロイ先へ反映する方法。きっかけ・成果物・CIでの検査・可用性の目標・切り替え方・事前確認・細部を**2026-11-09決定**
 
 書き方の約束。
 
