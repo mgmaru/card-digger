@@ -76,6 +76,12 @@ SSHで入るのはデプロイ用ユーザーだけである。
 
 **SSHのPowerShellは、Windowsの前で操作している間も切らずに残しておく。**
 
+### コマンドの貼り方
+
+- **枠の中は、そのままコピーして貼れる。**`<…>`がある枠だけ、書き換えてから貼る
+- **長いコマンドも1行で書く。**行の最後に`` ` ``を付けて折り返す書き方は、貼ると途中で切れることがあるので使わない
+- 複数行の枠は、まとめて貼ってよい（1行ずつ順に実行される）。`#`より右は説明で、実行されない
+
 **Aが失敗しても、BとCは続けてよい。**それぞれ独立に答えが出る。失敗したところは[トラブルシュート](#トラブルシュート)を見る。
 直せなかったら、**直さずに「できなかった」と記録する**。それが答えである。
 
@@ -283,32 +289,102 @@ C:\card-digger-check\.venv\Scripts\python.exe -m http.server 8000 --bind 127.0.0
 ## 2. タスクを登録する（Windowsの前で、管理者のPowerShell）
 
 **管理者が行う最初の1回の操作。**スタートメニューで「PowerShell」を右クリックし、「管理者として実行」で開く。
+**下の枠を、上から順に1つずつコピーして貼る。**書き換えるのは2-1の1か所だけである。
+
+### 2-1. タスクを動かすユーザーを決める（ここだけ書き換える）
+
+`<デプロイ用ユーザー>`を実際の名前に書き換えてから貼る。
 
 ```powershell
-$cred = Get-Credential -UserName "$env:COMPUTERNAME\<デプロイ用ユーザー>" -Message "デプロイ用ユーザーのパスワード"
+$deployUser = "$env:COMPUTERNAME\<デプロイ用ユーザー>"
+```
 
-$action = New-ScheduledTaskAction `
-  -Execute "C:\card-digger-check\.venv\Scripts\python.exe" `
-  -Argument "-m http.server 8000 --bind 127.0.0.1 --directory C:\card-digger-check" `
-  -WorkingDirectory "C:\card-digger-check"
-$trigger  = New-ScheduledTaskTrigger -AtStartup
+正しい名前は、**SSHのPowerShell（デプロイ用ユーザー）で`whoami`を打つと出る**（`<ホスト名>\<デプロイ用ユーザー>`の形）。
+そのまま`$deployUser = "…"`の中に入れてもよい。**管理者の名前を入れない。**管理者として動くタスクになってしまう。
+
+### 2-2. パスワードを預ける
+
+```powershell
+$cred = Get-Credential -UserName $deployUser -Message "デプロイ用ユーザーのパスワード"
+```
+
+パスワードを聞く小さな窓が出る。**デプロイ用ユーザーの**パスワードを、パスワード管理ツールから貼る
+（[SSHの手順書 3](ssh-key-setup.md#3-デプロイ用の一般ユーザーを作るwindowsの前で管理者のpowershell)で作ったもの）。管理者のパスワードではない。
+
+```powershell
+$cred.UserName
+```
+
+2-1で決めた名前が出ればよい。
+
+### 2-3. 何を・いつ・どう動かすかを決める
+
+3つを順に貼る。何も表示されないのが正常である。
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "C:\card-digger-check\.venv\Scripts\python.exe" -Argument "-m http.server 8000 --bind 127.0.0.1 --directory C:\card-digger-check" -WorkingDirectory "C:\card-digger-check"
+```
+
+```powershell
+$trigger = New-ScheduledTaskTrigger -AtStartup
+```
+
+```powershell
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan) -MultipleInstances IgnoreNew
-
-Register-ScheduledTask -TaskName "card-digger-check" `
-  -Action $action -Trigger $trigger -Settings $settings `
-  -User $cred.UserName -Password $cred.GetNetworkCredential().Password
 ```
 
 | 部分 | 何をしているか |
 |---|---|
-| `Get-Credential` | デプロイ用ユーザーのWindowsのパスワードを、画面に出さずに聞く。パスワード管理ツールから貼る（[SSHの手順書 3](ssh-key-setup.md#3-デプロイ用の一般ユーザーを作るwindowsの前で管理者のpowershell)で作ったもの） |
-| `New-ScheduledTaskAction` | **何を動かすか。**1-4で手で動かしたのと同じコマンド |
+| `New-ScheduledTaskAction` | **何を動かすか。**1-4と同じコマンド |
 | `-AtStartup` | **いつ動かすか。Windowsが起動したとき。**誰かのログインを待たない |
 | `-ExecutionTimeLimit (New-TimeSpan)` | **時間切れで止めない。**長さ0は「制限なし」の意味。**既定は72時間で、付けないと3日ごとに止まる** |
 | `-MultipleInstances IgnoreNew` | 動いている最中にもう一度起動しようとしても、2つ目を立てない。8000番の取り合いを防ぐ |
+
+### 2-4. 登録する
+
+```powershell
+Register-ScheduledTask -TaskName "card-digger-check" -Action $action -Trigger $trigger -Settings $settings -User $cred.UserName -Password $cred.GetNetworkCredential().Password
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `-Action`・`-Trigger`・`-Settings` | 2-3で決めた3つを組み合わせる |
 | `-User … -Password …` | **誰として動かすか。デプロイ用ユーザーとして、ログインしていなくても動かす。**パスワードはWindowsが預かる |
 
-`TaskName  State`の表に`card-digger-check  Ready`と出ればよい。**まだ起動はしない**（Aで、デプロイ用ユーザーが起動する）。
+| 結果 | 意味 |
+|---|---|
+| `card-digger-check  Ready` | 登録できた（2026-11-10はこれだった）。**まだ起動はしない**（Aで、デプロイ用ユーザーが起動する） |
+| `アカウント名とセキュリティID間のマッピングは実行されませんでした` | **名前のユーザーが見つからない。**2-1で`<デプロイ用ユーザー>`を書き換え忘れたか、綴りが違う（2026-11-10に起きた）。`$cred.UserName`を見て、2-1からやり直す |
+| `$action`などが無いというエラー | ウィンドウを開き直して、2-3の値が消えた。2-1から順に貼り直す |
+
+### 2-5. デプロイ用ユーザーとして動くか確かめる
+
+```powershell
+(Get-ScheduledTask card-digger-check).Principal | Format-List UserId, LogonType, RunLevel
+```
+
+| 項目 | 期待する値 | 意味 |
+|---|---|---|
+| `UserId` | デプロイ用ユーザーの名前 | **デプロイ用ユーザーとして動く** |
+| `LogonType` | `Password` | パスワードを預けて、ログインしていなくても動く |
+| `RunLevel` | `Limited` | **管理者の権限を使わない。**`Highest`なら管理者の権限で動けてしまう |
+
+3つとも期待どおりなら、管理者のPowerShellは閉じてよい。
+
+### 管理者で登録してよいのか
+
+**よい。この操作だけは管理者で行う前提である**（ADR 0003 論点8「管理者が要る操作を最初の1回に寄せる」）。
+
+**別のユーザーを指定して、ログインしていなくても動くタスクを登録するには、管理者の権限が要る。**
+デプロイ用ユーザーは一般ユーザーなので、自分では登録できない。
+
+| 操作 | いつ | 誰が |
+|---|---|---|
+| タスクを登録する（この節） | **最初の1回だけ** | **管理者（Windowsの前で）** |
+| タスクを止める・起動する | デプロイのたび | **デプロイ用ユーザー（SSHから）** |
+
+**登録した人と、タスクが動くときの身分は別である。**2-4で`-User`にデプロイ用ユーザーを指定したので、タスクで動くPythonは
+デプロイ用ユーザーの権限しか持たない。2-5の`UserId`と`RunLevel`がその確かめである。
 
 ### なぜパスワードを預けるのか
 
