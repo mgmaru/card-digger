@@ -66,6 +66,25 @@ C:\card-digger-check\
 | `card-digger-deploy-check` | `deploy-check.ps1` | デプロイ用ユーザー | 管理者（2で） |
 | `card-digger-uvicorn-check` | `current\src\backend\.venv`のPythonで、受入用のアプリをuvicornで起動 | デプロイ用ユーザー | 管理者（2で） |
 
+**タスクを2つに分ける。**本番でも同じ形になる。
+
+| タスク | 本番でいうと | いつ動くか |
+|---|---|---|
+| `card-digger-uvicorn-check` | **アプリそのもの**（uvicorn） | ずっと動き続ける |
+| `card-digger-deploy-check` | **デプロイの作業** | 頼まれたときだけ動き、終わったら止まる |
+
+デプロイのタスクが、アプリのタスクを「止める → `current`を向け直す → 起動する」。SSHからは、デプロイのタスクを起動するだけである。
+
+```text
+SSH（デプロイ用ユーザー）
+   │  schtasks /run
+   ▼
+card-digger-deploy-check（デプロイの作業）
+   │  止める・起動する
+   ▼
+card-digger-uvicorn-check（アプリ）── current を通して起動
+```
+
 ## 1. 準備（Mac → SSH、デプロイ用ユーザー）
 
 ### 1-1. フォルダーを作り、`git`とuvと8000番を確かめる
@@ -191,10 +210,16 @@ Register-ScheduledTask -TaskName "card-digger-deploy-check" -Action $dpAction -S
 ### 2-4. 確かめる
 
 ```powershell
-Get-ScheduledTask card-digger-*-check | ForEach-Object { $_.TaskName; $_.Principal | Format-List UserId, LogonType, RunLevel }
+Get-ScheduledTask card-digger-*-check | Select-Object TaskName, @{n='UserId';e={$_.Principal.UserId}}, @{n='LogonType';e={$_.Principal.LogonType}}, @{n='RunLevel';e={$_.Principal.RunLevel}}
 ```
 
-2つとも、`UserId`がデプロイ用ユーザー、`LogonType`が`Password`、`RunLevel`が`Limited`ならよい。
+| 部分 | 何をしているか |
+|---|---|
+| `Get-ScheduledTask card-digger-*-check` | 名前が`card-digger-`で始まり`-check`で終わるタスク、つまり**2-2と2-3で登録した2つ**を取り出す |
+| `Select-Object TaskName, @{…}` | タスクごとに1行で、名前・誰として動くか・ログオンの種類・権限の強さを並べる |
+
+**2行の表が出る。**2行とも、`UserId`がデプロイ用ユーザー、`LogonType`が`Password`、`RunLevel`が`Limited`ならよい。
+1行しか出なければ、もう1つの登録が済んでいない。
 `UserId`が管理者なら、[前回の2-5](windows-deploy-checks.md#2-5-デプロイ用ユーザーとして動くか確かめる)の方法で消して登録し直す。
 
 ## 3. 1回目のデプロイ（Mac → SSH、デプロイ用ユーザー）
