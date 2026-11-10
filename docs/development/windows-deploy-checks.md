@@ -598,12 +598,13 @@ Start-Sleep 3
 **③ 記録と電池の情報をファイルに書く（Windows・管理者）**
 
 ```powershell
-& { Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message; Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus; (Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries } | Out-File -Encoding utf8 C:\card-digger-check\task-check.txt
+& { Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 500 | Where-Object Message -like '*card-digger-check*' | Format-List TimeCreated, Id, Message; Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus; (Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries } | Out-File -Encoding utf8 C:\card-digger-check\task-check.txt
 ```
 
 | 部分 | 何をしているか |
 |---|---|
-| `Get-WinEvent … -MaxEvents 10` | 記録の新しいものから10件を、時刻・番号・文で出す。**起動しなかった理由はここに出る** |
+| `Get-WinEvent … -MaxEvents 500` | 記録の新しいものから500件を読む |
+| `Where-Object Message -like '*card-digger-check*'` | **このタスクの記録だけを残す。**Windowsは自分のタスクを数秒おきに動かしていて、絞らないと埋もれる（2026-11-10、新しい10件はすべてWindows自身のタスクで、このタスクの記録は1件も入らなかった） |
 | `Win32_Battery` | Windowsが電池（UPSを含む）を認識しているか。**何も出なければ電池は無い** |
 | `DisallowStartIfOnBatteries` | `True`なら、電池で動いているときは開始しない。2で電源の条件を指定しなかったので、既定の`True`が残っているはず |
 | `& { …; …; … }` | 3つを続けて実行し、出力を1つにまとめる |
@@ -613,6 +614,9 @@ Start-Sleep 3
 |---|---|
 | **何も表示されずに次のプロンプトが出る** | 書けた。④へ |
 | 赤い文字が出る | 書けていない。`Get-WinEvent`のエラーなら、①を打っていない。①から順に貼り直す |
+
+**2026-11-10の結果（電池）。**`Win32_Battery`は何も出さなかった（**電池もUPSも無い**）。`DisallowStartIfOnBatteries`は`True`だったが、
+電池が無いので効いていない。**電池は原因ではない。**
 
 **④ ファイルがあるかを見る（Mac）**
 
