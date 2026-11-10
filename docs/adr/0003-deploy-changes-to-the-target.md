@@ -391,8 +391,14 @@ Windowsのジャンクション（`mklink /J`）は、管理者でなくても�
 ```text
 # C:\ProgramData\ssh\sshd_config
 PasswordAuthentication no
+KbdInteractiveAuthentication no
 AllowUsers <デプロイ用ユーザー> <管理者ユーザー>
 ```
+
+**`password`を閉じるだけでは足りない。**`PasswordAuthentication no`だけでは、受け付ける入り方の一覧に
+`keyboard-interactive`（パスワードの別の窓口になりうる）が残った。`KbdInteractiveAuthentication no`も書き、
+**2026-11-10に、一覧が`publickey`だけになったことを確かめた。**デプロイ用・管理者（踏み台）とも鍵で入れ、
+踏み台の先の仮想マシンへも入れた。
 
 **仮想マシンへの入り方は、この変更に影響されない。**`ProxyJump`では、①MacからWindowsへの認証と、②Windowsを通り抜けた
 Macから仮想マシンへの認証が、別々に行われる。変わるのは①だけである。
