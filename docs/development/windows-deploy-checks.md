@@ -82,6 +82,32 @@ SSHで入るのはデプロイ用ユーザーだけである。
 - **長いコマンドも1行で書く。**行の最後に`` ` ``を付けて折り返す書き方は、貼ると途中で切れることがあるので使わない
 - 複数行の枠は、まとめて貼ってよい（1行ずつ順に実行される）。`#`より右は説明で、実行されない
 
+### 結果が長いとき — ファイルにしてMacへ送る
+
+**Windowsの前で出た長い結果は、画面から写さず、ファイルにしてMacへ送る。**MacからはSSHでデプロイ用ユーザーとして取ってこられる。
+
+1. Windowsで、結果をファイルに書く。コマンドの最後に`| Out-File -Encoding utf8 C:\Users\Public\<名前>.txt`を付ける
+2. Macで取ってくる
+
+   ```bash
+   scp <ホスト名>-deploy:C:/Users/Public/<名前>.txt /tmp/<名前>.txt
+   ```
+
+3. 読み終えたら、Windowsのファイルを消す（管理者でもデプロイ用ユーザーでもよい）
+
+   ```powershell
+   Remove-Item C:\Users\Public\<名前>.txt
+   ```
+
+| 部分 | 何をしているか |
+|---|---|
+| `Out-File -Encoding utf8` | 画面に出す代わりにファイルへ書く。`utf8`を付けないとWindows PowerShellはUTF-16で書き、Macで文字化けしやすい |
+| `C:\Users\Public\` | **どのユーザーからも読める**場所。管理者が書いたファイルを、デプロイ用ユーザーとして取ってこられる |
+| `scp <ホスト名>-deploy:…` | デプロイ用ユーザーの鍵で入り、ファイルをMacへ写す。パスワードは聞かれない |
+| 消す | `C:\Users\Public\`は誰でも読めるので、残さない |
+
+**結果にはユーザー名やコンピューター名が入る。**この手順書へ写すときは`<デプロイ用ユーザー>`などに置き換える。
+
 **Aが失敗しても、BとCは続けてよい。**それぞれ独立に答えが出る。失敗したところは[トラブルシュート](#トラブルシュート)を見る。
 直せなかったら、**直さずに「できなかった」と記録する**。それが答えである。
 
@@ -529,6 +555,23 @@ Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus
 |---|---|
 | `Win32_Battery` | Windowsが電池（UPSを含む）を認識しているか。**何も出なければ電池は無い** |
 | `DisallowStartIfOnBatteries` | `True`なら、電池で動いているときは開始しない |
+
+**結果が長いときは、まとめてファイルにする**（[結果が長いとき](#結果が長いとき--ファイルにしてmacへ送る)）。
+`Start-ScheduledTask`は既に頼んだので、記録を読む行と電池の2行だけを1つにまとめる。
+
+```powershell
+& { Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message; Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus; (Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries } | Out-File -Encoding utf8 C:\Users\Public\task-check.txt
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `& { …; …; … }` | 3つのコマンドを続けて実行し、出力を1つにまとめる |
+
+Macで取ってくる。
+
+```bash
+scp <ホスト名>-deploy:C:/Users/Public/task-check.txt /tmp/task-check.txt
+```
 
 ### 3-3. 止める
 
