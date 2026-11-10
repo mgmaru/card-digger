@@ -8,7 +8,7 @@
   （準備と切り替えはタスクの中で行い、SSHからはそのタスクを起動するだけにする）が、実際のWindowsで成り立つかを、デプロイScriptを書く前に確かめる
 - 根拠: ADR 0003 論点5の「まだ確かめていないこと」
 - 前提: [前回の確かめの手順書](windows-deploy-checks.md)が済んでいる（デプロイ用ユーザーに「バッチ ジョブとしてログオン」の権利があり、uvが入り、Run unattendedが有効）
-- 状態: **まだ実行していない**
+- 状態: **2026-11-10に実行中。**1-1は済んだ（`git`はあった）
 
 **前回の手順書の書き方をそのまま使う。**伏せ字（`<デプロイ用ユーザー>`など）、[どこで誰として打つか](windows-deploy-checks.md#どこで誰として打つか)、
 [コマンドの貼り方](windows-deploy-checks.md#コマンドの貼り方)、[長い結果をMacへ送る方法](windows-deploy-checks.md#結果が長いとき--ファイルにしてmacへ送る)は、前回の手順書にある。
@@ -98,6 +98,17 @@ scp /tmp/deploy-check.ps1 <ホスト名>-deploy:/C:/card-digger-check/deploy-che
 ```
 
 取れなければ`/C:/`を`C:/`にして試す。
+
+**Macの新しいターミナル（別のウィンドウかタブ）で打つ。SSHで入っているウィンドウではない。**Scriptが置いてあるのはMacの`/tmp`なので、
+SSHのウィンドウ（Windows）で打つと`stat local "/tmp/deploy-check.ps1": No such file or directory`になる（2026-11-10に起きた）。
+
+届いたかは、SSHのPowerShellで見る。
+
+```powershell
+Get-Item C:\card-digger-check\deploy-check.ps1 | Select-Object Name, Length
+```
+
+`deploy-check.ps1`と、数千バイトの大きさが出ればよい。
 
 **Scriptは英語だけで書く。**Windows PowerShell 5.1は、印の無いUTF-8のScriptをShift_JISとして読むので、日本語を入れると壊れる。
 
