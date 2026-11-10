@@ -91,7 +91,7 @@ SSHで入るのはデプロイ用ユーザーだけである。
 2. Macで、ファイルがWindowsにあるかを見る
 
    ```bash
-   ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" | iconv -f cp932 -t utf-8
+   ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" 2>&1 | iconv -f cp932 -t utf-8
    ```
 
    `<名前>.txt`が出なければ、1が失敗している。1に戻る
@@ -117,6 +117,7 @@ SSHで入るのはデプロイ用ユーザーだけである。
 | `Out-File -Encoding utf8` | 画面に出す代わりにファイルへ書く。`utf8`を付けないとWindows PowerShellはUTF-16で書き、Macで文字化けしやすい |
 | `C:\Users\Public\` | **どのユーザーからも読める**場所。管理者が書いたファイルを、デプロイ用ユーザーとして取ってこられる |
 | `ssh … "dir …"` | Windowsのコマンドプロンプトで`dir`を動かし、ファイルの一覧を出す |
+| `2>&1` | エラーの文（「ファイルが見つかりません」など）も`iconv`へ通す。付けないとエラーの文だけが化けたまま出る |
 | `\| iconv -f cp932 -t utf-8` | **文字化けを直す。**Windowsのコマンドプロンプトは日本語をShift_JIS（cp932）で出し、MacのターミナルはUTF-8として読むので、付けないと`?t?@?C??`のように化ける |
 | `scp <ホスト名>-deploy:…` | デプロイ用ユーザーの鍵で入り、ファイルをMacへ写す。パスワードは聞かれない |
 | `/C:/…`と`C:/…` | Windowsのパスを`scp`で指す書き方。環境によって片方しか通らないことがある（[SSHの手順書 4-2](ssh-key-setup.md#4-2-公開鍵をwindowsへ送るmac)） |
@@ -592,7 +593,7 @@ Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus
 Macで、ファイルがあるかを見てから取ってくる（[結果が長いとき](#結果が長いとき--ファイルにしてmacへ送る)の2・3）。
 
 ```bash
-ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" | iconv -f cp932 -t utf-8
+ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" 2>&1 | iconv -f cp932 -t utf-8
 ```
 
 ```bash
