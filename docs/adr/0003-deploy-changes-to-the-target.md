@@ -252,7 +252,7 @@ Mercariへ通信しない受入用のアプリを`current`を通して起動し�
 
 | 確かめること | 分からないと困ること |
 |---|---|
-| ADR 0002の論点1はC（2026-11-11に決定）なので、`tailscale serve`が`current\dist`をたどれるか | `tailscale serve`は管理者のものとして動く（論点8）。デプロイ用ユーザーが作ったジャンクションを、Tailscaleのサービスがたどれるかは分からない |
+| ADR 0002の論点1はC（2026-11-11に決定）なので、`tailscale serve`が`current\dist`をたどれるか | **2026-11-11、たどれた**（デプロイ用ユーザーが作ったジャンクションを通して配った）。**`current`を向け直すだけで新しい画面が配られるかは、まだ確かめていない**（[手順書の6](../development/windows-tailscale-serve-checks.md#6-currentを向け直す4)） |
 
 ### 選ばなかったもの
 
