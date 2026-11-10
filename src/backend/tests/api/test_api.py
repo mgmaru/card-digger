@@ -78,13 +78,101 @@ def failing_search(code: ErrorCode) -> ScriptedPort:
 
 
 class TestHealth:
+    """Whether the process is up, and what a restart would throw away.
+
+    A deploy reads this before it stops the process (ADR 0003 issue 6). The
+    safety stop lives only in memory, so restarting during one would clear it
+    and send the next search straight back to a Mercari that just refused
+    three times. A collection that is running would be cut off.
+    """
+
     def test_it_reports_that_the_process_is_up(self):
-        assert client(ScriptedPort()).get("/api/health").json() == {"status": "ok"}
+        assert client(ScriptedPort()).get("/api/health").json() == {
+            "status": "ok",
+            "safetyStop": {"active": False, "retryAfterSeconds": None},
+            "collectionsInFlight": 0,
+        }
 
     def test_it_reaches_the_marketplace_for_nothing(self):
         port = ScriptedPort()
         client(port).get("/api/health")
         assert port.calls == []
+
+    def test_it_reports_a_safety_stop_and_how_long_it_holds(self):
+        clock = FrozenClock()
+        http = client(failing_search(ErrorCode.RATE_LIMITED_429), clock)
+        for _ in range(3):
+            http.post("/api/search", json={"keyword": "sample"})
+        clock.advance(15)
+
+        assert http.get("/api/health").json()["safetyStop"] == {
+            "active": True,
+            "retryAfterSeconds": SAFETY_STOP_COOLDOWN_SECONDS - 15,
+        }
+
+    def test_the_stop_is_reported_over_once_the_wait_is(self):
+        clock = FrozenClock()
+        http = client(failing_search(ErrorCode.RATE_LIMITED_429), clock)
+        for _ in range(3):
+            http.post("/api/search", json={"keyword": "sample"})
+
+        clock.advance(SAFETY_STOP_COOLDOWN_SECONDS)
+
+        assert http.get("/api/health").json()["safetyStop"] == {
+            "active": False,
+            "retryAfterSeconds": None,
+        }
+
+    def test_two_refusals_are_not_a_stop(self):
+        # Mercari declining is not this application stopping. Only the third
+        # refusal in a row is.
+        http = client(failing_search(ErrorCode.RATE_LIMITED_429))
+        for _ in range(2):
+            http.post("/api/search", json={"keyword": "sample"})
+
+        assert http.get("/api/health").json()["safetyStop"]["active"] is False
+
+    async def test_it_counts_a_collection_that_is_running(self):
+        port = HeldMarketplace()
+        clock = FrozenClock()
+        app = create_app(
+            marketplace=port, clock=clock, sleeper=RecordingSleeper(clock=clock)
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as http:
+            search = asyncio.create_task(
+                http.post("/api/search", json={"keyword": "sample"})
+            )
+            await port.reached.wait()
+
+            during = (await http.get("/api/health")).json()
+            port.release.set()
+            await search
+            after = (await http.get("/api/health")).json()
+
+        assert during["collectionsInFlight"] == 1
+        assert after["collectionsInFlight"] == 0
+
+    async def test_it_says_how_many_and_never_what(self):
+        port = HeldMarketplace()
+        clock = FrozenClock()
+        app = create_app(
+            marketplace=port, clock=clock, sleeper=RecordingSleeper(clock=clock)
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as http:
+            search = asyncio.create_task(
+                http.post("/api/search", json={"keyword": "秘密のキーワード"})
+            )
+            await port.reached.wait()
+
+            during = await http.get("/api/health")
+            port.release.set()
+            await search
+
+        assert "秘密のキーワード" not in during.text
 
 
 class TestKeywordValidation:
@@ -817,6 +905,32 @@ class TestPacing:
         app = create_app(marketplace=port, clock=clock, sleeper=sleeper)
         TestClient(app).post("/api/search", json={"keyword": "sample"})
         assert sleeper.slept == [2.0]
+
+
+class HeldMarketplace:
+    """A search that stays on the wire until the test lets it go.
+
+    `reached` is set once the search is inside the marketplace, so the test
+    can look at the application while a collection is genuinely running.
+    """
+
+    def __init__(self) -> None:
+        self.reached = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def search_items_page(self, keyword, cursor=None, *, price_min=None, price_max=None):
+        self.reached.set()
+        await self.release.wait()
+        return make_search_page(make_items(1))
+
+    async def get_item(self, item_id):
+        return make_item(item_id)
+
+    async def get_seller(self, seller_id):
+        return seller(seller_id)
+
+    async def get_seller_items_page(self, seller_id, status, cursor=None):
+        return make_seller_page(make_items(1), status)
 
 
 class CountingMarketplace:

@@ -108,7 +108,12 @@ class MarketplaceAccess:
         return self._brake.retry_after_seconds()
 
     def in_flight(self) -> frozenset[str]:
-        """Which collections are running. For tests and for reading."""
+        """Which collections are running or queued for the semaphore.
+
+        Read by `/api/health` as a count, so a deploy can wait for them rather
+        than cut one off. A queued one counts: it was asked for, and a restart
+        would drop it just the same.
+        """
         return frozenset(self._in_flight)
 
     async def collect(self, key: str, run: Callable[[], Awaitable[T]]) -> T:

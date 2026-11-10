@@ -29,6 +29,7 @@ from card_digger.api.schemas import (
     CollectionMetaResponse,
     HealthResponse,
     ItemResponse,
+    SafetyStopStatusResponse,
     SearchRequest,
     SearchResponse,
     SellerAnalysisResponse,
@@ -164,8 +165,19 @@ def create_app(
 
     @app.get("/api/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
-        """Whether the process is up. Sends no request to Mercari."""
-        return HealthResponse()
+        """Whether the process is up, and what a restart would throw away.
+
+        Sends no request to Mercari. Read by the deploy before it stops this
+        process: a restart forgets the safety stop and cuts off whatever is
+        being collected.
+        """
+        retry_after = reaching_out.retry_after_seconds()
+        return HealthResponse(
+            safety_stop=SafetyStopStatusResponse(
+                active=retry_after is not None, retry_after_seconds=retry_after
+            ),
+            collections_in_flight=len(reaching_out.in_flight()),
+        )
 
     @app.post("/api/search", response_model=SearchResponse)
     async def search(request: SearchRequest, response: Response) -> SearchResponse:

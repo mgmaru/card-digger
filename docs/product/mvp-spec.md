@@ -1125,7 +1125,28 @@ Profileを読めなかったときの本体は分類Codeと操作だけを返す
 
 ### `GET /api/health`
 
-Processの稼働確認だけを返す。Mercariへ外部Requestを送らない。
+Processの稼働と、**いま再起動すると失われるもの**を返す。Mercariへ外部Requestを送らない。
+
+```json
+{
+  "status": "ok",
+  "safetyStop": { "active": true, "retryAfterSeconds": 45 },
+  "collectionsInFlight": 1
+}
+```
+
+| Field | 意味 |
+|---|---|
+| `status` | 常に`"ok"`。応答できたことが稼働の証拠 |
+| `safetyStop.active` | 安全停止が効いているか。`retryAfterSeconds`が`null`でないことと同じだが、読む側が`null`の意味を知らずに済むよう明示する |
+| `safetyStop.retryAfterSeconds` | 安全停止が解けるまでの秒数。効いていなければ`null`。安全停止の応答の`Retry-After`と同じ値 |
+| `collectionsInFlight` | 実行中と、順番待ちの収集の**件数**。何を収集しているか（検索語・Seller ID）は返さない |
+
+**デプロイが読む（2026-11-10追加）。**安全停止はProcessのメモリにしか無く、再起動すると解除される。
+実行中の収集は再起動で途切れる。デプロイはこの2つを見て、再起動してよいかを決める
+（[ADR 0003 論点6](../adr/0003-deploy-changes-to-the-target.md#論点6--デプロイ前に確かめること)）。
+**「デプロイしてよいか」はここで判定しない。**CIが成功したかなど、Processが知らない条件もあるため、判定はデプロイの側が持つ。
+画面はこの2つを読まない。
 
 商品詳細EndpointはPhase 0-FのAdapter Contractには存在するが、MVP Frontendからは使用しない。
 
