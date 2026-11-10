@@ -5,11 +5,11 @@
 - 作成日: **2026-11-09**
 - 対象: Mac（入る側）と、家のWindows（Windows標準のOpenSSHサーバー）
 - 目的: MacからWindowsへ、**デプロイ用の一般ユーザー**と、**踏み台として使う管理者**の2つで、
-  **鍵認証だけ**で入れるようにする。**パスワードで入る道は閉じる**
+  **鍵認証だけ**で入れるようにする。**鍵以外の入り方（パスワードなど）は閉じる**
 - 根拠: ADR 0003（PR #48）の論点7（家のLANからも入れるまま、鍵認証だけにする）と、
   論点8（デプロイは専用の一般ユーザーで動かす。管理者は踏み台として鍵だけで残す）
-- **状態: 実機で通したのは、1（鍵のペアを作る、2026-11-09）、3〜5（デプロイ用ユーザーを作り、鍵で入れることを
-  確かめた、2026-11-10）。5-2（管理者の鍵）の途中、6以降はまだ通していない。**最後まで通したら結果で直し、この行を消す
+- **状態: 実機で通したのは、1（2026-11-09）、3〜5、5-2、6のうち`PasswordAuthentication no`と`AllowUsers`、7（2026-11-10）。
+  6の`KbdInteractiveAuthentication no`はまだ通していない。**通したら結果で直し、この行を消す。8は後で行う
 
 なぜ鍵の方が安全か、何がまずいかは[南京錠の問答](../questions/2026-11-09-how-ssh-keys-prove-who-you-are.md)、
 パスワードで家のLANから入れる状態がなぜ危ないかは[SSHの問答](../questions/2026-11-09-why-ssh-on-all-addresses-is-risky.md)にある。
@@ -60,7 +60,7 @@ flowchart TD
     D --> E{"5. デプロイ用ユーザーで<br/>鍵で入れる？"}
     E -- "いいえ" --> T["トラブルシュートへ<br/>（sshd_configはまだ変えない）"]
     E -- "はい" --> H["5-2. 管理者（踏み台）の鍵を置く<br/>Windowsと仮想マシンへ入れるか確かめる"]
-    H --> F["6. パスワードを閉じる<br/>（Windowsの前で）"]
+    H --> F["6. 鍵以外の入り方を閉じる<br/>（Windowsの前で）"]
     F --> G["7. 確かめる"]
     G -.-> J["8. 管理者を踏み台だけに絞る<br/>（後で）"]
 ```
@@ -470,7 +470,36 @@ ssh <踏み台の先の入り口> hostname     # 踏み台の先の仮想マシ�
 
 ①が鍵で通れば、②は今までどおりである。
 
-## 6. パスワードを閉じる（5と5-2が成功してから。Windowsの前で、管理者のPowerShell）
+## SSHには入り方が何種類かある（6の前に読む）
+
+**6でやることは、「鍵以外の入り方を、すべて閉じる」ことである。**そのために、SSHにどんな入り方があるかを知っておく。
+
+SSHサーバーは、接続してきた相手に**「この入り方なら受け付けます」という一覧**を示す。Macで`ssh -v`を付けると、
+`Authentications that can continue: …`という行に、その一覧が出る。
+
+| 入り方 | 中身 | 南京錠のたとえ | この手順での扱い |
+|---|---|---|---|
+| **`publickey`** | **鍵**で入る。秘密鍵で署名し、サーバーが公開鍵で確かめる | 門番が閉めた箱を、自分の鍵で開けてみせる | **これだけを残す** |
+| `password` | パスワードを送って入る | 合言葉の窓口 | **6で閉じる**（`PasswordAuthentication no`） |
+| `keyboard-interactive` | サーバーが質問を出し、利用者がキーボードで答えて入る | 質問に答える窓口 | **6で閉じる**（`KbdInteractiveAuthentication no`） |
+
+**`password`を閉じるだけでは足りない。**`keyboard-interactive`は、多くの環境で**「Password:」と聞いてくる、パスワードの
+別の窓口**として使われる。`password`を閉じても、こちらからパスワードで入れてしまう場合がある。
+
+2026-11-10に、`PasswordAuthentication no`だけを書いた状態で一覧を見ると、`publickey,keyboard-interactive`だった。
+**`password`は消えたが、`keyboard-interactive`が残っていた。**WindowsのOpenSSHで、この窓口から実際にパスワードで入れるのかは
+確かめていない。**使わない入口は閉じる**（最小権限）。閉じておけば、入れるかどうかを確かめる必要自体がなくなる。
+
+| 状態 | 一覧（`Authentications that can continue`） |
+|---|---|
+| 6の前 | `publickey,password,keyboard-interactive` |
+| `PasswordAuthentication no`だけ | `publickey,keyboard-interactive` |
+| **6の後（目標）** | **`publickey`** |
+
+**仮想マシンの入り方は、これとは別である。**踏み台の先の仮想マシンは、仮想マシン自身のSSHサーバーが入り方を決める。
+Windowsの設定で、仮想マシンのパスワードは閉じない。
+
+## 6. 鍵以外の入り方を閉じる（5と5-2が成功してから。Windowsの前で、管理者のPowerShell）
 
 **SSHで入った画面ではなく、Windowsの前で作業する。**設定を誤っても、Windowsの前なら直せる。
 
@@ -479,14 +508,19 @@ Copy-Item C:\ProgramData\ssh\sshd_config C:\ProgramData\ssh\sshd_config.bak   # 
 notepad C:\ProgramData\ssh\sshd_config
 ```
 
-次の2点を直して保存する。
+次の3点を直して保存する。
 
 | 直すところ | 書き方 | 意味 |
 |---|---|---|
-| `#PasswordAuthentication yes`の行 | 先頭の`#`を消して`PasswordAuthentication no` | **全員、**パスワードでは入れない |
+| `#PasswordAuthentication yes`の行 | 先頭の`#`を消して`PasswordAuthentication no` | **全員、**`password`の窓口を閉じる |
+| ファイルの**`Match`で始まる行より前**に1行足す | `KbdInteractiveAuthentication no` | **全員、**`keyboard-interactive`の窓口を閉じる |
 | ファイルの**`Match`で始まる行より前**に1行足す | `AllowUsers <デプロイ用ユーザー> <管理者ユーザー>` | **この2人しか入れない**（許可リスト） |
 
-**`AllowUsers`は`Match`の行より前に書く。**`Match`の後ろに書いた設定は、すべてその`Match`の中として扱われる。
+`#KbdInteractiveAuthentication yes`や`#ChallengeResponseAuthentication yes`のような行がすでにあれば、それを書き換えてもよい
+（`ChallengeResponseAuthentication`は同じ設定の古い名前）。`KbdInteractiveAuthentication`はOpenSSH 8.7以降の名前で、
+2026-11-10のWindowsのOpenSSHは9.5だった（`ssh -V`で確かめられる）。
+
+**`AllowUsers`と`KbdInteractiveAuthentication`は`Match`の行より前に書く。**`Match`の後ろに書いた設定は、すべてその`Match`の中として扱われる。
 
 **`sshd_config`は1つで、全員に効く。**デプロイ用の設定だけをするつもりでも、書き方しだいで管理者（踏み台）にも効く。
 特定のユーザーだけに効かせたいときは、ファイルの一番最後に`Match User <名前>`の段落を書く。
@@ -514,6 +548,19 @@ Restart-Service sshd
 | `ssh <踏み台の先の入り口> hostname` | **今までどおり入れる** |
 | `ssh -o PubkeyAuthentication=no <ホスト名>-deploy` | **`Permission denied`で断られる**（パスワードの道が閉じた） |
 | `ssh -o PubkeyAuthentication=no <管理者の入り口>` | **`Permission denied`で断られる** |
+
+**受け付ける入り方の一覧が`publickey`だけになったか**も確かめる（鍵を使わない指定で、一覧だけを見る）。
+
+```bash
+ssh -v -o PubkeyAuthentication=no -o BatchMode=yes <ホスト名>-deploy true 2>&1 | grep "Authentications that can continue"
+ssh -v -o PubkeyAuthentication=no -o BatchMode=yes <管理者の入り口> true 2>&1 | grep "Authentications that can continue"
+```
+
+| 出た一覧 | 意味 |
+|---|---|
+| **`publickey`** | **鍵以外の入り方がすべて閉じた** |
+| `publickey,keyboard-interactive` | `KbdInteractiveAuthentication no`が効いていない。書いた場所（`Match`より前か）と、再起動したかを確かめる |
+| `password`が入っている | `PasswordAuthentication no`が効いていない |
 
 ## 8. 管理者を踏み台だけに絞る（後で行う）
 
@@ -563,6 +610,8 @@ Match User <管理者ユーザー>
 | どの鍵を使っているか分からない | Macで`ssh -v <ホスト名>-deploy`。`Offering public key: … id_ed25519_deploy`が出るか |
 | 違うアカウントで入ってしまう | `~/.ssh/config`の`User`と`IdentityFile`、`IdentitiesOnly yes`があるか |
 | 6の後、デプロイ用ユーザーでも入れない | `AllowUsers`のユーザー名の綴り。`Match`の段落の中に書いていないか |
+| 6の後も、入り方の一覧に`keyboard-interactive`が残る | `KbdInteractiveAuthentication no`を書いていない、`Match`の後ろに書いた、再起動していない（[SSHには入り方が何種類かある](#sshには入り方が何種類かある6の前に読む)） |
+| `sshd.exe -t`で`Bad configuration option: KbdInteractiveAuthentication` | WindowsのOpenSSHが古い（8.7より前）。代わりに`ChallengeResponseAuthentication no`と書く |
 | Windows側で何が起きたか知りたい | Windowsの「イベント ビューアー」→「アプリケーションとサービス ログ」→「OpenSSH」→「Operational」 |
 | PowerShellのコマンドが「認識されていません」になる | **SSHで入った先はcmd**である。`powershell`と打ってから実行するか、`powershell -Command "…"`で呼ぶ。権限の問題ではない |
 | `net localgroup`が「システム エラー 1376」になる | グループ名の打ち間違い（`administrators`の`s`が抜けている）。`whoami /groups`で確かめる |
