@@ -3445,9 +3445,9 @@ Marketplace
 
 - [ ] Windowsで`uv run --frozen pytest tests`と`npm run test`が通るか確かめる（CIはLinuxだけ）
 - [ ] Frontendが`127.0.0.1:8000`を見に行く問題の直し方を決める
-  （[ADR 0002](../adr/0002-switch-deploy-target-by-configuration.md)の5論点。**論点5は2026-11-09に決定（消す）、論点1はB′かCに絞り、Windowsでの検証待ち**）
+  （[ADR 0002](../adr/0002-switch-deploy-target-by-configuration.md)の5論点。**論点5は2026-11-09に決定（消す）、論点1は2026-11-11にCに決定。`tailscale serve`だけで足りるかはWindowsでの検証待ち**）
 - [x] ADR 0002 論点5の変更（`client.ts`の相対パス化、Viteの中継、Test）をPRにする（2026-11-09、#46でマージ）
-- [ ] ADR 0002 論点1の検証をWindowsで行う（`tailscale serve`のディレクトリ配信、`/api`のパス、SPA fallback）
+- [ ] ADR 0002 論点1の検証をWindowsで行う（`tailscale serve`のディレクトリ配信、`/api`のパス、SPA fallback、`current\dist`のジャンクションを通して配れるか）
 - [ ] 決めた直し方をPRにする
 - [ ] Tailscaleの管理画面でMagicDNSとHTTPS証明書を有効にし、`tailscale serve --bg 8000`を設定する
 - [ ] uvicornを起動時に立ち上がるようにする（**タスクスケジューラー**。2026-11-10に仮のサーバーで、ログインしていなくても起動することを確かめた）。`--workers`は付けない

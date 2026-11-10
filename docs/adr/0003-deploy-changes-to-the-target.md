@@ -252,7 +252,7 @@ Mercariへ通信しない受入用のアプリを`current`を通して起動し�
 
 | 確かめること | 分からないと困ること |
 |---|---|
-| ADR 0002の論点1でCを選ぶなら、`tailscale serve`が`current\dist`をたどれるか | `tailscale serve`は管理者のものとして動く（論点8）。デプロイ用ユーザーが作ったジャンクションを、Tailscaleのサービスがたどれるかは分からない |
+| ADR 0002の論点1はC（2026-11-11に決定）なので、`tailscale serve`が`current\dist`をたどれるか | `tailscale serve`は管理者のものとして動く（論点8）。デプロイ用ユーザーが作ったジャンクションを、Tailscaleのサービスがたどれるかは分からない |
 
 ### 選ばなかったもの
 
