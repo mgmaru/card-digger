@@ -171,7 +171,15 @@ error: Failed to create Python minor version link directory
 ```
 
 uvはPythonを入れるとき、`3.11`という名前で実際の版のフォルダーを指すジャンクションを作る。そこで、Windowsがジャンクションをたどるのを断った。
-**SSHから入ったときだけ起きるかは、まだ確かめていない。**論点5の`current`もジャンクションなので、原因が分かるまで先へ進まない。
+同じSSHのセッションで、**自分で作ったジャンクションも、作れたがたどれなかった。**
+
+```powershell
+cmd /c mklink /J C:\card-digger-check\link C:\card-digger-check   # 「ジャンクションが作成されました」
+Get-ChildItem C:\card-digger-check\link                             # 同じ448のエラー
+```
+
+**SSHから入ったときだけ起きるかは、まだ確かめていない**（Windowsの前で、デプロイ用ユーザーとして同じことをする）。
+論点5の`current`もジャンクションなので、原因が分かるまで先へ進まない。
 
 **なぜ`.venv`のPythonで動かすのか。**本番のuvicornは、版ごとのフォルダーの`.venv`のPythonで動く（ADR 0003 論点5）。
 **Windowsの`.venv\Scripts\python.exe`は、本物のPythonを子として起動する中継役である。**
@@ -437,6 +445,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<ホスト名>:8080/
 |---|---|---|
 | 仮のサーバーを止める | SSHのPowerShell（デプロイ用ユーザー） | `schtasks /end /tn card-digger-check` |
 | タスクを消す | **Windowsの前で、管理者のPowerShell** | `Unregister-ScheduledTask -TaskName card-digger-check -Confirm:$false` |
+| ジャンクションを消す（作っていたら） | SSHのPowerShell（デプロイ用ユーザー） | `cmd /c rmdir C:\card-digger-check\link`。**フォルダーより先に消す。**`rmdir`はジャンクションだけを消し、指す先の中身は消さない |
 | フォルダーを消す | SSHのPowerShell（デプロイ用ユーザー） | `Remove-Item -Recurse -Force C:\card-digger-check` |
 
 **残すもの。**uv（本番のデプロイで使う）と、Tailscaleの「無人で動かす」設定（本番で要る）。
