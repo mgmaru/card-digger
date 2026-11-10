@@ -54,7 +54,9 @@ docs/
 │   ├── 2026-11-09-how-ssh-keys-prove-who-you-are.md
 │   ├── 2026-11-09-what-a-python-backend-deploys.md
 │   ├── 2026-11-09-what-a-reverse-proxy-is.md
-│   └── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
+│   ├── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
+│   ├── 2026-11-10-what-a-junction-is.md
+│   └── 2026-11-10-why-switch-releases-through-current.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -147,6 +149,12 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   SSHの鍵はどうやって本人だと証明するのか。南京錠のたとえ、パスワードより安全な理由、公開鍵が漏れても大丈夫な理由、まずいこと
 - [2026-11-09-why-ssh-on-all-addresses-is-risky.md](questions/2026-11-09-why-ssh-on-all-addresses-is-risky.md):
   SSHサーバーが`0.0.0.0:22`で待つと、なぜ家のLANから入れて、なぜ危ないのか。2枚の扉、どちらを閉めるか、家のLANから入りたいとき
+- [2026-11-10-what-a-junction-is.md](questions/2026-11-10-what-a-junction-is.md):
+  ジャンクションとは何か。コピーとの違い、リパースポイントの仕組み、ショートカット・シンボリックリンクとの違い、
+  使われる場面、SSHからたどれなかったこと（分かっていることと推測）、扱うときの注意
+- [2026-11-10-why-switch-releases-through-current.md](questions/2026-11-10-why-switch-releases-through-current.md):
+  `current`は何を切り替えるのか。デプロイの手順、タスクの設定を書き換える場合との違い、ほかのやり方（その場で上書き、
+  名前の付け替え、`current.txt`、シンボリックリンク、Blue-Green）で何が起きるか、`current`の弱点
 
 書き方の約束。
 
