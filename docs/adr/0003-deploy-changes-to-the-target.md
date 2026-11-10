@@ -88,7 +88,8 @@ LinuxのCIで確かめたものをWindowsへは持っていけない。**そこ�
 ### 実装に要るもの
 
 - CIで`dist/`を保存する（GitHub Actionsのartifact）。[ci-policy §7](../development/ci-policy.md#7-やらないこと)の
-  「Deploy / Release Pipeline」の行を書き直す
+  「Deploy / Release Pipeline」の行を書き直す。**2026-11-11に実装した**（[`package` Job](../development/ci-policy.md#package-jobを足した2026-11-11)。
+  論点7のとおり、`dist/`とBackendのソース・`uv.lock`を1つのzipにし、sha256を添える）
 - Windowsが保存された`dist/`を取るために`gh`へログインする。**CI側にSecretsは要らない**
 
 ## 論点3 — CIでの検査
@@ -533,7 +534,7 @@ SSHで入ったデプロイ用ユーザーは`NT AUTHORITY\NETWORK`として扱�
 | 文書・ファイル | 直すこと | いつ |
 |---|---|---|
 | [ci-policy §3.1・§6](../development/ci-policy.md#backend-windows-jobを足した2026-11-11) | BackendのテストをWindowsでも流すこと | **2026-11-11に実装した**（`backend-windows` Job） |
-| [ci-policy §7](../development/ci-policy.md#7-やらないこと) | 「Deploy / Release Pipeline」の行を、`dist/`を保存することに合わせて書き直す | 論点2を実装するPR |
+| [ci-policy §7](../development/ci-policy.md#7-やらないこと) | 「Deploy / Release Pipeline」の行を、`dist/`を保存することに合わせて書き直す | **2026-11-11に直した**（「CIからのデプロイ」はやらない、成果物を作って残すところまではCIが行う） |
 | [ci-policy §4](../development/ci-policy.md#4-pr運用)、`CLAUDE.md` | `deploy/`もPRを経由する | **ADR 0002の論点4で決め、PR #42で直した** |
 | `src/backend/tests/unit/test_normalization.py` | `time.tzset()`をWindowsで手当てする | **2026-11-11に実装した**（`tzset`の無いOSではそのテストだけをskipする） |
 | [todo](../planning/todo.md#自宅windowsで使う2026-11-08決定) | 実装の項目 | このADRと同じPR |

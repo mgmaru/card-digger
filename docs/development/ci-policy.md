@@ -61,6 +61,7 @@ CIの並列実行や再実行はこの条件を守れない。
 | `backend` | `uv run pytest`によるL2 / L3（`src/backend`） | 導入済み |
 | `backend-windows` | `backend`と同じテストを`windows-latest`で流す | **2026-11-11追加** |
 | `e2e` | PlaywrightによるE2E受入Flow。**Chromiumのみ、390pxと1280pxの2幅** | **2026-09-03追加** |
+| `package` | デプロイに使う成果物を1つのzipにまとめ、artifactとして残す。**`main`へのpushだけ** | **2026-11-11追加** |
 
 `frontend` Jobは`src/frontend/package.json`の3つのScriptに依存する。
 
@@ -102,6 +103,42 @@ Pythonと、機械語を含むパッケージはOSごとに別物で、Linuxで�
 | 流さないもの | Frontend、E2E、文書、PoC | 出力がOSに依存しないか、デプロイ先のOSに関係が薄い（ADR 0003 論点3） |
 
 2026-11-11の初回は、515件が通り、3件をskipした（Linuxは518件が通る）。
+
+#### `package` Jobを足した（2026-11-11）
+
+**家のWindowsへのデプロイが取りに来る成果物を作る**（[ADR 0003 論点2・7](../adr/0003-deploy-changes-to-the-target.md#論点2--成果物)）。
+**デプロイはしない。**Windowsは家のRouterの内側にあり、CIから届かない。取りに行くのはWindowsの側で、利用者が手で実行する。
+
+| 項目 | 値 | 理由 |
+|---|---|---|
+| 動く時 | **`main`へのpushだけ** | デプロイするのは`main`のcommitだけ |
+| 前提 | **ほかの6つのJobすべて**（`needs`） | **成果物があること自体が、CIを通った証拠になる** |
+| Frontend | `frontend` Jobが`npm run build`で作った`dist/`を受け取る（1日だけ残すartifact `frontend-dist`） | **ビルドは1回だけ**（Build once, deploy many）。`package`ではビルドし直さない |
+| Backend | そのcommitの`src/backend`を`git archive`で取る | Gitが追っているものだけ。Runnerが作ったもの（`.venv`など）は入らない |
+| 形 | `card-digger-<commit SHA>.zip`の1つ。中は`card-digger-<SHA>/src/backend/`、`card-digger-<SHA>/dist/`、`card-digger-<SHA>/manifest.json` | デプロイの単位を1つにする（ADR 0003 論点7） |
+| 指紋 | 同じartifactに`card-digger-<SHA>.zip.sha256` | Windowsで照合し、CIが作ったものと同じだと確かめる |
+| artifactの名前 | `deploy-package-<commit SHA>` | commitから引ける |
+| 残す期間 | **90日** | 戻す先の版はWindowsにも残す（ADR 0003 論点5）。90日を過ぎた版へ戻したくなったら、そのcommitでCIを再実行する |
+| Secrets | **要らない** | artifactを上げるだけ。取りに行くWindowsの側が`gh`にログインする |
+
+**必須Statusにしない。**Pull Requestでは動かないので、必須にするとMergeできなくなる。
+
+2026-11-11の初回の中身（Pull Requestで一時的に動かして確かめた）は、[下](#package-jobの初回の中身2026-11-11)にある。
+
+#### `package` Jobの初回の中身（2026-11-11）
+
+**Pull Request #57で一時的に動かし、成果物を取ってきて中を見た。**その後、`main`へのpushだけに絞った。
+Pull Requestでは、GitHubがPRと`main`を合わせた仮のcommitで動かすので、名前のSHAはそのcommitのものだった。
+
+| 見たこと | 結果 |
+|---|---|
+| artifact | `deploy-package-<SHA>`に、`card-digger-<SHA>.zip`（約270KB）と`.zip.sha256`の2つ |
+| 指紋 | Macで`shasum -a 256 -c`が`OK` |
+| 中身 | 91ファイル。`src/backend/`（`card_digger/`、`scripts/`、`tests/`、`pyproject.toml`、`uv.lock`、`.python-version`）、`dist/`（`index.html`と`assets/`の2ファイル）、`manifest.json` |
+| 入っていないもの | `.venv`、`__pycache__`、`node_modules`は0件 |
+| `manifest.json` | `{"commit":"<SHA>","runId":"…","builtAt":"2026-11-10T15:36:08Z"}` |
+
+**`tests/`も入る。**`src/backend`をそのまま取るためで、Windowsで`uv sync --locked`するときには使わない。入れても害は無く、分けない方が単純である。
 
 #### `e2e` Jobを足した（2026-09-03）
 
@@ -239,7 +276,7 @@ Card Diggerが参照中のcommitを到達不能にしないことを最優先と
 | **L4のCI実行** | アクセス頻度条件を守れない |
 | Coverage率のGate | [Test運用規約 §11](test-policy.md#11-やらないこと)で除外済み |
 | 定期実行（cron） | 外部通信や無人実行を常態化させない |
-| Deploy / Release Pipeline | 公開Serviceではなく、単一利用者が家のWindowsで動かす。取り込みは手動のScriptで行う（[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)） |
+| **CIからのデプロイ** | 公開Serviceではなく、単一利用者が家のWindowsで動かす。Windowsは家のRouterの内側にあり、CIから届かない。取り込みは利用者が手で実行する（[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)、[ADR 0003 論点1](../adr/0003-deploy-changes-to-the-target.md#論点1--きっかけ)）。**成果物を作って残すところまではCIが行う**（2026-11-11に書き直した。[`package` Job](#package-jobを足した2026-11-11)） |
 | PRの承認必須化 | 1人開発では機能しない |
 | CIからの自動Merge | 判断を機械へ委ねない |
 | Secretsを要するJob | 現時点で必要な秘密情報がない |

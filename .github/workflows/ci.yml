@@ -79,7 +79,7 @@ jobs:
       # the one build the deploy uses: the package does not build again
       # (ADR 0003 issue 2, build once).
       - name: Keep the build for the package
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
@@ -181,7 +181,7 @@ jobs:
     # file with one hash. It needs every other job, so a package exists only
     # for a commit CI passed. It deploys nothing: the Windows machine fetches
     # it, by hand, when its owner runs the deploy.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [docs, poc, frontend, backend, backend-windows, e2e]
     runs-on: ubuntu-latest
     steps:
