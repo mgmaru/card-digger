@@ -4,12 +4,12 @@
 
 - 作成日: **2026-11-09**
 - 対象: Mac（入る側）と、家のWindows（Windows標準のOpenSSHサーバー）
-- 目的: Macから**デプロイ用の一般ユーザー**として、**鍵認証だけ**でWindowsへ入れるようにする。
-  **パスワードで入る道と、管理者で入る道は閉じる**
+- 目的: MacからWindowsへ、**デプロイ用の一般ユーザー**と、**踏み台として使う管理者**の2つで、
+  **鍵認証だけ**で入れるようにする。**パスワードで入る道は閉じる**
 - 根拠: ADR 0003（PR #48）の論点7（家のLANからも入れるまま、鍵認証だけにする）と、
-  論点8（デプロイは専用の一般ユーザーで動かす。管理者用の鍵は作らず、管理者ではSSHで入れない）
-- **状態: 実機で通したのは、1-2（鍵のペアを作る、2026-11-09）と3（デプロイ用ユーザーを作る、2026-11-10）。
-  1-3、4以降はまだ通していない。**最後まで通したら結果で直し、この行を消す
+  論点8（デプロイは専用の一般ユーザーで動かす。管理者は踏み台として鍵だけで残す）
+- **状態: 実機で通したのは、1（鍵のペアを作る、2026-11-09）、3〜5（デプロイ用ユーザーを作り、鍵で入れることを
+  確かめた、2026-11-10）。5-2（管理者の鍵）の途中、6以降はまだ通していない。**最後まで通したら結果で直し、この行を消す
 
 なぜ鍵の方が安全か、何がまずいかは[南京錠の問答](../questions/2026-11-09-how-ssh-keys-prove-who-you-are.md)、
 パスワードで家のLANから入れる状態がなぜ危ないかは[SSHの問答](../questions/2026-11-09-why-ssh-on-all-addresses-is-risky.md)にある。
@@ -24,6 +24,8 @@
 | 管理者のアカウント名 | `<管理者ユーザー>` |
 | デプロイ用のアカウント名 | `<デプロイ用ユーザー>` |
 | `~/.ssh/config`の、管理者として入る`Host`の名前 | `<管理者の入り口>` |
+| 踏み台の先の仮想マシンの住所 | `<踏み台の先>` |
+| `~/.ssh/config`の、踏み台の先へ入る`Host`の名前（`ProxyJump`を書いている段落） | `<踏み台の先の入り口>` |
 | tailnetの名前、IPアドレス | 書かない |
 | **秘密鍵の中身** | 絶対に書かない・貼らない |
 | 公開鍵の中身 | 漏れても困らないが、書く理由も無い |
@@ -37,14 +39,16 @@
 
 | アカウント | 種類 | 使い方 | SSHで入れるか | Macの鍵 |
 |---|---|---|---|---|
-| `<デプロイ用ユーザー>`（新しく作る） | **一般ユーザー** | **デプロイ**。Card Diggerを動かす | **入れる（鍵だけ）** | `~/.ssh/id_ed25519_deploy`の1組 |
-| `<管理者ユーザー>`（今のアカウント） | 管理者 | Windowsの管理。**Windowsの前で行う** | **入れない** | **作らない** |
+| `<デプロイ用ユーザー>`（新しく作る） | **一般ユーザー** | **デプロイ**。Card Diggerを動かす | **入れる（鍵だけ）** | `~/.ssh/id_ed25519_deploy` |
+| `<管理者ユーザー>`（今のアカウント） | 管理者 | **踏み台**（`ProxyJump`）。Windowsの先の仮想マシンへ通り抜ける。Windowsの管理はWindowsの前で行う | **入れる（鍵だけ）** | `~/.ssh/id_ed25519_jump` |
 
-**管理者用の鍵を作らない理由。**管理者の作業は「最初の1回」か「まれ」で、家にあるデスクトップなのでWindowsの前で
-できる。**作らなければ、漏れることも無い。**SSHで入られたときの最悪も、Card Diggerの範囲に留まる。
+**管理者も鍵で残す理由。**別のプロジェクト（ルーターの自作）で、Windowsを踏み台にして仮想マシンへ入っている。
+パスワードを閉じると、管理者にも鍵が要る。
 
-**鍵を作らないだけでは足りない。**作業前は、管理者が**パスワードで**入れる。最後に`sshd_config`の
-`AllowUsers`で、入れるユーザーをデプロイ用だけにして閉じる（6）。
+**鍵は役割ごとに別のペアにする。**デプロイ用の鍵が盗まれても、管理者（踏み台）には入れない。逆も同じ。
+
+**管理者の鍵を盗まれると、Windowsのすべてを取られうる。**踏み台に要るのは「通り抜けること」だけなので、
+後で**踏み台だけに絞る**（[8](#8-管理者を踏み台だけに絞る後で行う)）。一度に変えるものを少なくするため、まず鍵にすることだけを行う。
 
 ## 全体の流れ
 
@@ -55,12 +59,14 @@ flowchart TD
     C --> D["4. 公開鍵を送り、その人の棚に置く<br/>（Macで送り、Windowsの前で置く）"]
     D --> E{"5. デプロイ用ユーザーで<br/>鍵で入れる？"}
     E -- "いいえ" --> T["トラブルシュートへ<br/>（sshd_configはまだ変えない）"]
-    E -- "はい" --> F["6. パスワードと管理者の道を閉じる<br/>（Windowsの前で）"]
+    E -- "はい" --> H["5-2. 管理者（踏み台）の鍵を置く<br/>Windowsと仮想マシンへ入れるか確かめる"]
+    H --> F["6. パスワードを閉じる<br/>（Windowsの前で）"]
     F --> G["7. 確かめる"]
+    G -.-> J["8. 管理者を踏み台だけに絞る<br/>（後で）"]
 ```
 
-**順番を守る。デプロイ用ユーザーで鍵で入れることを確かめる（5）より前に、`sshd_config`を変えない（6）。**
-6が終わると、管理者ではSSHで入れなくなる。作業はずっとWindowsの前で行う。
+**順番を守る。2つのアカウントとも鍵で入れることを確かめる（5、5-2）より前に、`sshd_config`を変えない（6）。**
+鍵が通らないままパスワードを閉じると、締め出される。踏み台の先の仮想マシンにも入れなくなる。
 
 ## 1. Macでデプロイ用の鍵を1組作る
 
@@ -373,11 +379,103 @@ ssh -v -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o BatchM
 `-o BatchMode=yes`は、パスワードやパスフレーズの入力を求められたら、入力を待たずに止まる指定である。
 パスフレーズはキーチェーン（1-3）から読まれるので、止まらない。
 
-## 6. パスワードと管理者の道を閉じる（5が成功してから。Windowsの前で、管理者のPowerShell）
+## 5-2. 管理者（踏み台）の鍵を置き、確かめる
+
+**踏み台として使う管理者にも、鍵を置く。**流れはデプロイ用と同じだが、**置き場所が違う。**
+
+### 5-2-1. Macで鍵を作り、入り口に書く
+
+1-1〜1-3と同じ。**パスフレーズはデプロイ用とは別に作る。**
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_jump -C "mac-to-windows-jump"
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519_jump
+```
+
+`~/.ssh/config`の、管理者として入る段落（`<管理者の入り口>`）に4行を足す。**踏み台の先の段落（`ProxyJump`を書いている段落）は
+触らない。**`ProxyJump <管理者の入り口>`は、この段落の設定（鍵を含む）を使ってWindowsへ入る。
+
+```text
+Host <管理者の入り口>
+  HostName <ホスト名>
+  User <管理者ユーザー>
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519_jump
+  IdentitiesOnly yes
+  AddKeysToAgent yes
+  UseKeychain yes
+```
+
+### 5-2-2. 公開鍵を送り、**管理者の棚**に置く
+
+Macで（この時点ではまだパスワードで入れる）：
+
+```bash
+scp ~/.ssh/id_ed25519_jump.pub <管理者の入り口>:C:/Users/Public/jump-key.pub
+```
+
+Windowsの前で、**管理者として実行したPowerShell**で：
+
+```powershell
+Get-Content C:\Users\Public\jump-key.pub | Add-Content C:\ProgramData\ssh\administrators_authorized_keys
+icacls.exe C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r /grant "*S-1-5-32-544:F" /grant "*S-1-5-18:F"
+Get-Content C:\ProgramData\ssh\administrators_authorized_keys   # ssh-ed25519 AAAA… mac-to-windows-jump の行があるか
+icacls.exe C:\ProgramData\ssh\administrators_authorized_keys    # Administrators と SYSTEM の2行だけか
+Remove-Item C:\Users\Public\jump-key.pub
+```
+
+**落とし穴：管理者の鍵を`$env:USERPROFILE\.ssh\authorized_keys`に置いても、使われない**（2026-11-10に起きた）。
+Windowsの`sshd_config`には、もともと次の段落がある。管理者グループの人については、**管理者の棚だけを見る。**
+
+```text
+Match Group administrators
+       AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys
+```
+
+| 鍵を置いた場所 | 管理者のとき | 一般ユーザーのとき |
+|---|---|---|
+| `C:\Users\<名前>\.ssh\authorized_keys`（`$env:USERPROFILE`） | **見ない（無視される）** | 見る |
+| `C:\ProgramData\ssh\administrators_authorized_keys` | **見る** | 見ない |
+
+間違えて`$env:USERPROFILE`に置いたときは、その行を管理者の棚へ移し、間違えた方を片付ける
+（**管理者として実行したPowerShell**でも、`$env:USERPROFILE`は自分のフォルダーのままである）。
+
+```powershell
+(Select-String -Path $env:USERPROFILE\.ssh\authorized_keys -Pattern 'mac-to-windows-jump').Line |
+  Add-Content C:\ProgramData\ssh\administrators_authorized_keys
+icacls.exe C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r /grant "*S-1-5-32-544:F" /grant "*S-1-5-18:F"
+Get-Content $env:USERPROFILE\.ssh\authorized_keys   # mac-to-windows-jump の1行だけなら、下で消す
+Remove-Item $env:USERPROFILE\.ssh\authorized_keys   # ほかの行もあるときは消さず、その1行だけを取り除く
+```
+
+### 5-2-3. 確かめる（Mac。パスワードを閉じる前に）
+
+```bash
+ssh -v -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o BatchMode=yes <管理者の入り口> whoami 2>&1 \
+  | grep -E "Offering public key|Server accepts key|Authenticated to|Permission denied"
+ssh <踏み台の先の入り口> hostname     # 踏み台の先の仮想マシンへ、今までどおり入れるか
+```
+
+| 確かめること | 期待する結果 |
+|---|---|
+| 管理者の入り口 | `Server accepts key: … id_ed25519_jump`が出る |
+| 踏み台の先 | 今までどおり入れる。**ここで入れなければ6へ進まない** |
+
+**踏み台の先の仮想マシンへの入り方は、Windowsの設定に影響されない。**`ProxyJump`では認証が2回、別々に行われる。
+
+```text
+① Mac ──認証──> Windows（踏み台）                 ← 変わるのはここだけ（パスワード → 鍵）
+② Mac ──認証──> 仮想マシン（Windowsを通り抜けて） ← 仮想マシン自身の認証。Windowsの設定は関係ない
+```
+
+①が鍵で通れば、②は今までどおりである。
+
+## 6. パスワードを閉じる（5と5-2が成功してから。Windowsの前で、管理者のPowerShell）
 
 **SSHで入った画面ではなく、Windowsの前で作業する。**設定を誤っても、Windowsの前なら直せる。
 
 ```powershell
+Copy-Item C:\ProgramData\ssh\sshd_config C:\ProgramData\ssh\sshd_config.bak   # 控え
 notepad C:\ProgramData\ssh\sshd_config
 ```
 
@@ -385,13 +483,25 @@ notepad C:\ProgramData\ssh\sshd_config
 
 | 直すところ | 書き方 | 意味 |
 |---|---|---|
-| `#PasswordAuthentication yes`の行 | 先頭の`#`を消して`PasswordAuthentication no` | パスワードでは入れない |
-| ファイルの**`Match`で始まる行より前**に1行足す | `AllowUsers <デプロイ用ユーザー>` | **このユーザーしか入れない**（許可リスト）。管理者は鍵を持っていても入れない |
+| `#PasswordAuthentication yes`の行 | 先頭の`#`を消して`PasswordAuthentication no` | **全員、**パスワードでは入れない |
+| ファイルの**`Match`で始まる行より前**に1行足す | `AllowUsers <デプロイ用ユーザー> <管理者ユーザー>` | **この2人しか入れない**（許可リスト） |
 
-**`AllowUsers`は`Match`の行より前に書く。**Windowsの`sshd_config`の末尾には、もともと
-`Match Group administrators`で始まる段落がある。その中に書くと、意図と違う効き方をする。
+**`AllowUsers`は`Match`の行より前に書く。**`Match`の後ろに書いた設定は、すべてその`Match`の中として扱われる。
+
+**`sshd_config`は1つで、全員に効く。**デプロイ用の設定だけをするつもりでも、書き方しだいで管理者（踏み台）にも効く。
+特定のユーザーだけに効かせたいときは、ファイルの一番最後に`Match User <名前>`の段落を書く。
+
+書き間違いを確かめてから、再起動する（`sshd_config`は起動するときに読み込まれる）。
 
 ```powershell
+& 'C:\Windows\System32\OpenSSH\sshd.exe' -t   # 何も出なければ正しい。エラーなら再起動しない
+Restart-Service sshd
+```
+
+元に戻すときは、控えを戻して再起動する。
+
+```powershell
+Copy-Item C:\ProgramData\ssh\sshd_config.bak C:\ProgramData\ssh\sshd_config -Force
 Restart-Service sshd
 ```
 
@@ -400,14 +510,50 @@ Restart-Service sshd
 | コマンド | 期待する結果 |
 |---|---|
 | `ssh <ホスト名>-deploy whoami` | **入れる**。デプロイ用のアカウント名が出る |
+| `ssh <管理者の入り口> whoami` | **入れる**（鍵で） |
+| `ssh <踏み台の先の入り口> hostname` | **今までどおり入れる** |
 | `ssh -o PubkeyAuthentication=no <ホスト名>-deploy` | **`Permission denied`で断られる**（パスワードの道が閉じた） |
-| `ssh <管理者ユーザー>@<ホスト名>` | **`Permission denied`で断られる**（管理者の道が閉じた） |
+| `ssh -o PubkeyAuthentication=no <管理者の入り口>` | **`Permission denied`で断られる** |
+
+## 8. 管理者を踏み台だけに絞る（後で行う）
+
+**6・7が動いてから、別の機会に行う。**踏み台に要るのはWindowsを**通り抜けること**だけで、Windowsでコマンドを
+打つ必要は無い。`ProxyJump`は通信の転送（SSHの`direct-tcpip`）だけを使うので、コマンドの実行を禁じても踏み台は動く。
+
+`sshd_config`の**一番最後**に足す。
+
+```text
+Match User <管理者ユーザー>
+    PermitTTY no
+    ForceCommand cmd /c echo This account is for ProxyJump only.
+    AllowTcpForwarding local
+    PermitOpen <踏み台の先>:22
+    X11Forwarding no
+    AllowAgentForwarding no
+    PermitTunnel no
+```
+
+| 行 | 意味 |
+|---|---|
+| `PermitTTY no`、`ForceCommand …` | `ssh <管理者の入り口>`と打っても、メッセージを出して切れる。Windowsでコマンドを打てない |
+| `AllowTcpForwarding local` | `ProxyJump`に要る「通り抜け」だけを許す |
+| `PermitOpen <踏み台の先>:22` | **通り抜けの行き先を1つに絞る。**さらに先の仮想マシンへは、その仮想マシンから進むので、Windowsからの行き先はこれで足りる |
+| 残りの3行 | 使わない転送を閉じる |
+
+| | 絞る前 | 絞った後 |
+|---|---|---|
+| 管理者の鍵を盗まれたら | **Windowsのすべて** | 踏み台の先の22番へ通り抜けられるだけ |
+
+**`ForceCommand`は`scp`も止める。**絞った後は、管理者の入り口で`scp`（5-2-2）はできない。鍵の受け渡しは、
+デプロイ用ユーザーで送るか、Windowsの前で行う。
 
 ## トラブルシュート
 
 | 症状 | まず疑うこと |
 |---|---|
 | 鍵を置いたのにパスワードを聞かれる | **棚に置けていない。**`scp`で送っただけで、4-3をやっていない（2026-11-10に起きた）。デプロイ用ユーザーのウィンドウで`Get-Content $env:USERPROFILE\.ssh\authorized_keys`が1行を返すか |
+| **管理者**で、鍵を置いたのに断られる | **管理者の鍵を`$env:USERPROFILE\.ssh\authorized_keys`に置いた**（2026-11-10に起きた）。管理者は管理者の棚（`C:\ProgramData\ssh\administrators_authorized_keys`）しか見ない（5-2-2） |
+| 踏み台の先の仮想マシンへ入れない | ①Windowsへの認証で止まっていないか（`ssh -v <管理者の入り口>`）。②8を行った後なら、`PermitOpen`の行き先が合っているか |
 | 鍵を置いたのにパスワードを聞かれる | `authorized_keys`を**管理者のウィンドウで作った**（持ち主が違う）。4-1で開いたデプロイ用ユーザーのウィンドウで作り直す |
 | 「入れた」のに、5の確認で`Permission denied`になる | パスワードで入っていた。[「入れた」が鍵によるものか確かめる](#入れたが鍵によるものか確かめる) |
 | `<Macのユーザー名>@<ホスト名>'s password:`と聞かれ、断られる | `ssh`・`scp`に**ホスト名を直接書いた。**`~/.ssh/config`の`Host`の名前（入り口の名前）を使う（4-2の注意） |
