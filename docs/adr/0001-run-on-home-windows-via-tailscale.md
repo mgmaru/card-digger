@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 状態 | **決定（2026-11-08）**。ただし[同一Origin化](#未決--frontendが127001を見に行く問題)は未決 |
+| 状態 | **決定（2026-11-08）**。ただし[同一Origin化](#未決--frontendが127001を見に行く問題)は未決で、[ADR 0002](0002-switch-deploy-target-by-configuration.md)へ引き継いだ |
 | 決めた人 | 利用者 |
 | 影響する文書 | [mvp-spec §10](../product/mvp-spec.md#10-data取扱い)、[ci-policy §7](../development/ci-policy.md#7-やらないこと) |
 
@@ -105,12 +105,10 @@ PC名に個人情報を入れない。HTTPSにしても、守られる範囲は�
 `http://127.0.0.1:8000`で、これは**Browserで動くJavaScriptが持つ値**である。入口を
 転送しても、iPhoneで開いた画面はiPhone自身の8000番へAPIを呼びに行く。
 
-| 選択肢 | 中身 | 転送 | CORS | 端末ごとのBuild |
-|---|---|---|---|---|
-| A | `VITE_API_BASE_URL`にTailscaleのURLを入れてBuildする | 2本 | 許可を変える | Windows本体用に別Buildが要る |
-| B | FastAPIがBuild済みFrontendも返し、APIは同じOriginの`/api/...`で呼ぶ | 1本 | 関係なくなる | 不要 |
-
-**Bを推す。**まだ利用者の承認を得ていないので、ここでは決めない。
+**直し方の選択肢は[ADR 0002](0002-switch-deploy-target-by-configuration.md#論点1--画面とapiを同じoriginから返すか)へ
+引き継いだ。**デプロイ先を設定だけで替えるという方針
+（[architecture §8](../development/architecture.md#8-デプロイ先をソースコードに持たない2026-11-08決定)）のもとで、
+他の論点と一緒に決める。
 
 ## まだ検証していないこと
 
