@@ -8,7 +8,7 @@
   （画面とAPIを同じOriginから返し、振り分けは入口が担う）を、`tailscale serve`だけで組めるかを確かめる
 - 根拠: ADR 0002 論点1の[決める前の検証](../adr/0002-switch-deploy-target-by-configuration.md#決める前の検証windows15分ほどmercariへは通信しない)
 - 前提: [前回の確かめの手順書](windows-deploy-checks.md)が済んでいる（Run unattendedが有効、デプロイ用ユーザーへSSHで入れる）
-- 状態: **まだ実行していない**
+- 状態: **2026-11-11に実行中。**1〜5は済んだ（1・4はできた、2はパスが削られた、3は404）。5-1（2の手当て）と6はまだ
 
 **前回までの手順書の書き方をそのまま使う。**伏せ字、[どこで誰として打つか](windows-deploy-checks.md#どこで誰として打つか)、
 [コマンドの貼り方](windows-deploy-checks.md#コマンドの貼り方)は、前回の手順書にある。
@@ -193,6 +193,65 @@ curl -s https://<入口の名前>/sellers/abc123 | head -c 200 ; echo
 
 **ブラウザーでも見てよい。**`https://<入口の名前>/`をMacやiPhoneのブラウザーで開くと`card-digger-check v1`と出る。
 
+**2026-11-11の結果。**
+
+```text
+<!doctype html><title>check</title><p>card-digger-check v1</p>
+console.log("v1")
+path=/health
+404
+404 page not found
+```
+
+| # | 結果 | 判定 |
+|---|---|---|
+| 1 | `/`と`/assets/app.js`が`v1`の中身を返した | **できた** |
+| 4 | `current`（デプロイ用ユーザーがSSHから作ったジャンクション）を通して配った | **入口はたどれた** |
+| **2** | **`path=/health`** | **入口が`/api`を削って渡した。**このままではAPIが壊れる |
+| **3** | **`404`、`404 page not found`** | **SPA fallbackができない** |
+
+### 5-1. `/api`の渡し先をパスつきにする（2の手当て）
+
+**入口は`/api`を削ってから渡す。**渡し先を`http://127.0.0.1:8000/api`と**パスつきで**書けば、削った後に`/api`を付け直して、
+`/api/health`のまま届く見込みである。決める前に試す。
+
+**Windowsの前、4の管理者のPowerShell**で、1つずつ貼る。
+
+```powershell
+& $ts serve --set-path=/api off
+```
+
+```powershell
+& $ts serve --bg --set-path=/api http://127.0.0.1:8000/api
+```
+
+```powershell
+& $ts serve status
+```
+
+| 行 | 何をしているか |
+|---|---|
+| `--set-path=/api off` | 今の`/api`の振り分けだけを消す。`/`の振り分けは残る |
+| `--set-path=/api http://127.0.0.1:8000/api` | 渡し先に`/api`を付けて、もう一度振り分ける |
+
+**Macのターミナル**で確かめる。
+
+```bash
+curl -s https://<入口の名前>/api/health ; echo
+curl -s "https://<入口の名前>/api/search?keyword=x" ; echo
+```
+
+| 結果 | 意味 |
+|---|---|
+| **`path=/api/health`**、**`path=/api/search?keyword=x`** | **渡し先の書き方で直る。**2は解決する |
+| `path=/health`のまま | 書き方では直らない |
+| `path=/api/api/health` | 削っていなかった（5の結果と食い違うので、記録する） |
+
+2行目は、下の階層のパスと、`?`以降（クエリ）がそのまま届くかを見る。
+
+**3（404）は、書き方では直らない。**ADR 0002の結果の表のとおり、**C＋D**（`HashRouter`。URLに`#`が入る）か
+**C＋Caddy**（SPA fallbackをCaddyが担う。Windowsで常駐するものが1つ増える）を、利用者が選ぶ。
+
 ## 6. `current`を向け直す（4）
 
 **本番のデプロイと同じく、入口の設定は変えずに`current`だけを`v2`へ向け直す。**
@@ -231,7 +290,7 @@ curl -s https://<入口の名前>/ ; echo
 
 | # | 何を | どこで | コマンド |
 |---|---|---|---|
-| 1 | 入口の設定を戻す | Windowsの前、管理者のPowerShell（4のウィンドウ） | 4-1で`No serve config`だったなら`& $ts serve reset`。**別の設定があったなら**、`& $ts serve --set-path=/api off`と`& $ts serve --set-path=/ off`で、足した2つだけを消す |
+| 1 | 入口の設定を戻す | Windowsの前、管理者のPowerShell（4のウィンドウ） | 4-1で`No serve config`だったなら`& $ts serve reset`（2026-11-11はこれ）。**別の設定があったなら**、`& $ts serve --set-path=/api off`と`& $ts serve --set-path=/ off`で、足した2つだけを消す |
 | 2 | 設定が戻ったか見る | 同じ | `& $ts serve status`。4-1で控えたのと同じ表示ならよい |
 | 3 | 届いたパスを返すサーバーを止める | 3のウィンドウ | **ウィンドウを閉じる** |
 | 4 | `current`を消す | Windowsの前、管理者のPowerShell | `cmd /c rmdir C:\card-digger-check\current` |
