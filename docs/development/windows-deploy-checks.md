@@ -491,6 +491,45 @@ curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:8000/
 | `LastRunTime`が今の時刻で、`000` | 起動したがPythonが終わった。`LastTaskResult`の番号を見る |
 | `LastRunTime`が`1999/11/30`のまま | **管理者が頼んでも動かない。**タスクの設定か、Windows側の条件の問題 |
 
+**2026-11-10の結果：`LastRunTime`は`1999/11/30`のまま、`curl.exe`は`000`。管理者が頼んでも動かなかった。**
+デプロイ用ユーザーの権限の問題ではなく、**タスクそのものが起動されていない。**
+
+#### 3-2-2. Windowsに理由を聞く（Windowsの前で、管理者のPowerShell）
+
+**推測で設定を変える前に、タスクスケジューラーの記録から理由を読む。**記録（履歴）は既定で止まっているので、先に有効にする。
+
+```powershell
+wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `wevtutil set-log … /enabled:true` | タスクスケジューラーの記録を有効にする。**記録を残し始めるだけ**で、タスクの動きは変えない。タスクスケジューラーの画面の「すべてのタスク履歴を有効にする」と同じ |
+
+もう一度起動を頼み、記録を読む。
+
+```powershell
+Start-ScheduledTask -TaskName card-digger-check
+Start-Sleep 3
+Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `Get-WinEvent … -MaxEvents 10` | 記録の新しいものから10件を、時刻・番号・文で出す |
+
+**同時に、電池で動いていると見なされていないかを見る。**2で電源の条件を指定しなかったので、既定の「電池では開始しない」が残っている。
+
+```powershell
+Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus
+(Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `Win32_Battery` | Windowsが電池（UPSを含む）を認識しているか。**何も出なければ電池は無い** |
+| `DisallowStartIfOnBatteries` | `True`なら、電池で動いているときは開始しない |
+
 ### 3-3. 止める
 
 ```powershell
