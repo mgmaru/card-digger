@@ -23,6 +23,7 @@
 | Windowsのホスト名 | `<ホスト名>` |
 | 管理者のアカウント名 | `<管理者ユーザー>` |
 | デプロイ用のアカウント名 | `<デプロイ用ユーザー>` |
+| `~/.ssh/config`の、管理者として入る`Host`の名前 | `<管理者の入り口>` |
 | tailnetの名前、IPアドレス | 書かない |
 | **秘密鍵の中身** | 絶対に書かない・貼らない |
 | 公開鍵の中身 | 漏れても困らないが、書く理由も無い |
@@ -51,7 +52,7 @@
 flowchart TD
     A["1. Macでデプロイ用の鍵を1組作る"] --> B["2. Windowsのアカウントを確かめる"]
     B --> C["3. デプロイ用の一般ユーザーを作る<br/>（Windowsの前で）"]
-    C --> D["4. その人の公開鍵を置く<br/>（Windowsの前で）"]
+    C --> D["4. 公開鍵を送り、その人の棚に置く<br/>（Macで送り、Windowsの前で置く）"]
     D --> E{"5. デプロイ用ユーザーで<br/>鍵で入れる？"}
     E -- "いいえ" --> T["トラブルシュートへ<br/>（sshd_configはまだ変えない）"]
     E -- "はい" --> F["6. パスワードと管理者の道を閉じる<br/>（Windowsの前で）"]
@@ -273,21 +274,68 @@ Windowsの機能が使っているかもしれないアカウント（名前に�
 runas /user:<デプロイ用ユーザー> powershell
 ```
 
-### 4-2. 公開鍵を置く（4-1で開いた、デプロイ用ユーザーのPowerShell）
+**管理者のアカウントから、デプロイ用ユーザーのフォルダーは開けない。これが正しい。**エクスプローラーで開こうとして
+「このフォルダーにアクセスする許可がありません」と出ても、**「続行」を押さない。**押すとWindowsがフォルダーの権限を
+書き換えて管理者を足し、SSHサーバーが「権限が緩い」と判断して`authorized_keys`を無視することがある。
+中身は、4-1で開いたデプロイ用ユーザーのウィンドウから見る（`Get-ChildItem $env:USERPROFILE`）。
 
-Macで公開鍵の1行を表示し、コピーする。**`BEGIN … PRIVATE KEY`と表示されたら秘密鍵である。コピーしない。**
-ファイル名に`.pub`が付いているかを確かめる。
+### 4-2. 公開鍵をWindowsへ送る（Mac）
+
+**MacとWindowsは別の機械なので、Macでコピーした文字はWindowsでそのまま貼れない。**公開鍵をファイルとして送る。
+公開鍵は見られても困らないので、送り方は何でもよい（メモアプリやメールでもよい）。ここでは、**この時点ではまだ管理者で
+SSHできる**ので、`scp`で送る。
 
 ```bash
-cat ~/.ssh/id_ed25519_deploy.pub
+scp ~/.ssh/id_ed25519_deploy.pub <管理者の入り口>:C:/Users/Public/deploy-key.pub
 ```
+
+| 部分 | 意味 |
+|---|---|
+| `~/.ssh/id_ed25519_deploy.pub` | 送るファイル。**`.pub`が付いていることを確かめる**（秘密鍵を送らない） |
+| `<管理者の入り口>` | `~/.ssh/config`で、管理者として入るために書いてある**`Host`の名前**（ホスト名そのものではない。下の注意） |
+| `C:/Users/Public/` | Windowsの「パブリック」フォルダー。**どのユーザーからも読める**ので、デプロイ用ユーザーのウィンドウから取り出せる |
+
+管理者（Windows）のパスワードを聞かれる。`ファイル名 100% …`と出れば送れている。
+「ファイルが見つからない」といったエラーになったら、パスの先頭に`/`を付けて`<管理者の入り口>:/C:/Users/Public/deploy-key.pub`で試す。
+
+**注意：`<管理者の入り口>`は`Host`の名前を使う。**`~/.ssh/config`に次のように書いてあるなら、使うのは`win`である。
+
+```text
+Host win              ← これを使う（ssh や scp で使う名前）
+  HostName <ホスト名>  ← 実際の接続先
+  User <管理者ユーザー>
+```
+
+ホスト名（`HostName`の値）を直接書くと、この段落の`User`が使われず、**Macのユーザー名で入ろうとして断られる**
+（`<Macのユーザー名>@<ホスト名>'s password:`と聞かれる。2026-11-10に起きた）。
+
+### 4-3. 公開鍵を置く（4-1で開いた、デプロイ用ユーザーのPowerShell）
 
 **4-1で開いたウィンドウ（デプロイ用ユーザーとして動いている）で**実行する。そのユーザー自身が作るので、
 ファイルの持ち主と権限が正しくなる。
 
 ```powershell
+whoami                                                   # <ホスト名>\<デプロイ用ユーザー> と出ることを確かめる
 New-Item -ItemType Directory -Force $env:USERPROFILE\.ssh | Out-Null
-Add-Content -Path $env:USERPROFILE\.ssh\authorized_keys -Value 'ここにコピーした1行を貼る'
+Get-Content C:\Users\Public\deploy-key.pub | Add-Content $env:USERPROFILE\.ssh\authorized_keys
+Get-Content $env:USERPROFILE\.ssh\authorized_keys        # ssh-ed25519 AAAA… mac-to-windows-deploy の1行が出るか
+Remove-Item C:\Users\Public\deploy-key.pub               # 受け渡しに使ったファイルを片付ける
+```
+
+| 行 | 確かめること |
+|---|---|
+| `whoami` | **デプロイ用ユーザーと出ること。**管理者と出たら管理者のウィンドウで、鍵が違うフォルダーに置かれてしまう |
+| 4行目の`Get-Content` | **`ssh-ed25519 AAAA… mac-to-windows-deploy`の1行。**`BEGIN … PRIVATE KEY`なら秘密鍵を送っている（[南京錠の問答 Q7](../questions/2026-11-09-how-ssh-keys-prove-who-you-are.md#q7-秘密鍵が自分の機械の外に出るのはどんなときか出てしまったらどうするか)に従い、鍵を作り直す） |
+
+**`scp`はファイルをコピーするだけである。**SSHサーバーが鍵を探すのは、決まった場所の決まった名前のファイル
+（`C:\Users\<デプロイ用ユーザー>\.ssh\authorized_keys`）だけである。送っただけでは鍵で入れない（2026-11-10に起きた）。
+名前が1文字でも違う（`authorized_key`、`authorized_keys.txt`など）と見つけられない。
+
+3行目で「パスが見つかりません」と出たら、送り先が違っている。次で探す。
+
+```powershell
+Get-ChildItem C:\Users\Public -Filter *.pub
+Get-ChildItem $env:USERPROFILE -Filter *.pub          # デプロイ用ユーザーとして送った場合はここ
 ```
 
 ## 5. デプロイ用ユーザーで、鍵で入れることを確かめる（Mac）
@@ -303,6 +351,27 @@ ssh -o PasswordAuthentication=no <ホスト名>-deploy whoami
 
 初めて鍵を使うときは、Macがキーチェーンのパスフレーズを聞くことがある。それは**Macの鍵の金庫を開けるもの**で、
 Windowsのパスワードではない。
+
+### 「入れた」が鍵によるものか確かめる
+
+**6でパスワードを閉じるまでは、鍵が断られてもSSHはパスワードを試す。**デプロイ用ユーザーのWindowsのパスワードを
+入れて入れてしまうと、鍵が効いていないことに気づけない（2026-11-10に起きた）。鍵だけで入れるかは、
+パスワードを使わない指定で、何が起きたかを表示して確かめる。
+
+```bash
+ssh -v -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o BatchMode=yes <ホスト名>-deploy whoami 2>&1 \
+  | grep -E "Offering public key|Server accepts key|Authenticated to|Permission denied"
+```
+
+| 出た行 | 意味 |
+|---|---|
+| `Offering public key: … id_ed25519_deploy` | Macが鍵を差し出した |
+| **`Server accepts key: … id_ed25519_deploy`** | **Windowsが鍵を受け付けた。**これが出れば鍵で入れている |
+| `Authenticated to <ホスト名>` | 入れた |
+| `Offering…`の次に`Permission denied` | **Windowsが鍵を断った。**4-3（棚に置けているか）をやり直す |
+
+`-o BatchMode=yes`は、パスワードやパスフレーズの入力を求められたら、入力を待たずに止まる指定である。
+パスフレーズはキーチェーン（1-3）から読まれるので、止まらない。
 
 ## 6. パスワードと管理者の道を閉じる（5が成功してから。Windowsの前で、管理者のPowerShell）
 
@@ -338,7 +407,12 @@ Restart-Service sshd
 
 | 症状 | まず疑うこと |
 |---|---|
+| 鍵を置いたのにパスワードを聞かれる | **棚に置けていない。**`scp`で送っただけで、4-3をやっていない（2026-11-10に起きた）。デプロイ用ユーザーのウィンドウで`Get-Content $env:USERPROFILE\.ssh\authorized_keys`が1行を返すか |
 | 鍵を置いたのにパスワードを聞かれる | `authorized_keys`を**管理者のウィンドウで作った**（持ち主が違う）。4-1で開いたデプロイ用ユーザーのウィンドウで作り直す |
+| 「入れた」のに、5の確認で`Permission denied`になる | パスワードで入っていた。[「入れた」が鍵によるものか確かめる](#入れたが鍵によるものか確かめる) |
+| `<Macのユーザー名>@<ホスト名>'s password:`と聞かれ、断られる | `ssh`・`scp`に**ホスト名を直接書いた。**`~/.ssh/config`の`Host`の名前（入り口の名前）を使う（4-2の注意） |
+| `~/.ssh/config line N: no argument after keyword "…"`と出て、どこにも繋がらない | `~/.ssh/config`のN行目に**余計な文字だけの行**がある（2026-11-10に`6`だけの行で起きた）。1行でも壊れると**ファイル全体が読めず、すべての入り口が使えなくなる**。その行を消す。直ったかは`ssh -G <入り口> \| grep -E "^(hostname\|user\|identityfile) "`で、繋がずに確かめられる |
+| 管理者のアカウントで、デプロイ用ユーザーのフォルダーが開けない | **正しい状態。「続行」を押さない**（4-1の注意） |
 | 鍵を置いたのにパスワードを聞かれる | 貼った1行が欠けている・改行が混ざっている。`ssh-ed25519 AAAA…`で始まる1行か |
 | どの鍵を使っているか分からない | Macで`ssh -v <ホスト名>-deploy`。`Offering public key: … id_ed25519_deploy`が出るか |
 | 違うアカウントで入ってしまう | `~/.ssh/config`の`User`と`IdentityFile`、`IdentitiesOnly yes`があるか |
