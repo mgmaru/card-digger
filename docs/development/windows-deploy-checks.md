@@ -82,13 +82,36 @@ powershell
 ### 1-1. 8000番が空いているか
 
 ```powershell
-Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+netstat -ano | findstr ":8000"
 ```
+
+| 部分 | 何をしているか |
+|---|---|
+| `netstat -ano` | このWindowsで開いている口の一覧を、番号（`-n`）とプロセスの番号（`-o`）つきで出す |
+| `findstr ":8000"` | そのうち8000番の行だけを残す |
 
 | 結果 | 意味 |
 |---|---|
 | **何も出ない** | 空いている。次へ |
-| 行が出る | 何か（開発中のuvicornなど）が8000番で待っている。**止めてから**進む。止めないと、仮のサーバーが起動できず、Aの結果が分からなくなる |
+| `127.0.0.1:8000`や`0.0.0.0:8000`の行に`LISTENING`がある | 何か（開発中のuvicornなど）が8000番で待っている。**止めてから**進む。止めないと、仮のサーバーが起動できず、Aの結果が分からなくなる |
+
+#### `Get-NetTCPConnection`などを使わない理由（2026-11-10に起きた）
+
+最初は`Get-NetTCPConnection`で調べる手順だったが、デプロイ用ユーザーでSSHから実行すると
+**`CIM サーバーに接続できません。アクセスは拒否されました`**で失敗した。
+
+`Get-NetTCPConnection`や`Get-ScheduledTask`の仲間は、**CIM（WMI）**というWindowsの管理情報の窓口を通して動く。
+**デプロイ用ユーザーがSSHから入ったときは、この窓口を使わせてもらえない。**
+`Get-ScheduledTask`の仲間は試していないが、同じ窓口を通るので、同じく断られる見込みである。
+そこで、この手順書でデプロイ用ユーザーが打つコマンドは、窓口を通らない昔からのコマンドにする。
+
+| やりたいこと | 窓口を通る（使わない） | 窓口を通らない（使う） |
+|---|---|---|
+| 8000番が使われているか | `Get-NetTCPConnection` | `netstat -ano` |
+| タスクを見る・起動する・止める | `Get-ScheduledTask`、`Start-ScheduledTask`、`Stop-ScheduledTask`、`Get-ScheduledTaskInfo` | `schtasks` |
+| Pythonが残っているか | `Get-CimInstance Win32_Process` | `Get-Process` |
+
+**デプロイScriptも同じ制約を受ける。**Scriptはデプロイ用ユーザーがSSHから動かすので、同じコマンドを使う。
 
 ### 1-2. uvを入れる
 
@@ -192,25 +215,25 @@ whoami      # <ホスト名>\<デプロイ用ユーザー> と出ることを確
 ### 3-1. タスクが見えるか
 
 ```powershell
-Get-ScheduledTask -TaskName card-digger-check
+schtasks /query /tn card-digger-check
 ```
 
 | 結果 | 意味 |
 |---|---|
-| `card-digger-check  Ready` | 見えている。次へ |
+| `card-digger-check`の行に`準備完了`（`Ready`） | 見えている。次へ |
 | 「見つからない」というエラー | **登録した管理者のタスクが、デプロイ用ユーザーから見えていない。**記録して、[トラブルシュート](#aが失敗したとき)へ |
 
 ### 3-2. 起動する
 
 ```powershell
-Start-ScheduledTask -TaskName card-digger-check
+schtasks /run /tn card-digger-check
 Start-Sleep 3
 curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:8000/
 ```
 
 | 部分 | 何をしているか |
 |---|---|
-| `Start-ScheduledTask` | タスクスケジューラーに「今すぐ動かして」と頼む。**本番のデプロイで新しい版を起動するときと同じ操作** |
+| `schtasks /run` | タスクスケジューラーに「今すぐ動かして」と頼む。**本番のデプロイで新しい版を起動するときと同じ操作** |
 | `curl.exe … -w "%{http_code}"` | 8000番に問い合わせ、応答の番号だけを出す。**本番の「起動後に`/api/health`を確かめる」と同じ形**（ADR 0003 論点5） |
 | `curl.exe`と`.exe`まで書く | PowerShellの`curl`は別物（`Invoke-WebRequest`の別名）なので、Windows付属の本物を呼ぶ |
 
@@ -223,22 +246,22 @@ curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:8000/
 ### 3-3. 止める
 
 ```powershell
-Stop-ScheduledTask -TaskName card-digger-check
+schtasks /end /tn card-digger-check
 Start-Sleep 2
-Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Select-Object ProcessId, ParentProcessId, CommandLine
+netstat -ano | findstr ":8000"
+Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, Path
 ```
 
 | 部分 | 何をしているか |
 |---|---|
-| `Stop-ScheduledTask` | タスクスケジューラーに「止めて」と頼む。**本番のデプロイで旧版を止めるときと同じ操作** |
-| `Get-NetTCPConnection` | **8000番が空いたか。**空いていないと、次に起動する新しい版が8000番を使えない |
-| `Get-CimInstance Win32_Process` | Pythonが残っていないか。デプロイ用ユーザーには、**自分のプロセスのコマンドだけが見える** |
+| `schtasks /end` | タスクスケジューラーに「止めて」と頼む。**本番のデプロイで旧版を止めるときと同じ操作** |
+| `netstat -ano` | **8000番が空いたか。**空いていないと、次に起動する新しい版が8000番を使えない |
+| `Get-Process python` | Pythonが残っていないか。`Path`（どのPythonか）は、**デプロイ用ユーザー自身のプロセスにだけ出る** |
 
 | 結果 | 意味 |
 |---|---|
-| **2つとも何も出ない（またはほかの人のPythonだけ）** | **止めて、8000番も空いた。Aは成功** |
-| `Get-NetTCPConnection`に行が出る、または`card-digger-check`を含むPythonが残る | **タスクは止まったが、子のPythonが残った**（[1-3](#1-3-仮のサーバーのフォルダーを作る)で心配したこと）。記録する。片付けは[トラブルシュート](#止めた後も8000番が空かない) |
+| **`netstat`に`LISTENING`の行が無く、`Path`が出るPythonも無い** | **止めて、8000番も空いた。Aは成功** |
+| `netstat`に`LISTENING`の行が出る、または`Path`が出るPython（デプロイ用ユーザーのもの）が残る | **タスクは止まったが、子のPythonが残った**（[1-3](#1-3-仮のサーバーのフォルダーを作る)で心配したこと）。記録する。片付けは[トラブルシュート](#止めた後も8000番が空かない) |
 | 「アクセスが拒否されました」 | **デプロイ用ユーザーには停止が許されていない。**記録して、トラブルシュートへ |
 
 **止めたまま4へ進む。**Bは、再起動したときにタスクが自分で起動するかを見る。
@@ -307,19 +330,19 @@ powershell
 
 ```powershell
 curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:8000/
-Get-ScheduledTaskInfo -TaskName card-digger-check | Select-Object LastRunTime, LastTaskResult
+schtasks /query /tn card-digger-check /v /fo list | findstr "前回"
 ```
 
 | 部分 | 何をしているか |
 |---|---|
 | `curl.exe` | 3-2と同じ。8000番が応答するか |
-| `Get-ScheduledTaskInfo` | タスクが**いつ**動いたかと、その結果の番号。`LastRunTime`が再起動した時刻なら、起動時に動いた |
+| `schtasks /query … /v` | タスクの詳しい情報。そのうち`前回の実行時刻`（いつ動いたか）と`前回の結果`（結果の番号）だけを残す。`前回の実行時刻`が再起動した時刻なら、起動時に動いた |
 
 | 結果 | 意味 |
 |---|---|
-| **`200`、`LastRunTime`が再起動の時刻、`LastTaskResult`が`267009`** | **Bは成功。**`267009`は「今動いている」の番号（16進数で`0x41301`） |
-| `000`、`LastTaskResult`が別の番号 | 起動しなかった。**番号を記録して**[トラブルシュート](#bが失敗したとき)へ |
-| `000`、`LastRunTime`が古い | タスクが起動時に呼ばれていない。記録して、トラブルシュートへ |
+| **`200`、`前回の実行時刻`が再起動の時刻、`前回の結果`が`267009`** | **Bは成功。**`267009`は「今動いている」の番号（16進数で`0x41301`） |
+| `000`、`前回の結果`が別の番号 | 起動しなかった。**番号を記録して**[トラブルシュート](#bが失敗したとき)へ |
+| `000`、`前回の実行時刻`が古い | タスクが起動時に呼ばれていない。記録して、トラブルシュートへ |
 
 **SSHで入れた時点で、Windowsは誰もログインしていなくても外から操作できる**ことも分かる（SSHサーバーはWindowsのサービスとして動く）。
 
@@ -382,7 +405,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<ホスト名>:8080/
 
 | 何を | どこで | コマンド |
 |---|---|---|
-| 仮のサーバーを止める | SSHのPowerShell（デプロイ用ユーザー） | `Stop-ScheduledTask -TaskName card-digger-check` |
+| 仮のサーバーを止める | SSHのPowerShell（デプロイ用ユーザー） | `schtasks /end /tn card-digger-check` |
 | タスクを消す | **Windowsの前で、管理者のPowerShell** | `Unregister-ScheduledTask -TaskName card-digger-check -Confirm:$false` |
 | フォルダーを消す | SSHのPowerShell（デプロイ用ユーザー） | `Remove-Item -Recurse -Force C:\card-digger-check` |
 
@@ -396,7 +419,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<ホスト名>:8080/
 | 確かめ | 記録すること |
 |---|---|
 | A | 3-1・3-2・3-3それぞれ、できたか。**3-3で子のPythonが残ったか** |
-| B | 4-1の`ForceDaemon`の最初の値。4-3の`offline`の有無。4-4の`LastTaskResult`の番号 |
+| B | 4-1の`ForceDaemon`の最初の値。4-3の`offline`の有無。4-4の`前回の結果`の番号 |
 | C | 5-2が通ったか。通らなかったら**エラーの文** |
 
 結果でADRのどこを直すか。
@@ -418,9 +441,9 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<ホスト名>:8080/
 
 | エラー | 考えられる原因 | 確かめ方 |
 |---|---|---|
-| 「見つからない」（3-1） | タスクを読む権限がデプロイ用ユーザーに無い | 管理者のPowerShellで`Get-ScheduledTask -TaskName card-digger-check`が見えるか |
+| 「見つからない」（3-1） | タスクを読む権限がデプロイ用ユーザーに無い | 管理者のPowerShellで`schtasks /query /tn card-digger-check`が見えるか |
 | 「アクセスが拒否されました」（3-2・3-3） | 起動・停止の権限がデプロイ用ユーザーに無い | 同上。管理者からは起動・停止できるか |
-| `000`のまま、`LastTaskResult`が`0`や`1` | タスクは起動したが、Pythonがすぐ終わった | 1-4のコマンドをSSHで手で動かし、エラーが出ないか |
+| `000`のまま、`前回の結果`が`0`や`1` | タスクは起動したが、Pythonがすぐ終わった | 1-4のコマンドをSSHで手で動かし、エラーが出ないか |
 
 **権限を広げる操作（タスクの権限の書き換え）は、この手順書では行わない。**ADRで方法を決めてから行う。
 
@@ -429,14 +452,14 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<ホスト名>:8080/
 残ったプロセスの番号を見て、止める。デプロイ用ユーザーは、**自分のプロセスなら**止められる。
 
 ```powershell
-$p = (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess
-Get-CimInstance Win32_Process -Filter "ProcessId=$p" | Select-Object ProcessId, ParentProcessId, CommandLine
-Stop-Process -Id $p
+netstat -ano | findstr ":8000"          # LISTENINGの行の、いちばん右の数字がプロセスの番号
+Get-Process -Id <番号> | Select-Object Id, Path
+Stop-Process -Id <番号>
 ```
 
 ### Bが失敗したとき
 
-`LastTaskResult`の番号で見当をつける。
+`前回の結果`の番号で見当をつける。
 
 | 番号 | 意味 | 対処 |
 |---|---|---|
