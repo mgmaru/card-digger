@@ -229,6 +229,17 @@ home = C:\Users\<デプロイ用ユーザー>\AppData\Roaming\uv\python\cpython-
 `cpython-3.11-…`は版の番号が`3.11`で止まっている。これがジャンクションで、実際の版（`3.11.x`）のフォルダーを指す。
 **`.venv`のPythonを起動するたびに、このジャンクションをたどる。**
 
+**SSHから1-4を打つと、起動できなかった**（448ではなく「見つからない」の形で出た）。
+
+```text
+error: uv trampoline failed to spawn Python child process
+  Caused by: entity not found (os error 2)
+```
+
+uvが作る`.venv\Scripts\python.exe`は**trampoline**（中継役）で、`home`の本物のPythonを子として起動する。
+その`home`へジャンクションをたどれず、本物のPythonが見つからなかった。
+**SSHからは、uvで作った`.venv`のPythonを起動できない。**タスクから起動できるかは、節2・3で確かめる。
+
 **どの結果でも、エラーの文と一緒にそのまま記録する。**1-4へ進むのは、結果を見て、直し方の見当をつけてからにする。
 本番のデプロイはSSHから動かすので、確かめたいのは**SSHからの動き**である。Windowsの前で通っただけでは、先へ進む理由にならない。
 
