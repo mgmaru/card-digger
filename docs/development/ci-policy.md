@@ -59,6 +59,7 @@ CIの並列実行や再実行はこの条件を守れない。
 | `poc` | `poc/mercapi`のUnit Test | 導入済み |
 | `frontend` | `npm ci` → `typecheck` → `test` → `build`（`src/frontend`） | **2026-09-02追加** |
 | `backend` | `uv run pytest`によるL2 / L3（`src/backend`） | 導入済み |
+| `backend-windows` | `backend`と同じテストを`windows-latest`で流す | **2026-11-11追加** |
 | `e2e` | PlaywrightによるE2E受入Flow。**Chromiumのみ、390pxと1280pxの2幅** | **2026-09-03追加** |
 
 `frontend` Jobは`src/frontend/package.json`の3つのScriptに依存する。
@@ -87,6 +88,20 @@ Node.jsのVersionはJob内で`26`に固定する。根拠は
 > 必要だった。記録として残す。形は
 > [検証の落とし穴 §3](../retrospectives/2026-09-01-verification-pitfalls.md)の
 > 「構造上100%にしかならない指標」と同じである。
+
+#### `backend-windows` Jobを足した（2026-11-11）
+
+**デプロイ先が家のWindowsなので、同じテストをWindowsでも流す**（[ADR 0003 論点3](../adr/0003-deploy-changes-to-the-target.md#論点3--ciでの検査)）。
+Pythonと、機械語を含むパッケージはOSごとに別物で、Linuxで通ってもWindowsで通るとは言えない。
+テストを分けるのではなく、`backend`と同じテストを流す。
+
+| 項目 | 値 | 理由 |
+|---|---|---|
+| 流すもの | `backend`と同じ`uv sync --extra dev --frozen`と`uv run --frozen pytest tests` | 2つのOSで、同じテストが同じ結果になることを見る |
+| skipするもの | `test_the_instant_does_not_move_with_the_process_timezone`（3件） | `time.tzset()`がUnixにしか無く、プロセスのタイムゾーンを切り替えられない。時刻が動かないことは、同じClassのほかのテストが、動いている機械のタイムゾーンで確かめる |
+| 流さないもの | Frontend、E2E、文書、PoC | 出力がOSに依存しないか、デプロイ先のOSに関係が薄い（ADR 0003 論点3） |
+
+2026-11-11の初回は、515件が通り、3件をskipした（Linuxは518件が通る）。
 
 #### `e2e` Jobを足した（2026-09-03）
 
@@ -197,8 +212,8 @@ Branchは目的ごとに分ける。実装と無関係な修正を同じBranch�
 | Allow deletions | **無効** | `main`を消せないようにする |
 
 必須Statusは`Docs links`、`PoC unit tests`、`Frontend unit and component tests`、
-`Backend unit and contract tests`、`E2E acceptance flow`の5つとする
-（2026-09-02に`Frontend`、2026-09-03に`E2E`を追加）。
+`Backend unit and contract tests`、`Backend unit and contract tests (Windows)`、`E2E acceptance flow`の6つとする
+（2026-09-02に`Frontend`、2026-09-03に`E2E`、2026-11-11に`Backend (Windows)`を追加）。
 
 > **この文書を直しただけでは、GitHubの設定は変わらなかった。** `Frontend`をこの表へ書いた時点では
 > 必須Statusは3つのままで、**Frontendが赤でもMergeできる状態が残っていた。** 気付いたのは、

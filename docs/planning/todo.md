@@ -3453,7 +3453,7 @@ Marketplace
 - [ ] uvicornを起動時に立ち上がるようにする（**タスクスケジューラー**。2026-11-10に仮のサーバーで、ログインしていなくても起動することを確かめた）。`--workers`は付けない
 - [ ] 変更を取り込むPowerShell Scriptを書く。**Buildが失敗したら再起動しない**
   （方法は[ADR 0003](../adr/0003-deploy-changes-to-the-target.md)。論点1〜4は2026-11-09に決定）
-- [ ] CIでBackendのテストをWindowsでも流す（`time.tzset()`の手当てを含む。ADR 0003 論点3）
+- [x] CIでBackendのテストをWindowsでも流す（2026-11-11。`backend-windows` Job。`time.tzset()`のテストだけをskip。ADR 0003 論点3）
 - [ ] CIでFrontendを1回だけビルドし、`dist/`とBackendのソース・`uv.lock`を1つのファイルにまとめて保存する（ADR 0003 論点2・7）
 - [x] `/api/health`に安全停止と実行中の収集の状態を足す（2026-11-10。`safetyStop`と`collectionsInFlight`。ADR 0003 論点6）
 - [x] タスクの中で`uv venv`・`uv sync --locked`が通るか確かめる（2026-11-10。通った。[タスクの中で確かめる手順書](../development/windows-deploy-task-checks.md)。ADR 0003 論点5の見直し）
