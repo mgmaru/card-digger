@@ -117,6 +117,26 @@ netstat -ano | findstr ":8000"
 
 **本番のデプロイでも要る**（ADR 0003 論点5の`uv sync`）。確かめた後も残す。
 
+**まず、既に入っているかを確かめる。**見るのは「デプロイ用ユーザーから見えるか」である。
+管理者のアカウントに入っているuvは管理者のフォルダーにあることが多く、デプロイ用ユーザーからは読めない。
+
+```powershell
+Get-Command uv -ErrorAction SilentlyContinue | Select-Object Source
+Test-Path "$env:USERPROFILE\.local\bin\uv.exe"
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `Get-Command uv` | PATHの通っている場所からuvを探す。全員向けに入っているuvなら、ここに場所が出る |
+| `Test-Path …\.local\bin\uv.exe` | 下の導入Scriptが入れる場所に、デプロイ用ユーザー向けのuvが既にあるか |
+
+| 結果 | 次 |
+|---|---|
+| `Source`に場所が出た | 入れない。`uv --version`で版を確かめ、1-3では`uv`とだけ書けばよい |
+| 何も出ず、`True` | 入れない。下の2行目（`--version`）だけ実行する |
+| **何も出ず、`False`** | **無い。下で入れる**（2026-11-10はこれだった） |
+
+
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 & "$env:USERPROFILE\.local\bin\uv.exe" --version
