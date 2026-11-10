@@ -42,7 +42,8 @@ docs/
 │   ├── ssh-key-setup.md
 │   ├── test-policy.md
 │   ├── windows-deploy-checks.md
-│   └── windows-deploy-task-checks.md
+│   ├── windows-deploy-task-checks.md
+│   └── windows-tailscale-serve-checks.md
 ├── adr/
 │   ├── 0001-run-on-home-windows-via-tailscale.md
 │   ├── 0002-switch-deploy-target-by-configuration.md
@@ -111,6 +112,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [windows-deploy-task-checks.md](development/windows-deploy-task-checks.md):
   デプロイの作業をタスクの中で行えるか（ADR 0003 論点5の見直し）を、家のWindowsで確かめる手順。タスクの中の`uv sync`、
   デプロイ用のタスクからuvicornのタスクを止めて起動すること、版の名前をファイルで渡すこと
+- [windows-tailscale-serve-checks.md](development/windows-tailscale-serve-checks.md):
+  `tailscale serve`で画面とAPIを振り分けられるか（ADR 0002 論点1のC）を、家のWindowsで確かめる手順。画面の配信、
+  `/api`のパス、SPA fallback、`current`を通した配信と向け直し
 
 ### `adr/`
 
