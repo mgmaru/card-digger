@@ -371,6 +371,21 @@ Register-ScheduledTask -TaskName "card-digger-check" -Action $action -Trigger $t
 
 3つとも期待どおりなら、管理者のPowerShellは閉じてよい。
 
+**`UserId`が管理者の名前なら、登録し直す**（2026-11-10に起きた）。2-2の窓でユーザー名の欄が管理者の名前になっていた、
+または2-1に管理者の名前を入れた。**そのままでは、タスクが管理者として動き、管理者のパスワードがWindowsに預けられている。**
+消してから、2-1から貼り直す。
+
+```powershell
+Unregister-ScheduledTask -TaskName card-digger-check -Confirm:$false
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `Unregister-ScheduledTask` | タスクを消す。**預けたパスワードも一緒に消える** |
+| `-Confirm:$false` | 「本当に消しますか」と聞かずに消す |
+
+2-2の窓では、**ユーザー名の欄を書き換えず**、デプロイ用ユーザーのパスワードだけを入れる。
+
 ### 管理者で登録してよいのか
 
 **よい。この操作だけは管理者で行う前提である**（ADR 0003 論点8「管理者が要る操作を最初の1回に寄せる」）。
