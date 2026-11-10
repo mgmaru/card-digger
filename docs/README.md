@@ -39,9 +39,12 @@ docs/
 │   ├── architecture.md
 │   ├── ci-policy.md
 │   ├── mercapi-fork-operations.md
-│   └── test-policy.md
+│   ├── ssh-key-setup.md
+│   ├── test-policy.md
+│   └── windows-deploy-checks.md
 ├── adr/
 │   ├── 0001-run-on-home-windows-via-tailscale.md
+│   ├── 0002-switch-deploy-target-by-configuration.md
 │   └── 0003-deploy-changes-to-the-target.md
 ├── questions/
 │   ├── 2026-11-08-reaching-home-server-from-devices.md
@@ -53,7 +56,9 @@ docs/
 │   ├── 2026-11-09-how-ssh-keys-prove-who-you-are.md
 │   ├── 2026-11-09-what-a-python-backend-deploys.md
 │   ├── 2026-11-09-what-a-reverse-proxy-is.md
-│   └── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
+│   ├── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
+│   ├── 2026-11-10-what-a-junction-is.md
+│   └── 2026-11-10-why-switch-releases-through-current.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -88,13 +93,20 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 
 - [architecture.md](development/architecture.md):
   層とimportの向き、**状態の寿命（どこに置くかは何についての事実かで決まる）**、外部依存と
-  2秒間隔の出所、Card Digger固有語と一般名の対応、Marketplace追加時に触る場所
+  2秒間隔の出所、Card Digger固有語と一般名の対応、Marketplace追加時に触る場所、
+  **デプロイ先をソースコードに持たない方針とデプロイ先への契約**
 - [mercapi-fork-operations.md](development/mercapi-fork-operations.md):
   Fork作成、upstream取込、Card Diggerの依存SHA更新、切戻しの手順
 - [test-policy.md](development/test-policy.md):
   用語、Testの目的と役割、Test層、Framework、配置、Fixtureの匿名化規則、実行時期、完了判定
 - [ci-policy.md](development/ci-policy.md):
   CIで実行する範囲、PR運用、Merge基準、Branch保護
+- [ssh-key-setup.md](development/ssh-key-setup.md):
+  Macから家のWindowsへ、SSHの鍵で入る手順。鍵の作り方、Windowsの棚への登録、パスワードを切る順番。
+  **デプロイ先固有の手順だが、利用者の判断で`deploy/`ではなくここに置いた**（2026-11-09）
+- [windows-deploy-checks.md](development/windows-deploy-checks.md):
+  デプロイScriptを書く前に、家のWindowsで、一般ユーザーがuvicornのタスクを止めて起動できるか、
+  ログインせずに動くか、`tailscale serve`を変えられるかを確かめる手順。`ssh-key-setup.md`と同じ理由でここに置く
 
 ### `adr/`
 
@@ -103,6 +115,8 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 
 - [0001-run-on-home-windows-via-tailscale.md](adr/0001-run-on-home-windows-via-tailscale.md):
   家のWindowsで動かし、3台からTailscale（`tailscale serve`）で繋ぐ。**2026-11-08決定**
+- [0002-switch-deploy-target-by-configuration.md](adr/0002-switch-deploy-target-by-configuration.md):
+  デプロイ先を設定だけで切り替えられる形にする。5論点の選択肢とメリット・デメリット。**保留**
 - [0003-deploy-changes-to-the-target.md](adr/0003-deploy-changes-to-the-target.md):
   変更をデプロイ先へ反映する方法。きっかけ・成果物・CIでの検査・可用性の目標・切り替え方・事前確認・細部を**2026-11-09決定**
 
@@ -142,6 +156,12 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   SSHの鍵はどうやって本人だと証明するのか。南京錠のたとえ、パスワードより安全な理由、公開鍵が漏れても大丈夫な理由、まずいこと
 - [2026-11-09-why-ssh-on-all-addresses-is-risky.md](questions/2026-11-09-why-ssh-on-all-addresses-is-risky.md):
   SSHサーバーが`0.0.0.0:22`で待つと、なぜ家のLANから入れて、なぜ危ないのか。2枚の扉、どちらを閉めるか、家のLANから入りたいとき
+- [2026-11-10-what-a-junction-is.md](questions/2026-11-10-what-a-junction-is.md):
+  ジャンクションとは何か。コピーとの違い、リパースポイントの仕組み、ショートカット・シンボリックリンクとの違い、
+  使われる場面、SSHからたどれなかったこと（分かっていることと推測）、扱うときの注意
+- [2026-11-10-why-switch-releases-through-current.md](questions/2026-11-10-why-switch-releases-through-current.md):
+  `current`は何を切り替えるのか。デプロイの手順、タスクの設定を書き換える場合との違い、ほかのやり方（その場で上書き、
+  名前の付け替え、`current.txt`、シンボリックリンク、Blue-Green）で何が起きるか、`current`の弱点
 
 書き方の約束。
 

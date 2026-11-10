@@ -25,7 +25,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 
 - **進捗の`- [ ]`は`docs/planning/todo.md`だけに置く。** 仕様書は「何をやるか」を定義し、
   済んだかは追わない（[配置ルール](docs/README.md#checkboxは3種類ある)）
-- **`src/` `poc/` `tools/` `.github/`はPull Requestを経由する。** `docs/`と`README.md`は
+- **`src/` `poc/` `tools/` `.github/` `deploy/`はPull Requestを経由する。** `docs/`と`README.md`は
   `main`へ直接pushしてよい（[§4](docs/development/ci-policy.md#4-pr運用)）
 - **Merge後もBranchを消さない。** Squashで潰れる前のcommitはBranchにしか残らない
   （[§5](docs/development/ci-policy.md#5-merge基準)）
@@ -36,6 +36,8 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 - **Phaseを機械的な緑だけで閉じない。** 完了条件の最後の1件「人間が見る商品を効率的に絞れるか」は
   **利用者にしか答えられない。**開発者側で`[x]`を入れず、答えとまだ遅かったことを1行残す
   （[§20](docs/product/concept.md#20-効率的かは利用者にしか答えられない2026-09-05決定)）
+- **デプロイ先を`src/`に持たない。** デプロイ先の違いは設定で吸収する。デプロイ先を替える変更が
+  `src/`を触ったら方針違反（[architecture §8](docs/development/architecture.md#8-デプロイ先をソースコードに持たない2026-11-08決定)）
 - **相場データをCard Diggerで作らない。** カードの相場も、Mercariの成約価格の分布も
   [card-pulse](https://github.com/mgmaru/card-pulse)の担当。Card Diggerは受け取って表示する側
   （[§19](docs/product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)）
