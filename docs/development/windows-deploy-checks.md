@@ -95,12 +95,12 @@ SSHで入るのはデプロイ用ユーザーだけである。
 
 **Windowsの前で出た長い結果は、画面から写さず、ファイルにしてMacへ送る。**MacからはSSHでデプロイ用ユーザーとして取ってこられる。
 
-1. Windowsで、結果をファイルに書く。コマンドの最後に`| Out-File -Encoding utf8 C:\Users\Public\<名前>.txt`を付ける。
+1. Windowsで、結果をファイルに書く。コマンドの最後に`| Out-File -Encoding utf8 C:\card-digger-check\<名前>.txt`を付ける。
    **何も表示されずに次のプロンプトが出れば書けている。**赤い文字が出たら書けていない
 2. Macで、ファイルがWindowsにあるかを見る
 
    ```bash
-   ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" 2>&1 | iconv -f cp932 -t utf-8
+   ssh <ホスト名>-deploy "dir C:\card-digger-check\*.txt" 2>&1 | iconv -f cp932 -t utf-8
    ```
 
    `<名前>.txt`が出なければ、1が失敗している。1に戻る
@@ -108,34 +108,53 @@ SSHで入るのはデプロイ用ユーザーだけである。
 3. Macで取ってくる。先頭に`/`を付けた形で試し、取れなければ`/`を外した形で試す
 
    ```bash
-   scp <ホスト名>-deploy:/C:/Users/Public/<名前>.txt /tmp/<名前>.txt
+   scp <ホスト名>-deploy:/C:/card-digger-check/<名前>.txt /tmp/<名前>.txt
    ```
 
    ```bash
-   scp <ホスト名>-deploy:C:/Users/Public/<名前>.txt /tmp/<名前>.txt
+   scp <ホスト名>-deploy:C:/card-digger-check/<名前>.txt /tmp/<名前>.txt
    ```
 
 4. 読み終えたら、Windowsのファイルを消す（管理者でもデプロイ用ユーザーでもよい）
 
    ```powershell
-   Remove-Item C:\Users\Public\<名前>.txt
+   Remove-Item C:\card-digger-check\<名前>.txt
    ```
 
 | 部分 | 何をしているか |
 |---|---|
 | `Out-File -Encoding utf8` | 画面に出す代わりにファイルへ書く。`utf8`を付けないとWindows PowerShellはUTF-16で書き、Macで文字化けしやすい |
-| `C:\Users\Public\` | **どのユーザーからも読める**場所。管理者が書いたファイルを、デプロイ用ユーザーとして取ってこられる |
+| `C:\card-digger-check\` | デプロイ用ユーザーが作ったフォルダー。**管理者が書いたファイルを、デプロイ用ユーザーがSSHから読める見込み**（下の「`C:\Users\Public`を使わない理由」） |
 | `ssh … "dir …"` | Windowsのコマンドプロンプトで`dir`を動かし、ファイルの一覧を出す |
 | `2>&1` | エラーの文（「ファイルが見つかりません」など）も`iconv`へ通す。付けないとエラーの文だけが化けたまま出る |
 | `\| iconv -f cp932 -t utf-8` | **文字化けを直す。**Windowsのコマンドプロンプトは日本語をShift_JIS（cp932）で出し、MacのターミナルはUTF-8として読むので、付けないと`?t?@?C??`のように化ける |
 | `scp <ホスト名>-deploy:…` | デプロイ用ユーザーの鍵で入り、ファイルをMacへ写す。パスワードは聞かれない |
 | `/C:/…`と`C:/…` | Windowsのパスを`scp`で指す書き方。環境によって片方しか通らないことがある（[SSHの手順書 4-2](ssh-key-setup.md#4-2-公開鍵をwindowsへ送るmac)） |
-| 消す | `C:\Users\Public\`は誰でも読めるので、残さない |
+| 消す | 確かめの記録を残さない。6で`C:\card-digger-check\`ごと消すので、消し忘れても残らない |
 
 **結果にはユーザー名やコンピューター名が入る。**この手順書へ写すときは`<デプロイ用ユーザー>`などに置き換える。
 
-**2026-11-10に起きたこと。**`scp`が`No such file or directory`で失敗した。`dir`で見ると、**ファイルがWindowsにまだ無かった**
-（1を貼る前に`scp`した）。`scp`の書き方を疑う前に、2でファイルがあるかを見る。
+#### `C:\Users\Public`を使わない理由（2026-11-10に起きた）
+
+最初は「どのユーザーからも読める」`C:\Users\Public\`に書く手順だった。**Windowsの前ではファイルが見えるのに、
+デプロイ用ユーザーがSSHから`dir`すると`ファイルが見つかりません`、`scp`は`No such file or directory`だった。**
+
+```bash
+ssh <ホスト名>-deploy "whoami /groups" 2>&1 | iconv -f cp932 -t utf-8 | grep -E "INTERACTIVE|NETWORK"
+ssh <ホスト名>-deploy "icacls C:\Users\Public" 2>&1 | iconv -f cp932 -t utf-8
+```
+
+| 結果 | 意味 |
+|---|---|
+| `NT AUTHORITY\NETWORK`があり、`INTERACTIVE`が無い | **SSHで入ると、「ネットワーク越しにログインした人」として扱われる。**Windowsの前でログインした人（`INTERACTIVE`）ではない |
+| `icacls`が`アクセスが拒否されました` | `C:\Users\Public`は、ネットワーク越しにログインした人には権限すら読ませない |
+
+**`C:\Users\Public`の「誰でも」は、Windowsの前でログインした人のことだった。**SSHから入るデプロイ用ユーザーは含まれない。
+[SSHの手順書 4-2](ssh-key-setup.md#4-2-公開鍵をwindowsへ送るmac)で使えたのは、送ったのが管理者（SSH）、読んだのがデプロイ用ユーザー（Windowsの前、`runas`）だったからである。
+
+**これまでのSSHでのつまずきと、同じ根の可能性がある。**CIMの窓口が断られた（[1-1](#get-nettcpconnectionなどを使わない理由2026-11-10に起きた)）、
+ジャンクションをたどれなかった（[1-3](#1-3-仮のサーバーのフォルダーを作る)）も、SSHのセッションだけで起きた。
+どちらも「ネットワーク越しのログイン」が原因かは、まだ確かめていない。**デプロイScriptはSSHから動かすので、ADR 0003で扱う。**
 
 **Aが失敗しても、BとCは続けてよい。**それぞれ独立に答えが出る。失敗したところは[トラブルシュート](#トラブルシュート)を見る。
 直せなかったら、**直さずに「できなかった」と記録する**。それが答えである。
@@ -579,7 +598,7 @@ Start-Sleep 3
 **③ 記録と電池の情報をファイルに書く（Windows・管理者）**
 
 ```powershell
-& { Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message; Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus; (Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries } | Out-File -Encoding utf8 C:\Users\Public\task-check.txt
+& { Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 10 | Format-List TimeCreated, Id, Message; Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus; (Get-ScheduledTask card-digger-check).Settings | Format-List DisallowStartIfOnBatteries, StopIfGoingOnBatteries } | Out-File -Encoding utf8 C:\card-digger-check\task-check.txt
 ```
 
 | 部分 | 何をしているか |
@@ -588,7 +607,7 @@ Start-Sleep 3
 | `Win32_Battery` | Windowsが電池（UPSを含む）を認識しているか。**何も出なければ電池は無い** |
 | `DisallowStartIfOnBatteries` | `True`なら、電池で動いているときは開始しない。2で電源の条件を指定しなかったので、既定の`True`が残っているはず |
 | `& { …; …; … }` | 3つを続けて実行し、出力を1つにまとめる |
-| `Out-File -Encoding utf8 …` | 画面に出さず、誰でも読める`C:\Users\Public\`にファイルとして書く |
+| `Out-File -Encoding utf8 …` | 画面に出さず、デプロイ用ユーザーがSSHから読める`C:\card-digger-check\`にファイルとして書く |
 
 | 結果 | 意味 |
 |---|---|
@@ -598,15 +617,15 @@ Start-Sleep 3
 **④ ファイルがあるかを見る（Mac）**
 
 ```bash
-ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" 2>&1 | iconv -f cp932 -t utf-8
+ssh <ホスト名>-deploy "dir C:\card-digger-check\*.txt" 2>&1 | iconv -f cp932 -t utf-8
 ```
 
-`task-check.txt`が出ればよい。`ファイルが見つかりません`なら、③が実行されていない（2026-11-10に起きた。①〜③をMacで待っている間に、Windowsの前で打っていなかった）。
+`task-check.txt`が出ればよい。`ファイルが見つかりません`なら、③が実行されていないか、書いた場所が違う。
 
 **⑤ 取ってくる（Mac）**
 
 ```bash
-scp <ホスト名>-deploy:/C:/Users/Public/task-check.txt /tmp/task-check.txt
+scp <ホスト名>-deploy:/C:/card-digger-check/task-check.txt /tmp/task-check.txt
 ```
 
 取れなければ、`/C:/`を`C:/`にして試す。
@@ -616,7 +635,7 @@ scp <ホスト名>-deploy:/C:/Users/Public/task-check.txt /tmp/task-check.txt
 読み終えてから消す。
 
 ```bash
-ssh <ホスト名>-deploy "del C:\Users\Public\task-check.txt"
+ssh <ホスト名>-deploy "del C:\card-digger-check\task-check.txt"
 ```
 
 ### 3-3. 止める
