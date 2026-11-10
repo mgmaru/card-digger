@@ -971,3 +971,7 @@ Select-String -Path C:\card-digger-check\rights.cfg -Pattern 'SeBatchLogonRight|
 | `SeBatchLogonRight = …` | 今この権利を持っている人。`*S-1-5-32-544`（Administrators）などの番号で書かれる。デプロイ用ユーザーは入っていないはず |
 | `SeDenyBatchLogonRight = …` | この権利を禁じられている人。**デプロイ用ユーザーや`Users`が入っていたら、与えても禁止が勝つ** |
 | 行が出ない | その設定に誰も入っていない |
+
+**2026-11-10の結果。**`SeBatchLogonRight = *S-1-5-32-544,*S-1-5-32-551,*S-1-5-32-559`（Administrators、Backup Operators、
+Performance Log Users。Windowsの既定のまま）。**デプロイ用ユーザーも`Users`（`S-1-5-32-545`）も入っていない。**
+タスクが起動しなかった理由（[3-2-2](#3-2-2-windowsに理由を聞くwindowsの前で管理者のpowershell--mac)の`0x80070569`）と合う。
