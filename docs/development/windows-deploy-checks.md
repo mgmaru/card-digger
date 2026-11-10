@@ -86,14 +86,27 @@ SSHで入るのはデプロイ用ユーザーだけである。
 
 **Windowsの前で出た長い結果は、画面から写さず、ファイルにしてMacへ送る。**MacからはSSHでデプロイ用ユーザーとして取ってこられる。
 
-1. Windowsで、結果をファイルに書く。コマンドの最後に`| Out-File -Encoding utf8 C:\Users\Public\<名前>.txt`を付ける
-2. Macで取ってくる
+1. Windowsで、結果をファイルに書く。コマンドの最後に`| Out-File -Encoding utf8 C:\Users\Public\<名前>.txt`を付ける。
+   **何も表示されずに次のプロンプトが出れば書けている。**赤い文字が出たら書けていない
+2. Macで、ファイルがWindowsにあるかを見る
+
+   ```bash
+   ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" | iconv -f cp932 -t utf-8
+   ```
+
+   `<名前>.txt`が出なければ、1が失敗している。1に戻る
+
+3. Macで取ってくる。先頭に`/`を付けた形で試し、取れなければ`/`を外した形で試す
+
+   ```bash
+   scp <ホスト名>-deploy:/C:/Users/Public/<名前>.txt /tmp/<名前>.txt
+   ```
 
    ```bash
    scp <ホスト名>-deploy:C:/Users/Public/<名前>.txt /tmp/<名前>.txt
    ```
 
-3. 読み終えたら、Windowsのファイルを消す（管理者でもデプロイ用ユーザーでもよい）
+4. 読み終えたら、Windowsのファイルを消す（管理者でもデプロイ用ユーザーでもよい）
 
    ```powershell
    Remove-Item C:\Users\Public\<名前>.txt
@@ -103,10 +116,16 @@ SSHで入るのはデプロイ用ユーザーだけである。
 |---|---|
 | `Out-File -Encoding utf8` | 画面に出す代わりにファイルへ書く。`utf8`を付けないとWindows PowerShellはUTF-16で書き、Macで文字化けしやすい |
 | `C:\Users\Public\` | **どのユーザーからも読める**場所。管理者が書いたファイルを、デプロイ用ユーザーとして取ってこられる |
+| `ssh … "dir …"` | Windowsのコマンドプロンプトで`dir`を動かし、ファイルの一覧を出す |
+| `\| iconv -f cp932 -t utf-8` | **文字化けを直す。**Windowsのコマンドプロンプトは日本語をShift_JIS（cp932）で出し、MacのターミナルはUTF-8として読むので、付けないと`?t?@?C??`のように化ける |
 | `scp <ホスト名>-deploy:…` | デプロイ用ユーザーの鍵で入り、ファイルをMacへ写す。パスワードは聞かれない |
+| `/C:/…`と`C:/…` | Windowsのパスを`scp`で指す書き方。環境によって片方しか通らないことがある（[SSHの手順書 4-2](ssh-key-setup.md#4-2-公開鍵をwindowsへ送るmac)） |
 | 消す | `C:\Users\Public\`は誰でも読めるので、残さない |
 
 **結果にはユーザー名やコンピューター名が入る。**この手順書へ写すときは`<デプロイ用ユーザー>`などに置き換える。
+
+**2026-11-10に起きたこと。**`scp`が`No such file or directory`で失敗した。`dir`で見ると、**ファイルがWindowsにまだ無かった**
+（1を貼る前に`scp`した）。`scp`の書き方を疑う前に、2でファイルがあるかを見る。
 
 **Aが失敗しても、BとCは続けてよい。**それぞれ独立に答えが出る。失敗したところは[トラブルシュート](#トラブルシュート)を見る。
 直せなかったら、**直さずに「できなかった」と記録する**。それが答えである。
@@ -567,11 +586,20 @@ Get-CimInstance Win32_Battery | Format-List Name, BatteryStatus
 |---|---|
 | `& { …; …; … }` | 3つのコマンドを続けて実行し、出力を1つにまとめる |
 
-Macで取ってくる。
+**何も表示されずに次のプロンプトが出れば書けている。**赤い文字が出たら書けていない。
+`Get-WinEvent`がエラーになるときは、この節の最初の`wevtutil …`を打っていないか、記録がまだ無い。最初の枠から順に貼り直す。
+
+Macで、ファイルがあるかを見てから取ってくる（[結果が長いとき](#結果が長いとき--ファイルにしてmacへ送る)の2・3）。
 
 ```bash
-scp <ホスト名>-deploy:C:/Users/Public/task-check.txt /tmp/task-check.txt
+ssh <ホスト名>-deploy "dir C:\Users\Public\*.txt" | iconv -f cp932 -t utf-8
 ```
+
+```bash
+scp <ホスト名>-deploy:/C:/Users/Public/task-check.txt /tmp/task-check.txt
+```
+
+取れなければ、`/C:/`を`C:/`にして試す。
 
 ### 3-3. 止める
 
