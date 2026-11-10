@@ -938,7 +938,7 @@ Stop-Process -Id <番号>
 
 **ログインしていなくても動くタスクは、この権利が無いと起動されない**（2026-11-10、[3-2-2](#3-2-2-windowsに理由を聞くwindowsの前で管理者のpowershell--mac)で分かった）。
 **2026-11-10、利用者がAに決めた**（デプロイ用ユーザーにだけ与える。下の選択肢）。ADR 0003 論点8には、PR #48を閉じるときに書く。
-与える手順は、Windowsのエディションを確かめてから書く。
+このWindowsは**Home**だった。与える手順は[下](#与える手順windows-homewindowsの前で管理者のpowershell)。
 
 #### 何の権利か — タスクを起動する権限とは別のもの
 
@@ -1005,3 +1005,111 @@ Select-String -Path C:\card-digger-check\rights.cfg -Pattern 'SeBatchLogonRight|
 Performance Log Users。Windowsの既定のまま）。**デプロイ用ユーザーも`Users`（`S-1-5-32-545`）も入っていない。**
 タスクが起動しなかった理由（[3-2-2](#3-2-2-windowsに理由を聞くwindowsの前で管理者のpowershell--mac)の`0x80070569`）と合う。
 `SeDenyBatchLogonRight`の行は出なかった（禁じられている人はいない）。
+
+**2026-11-10の結果。エディションはHome。**
+
+#### 与える手順（Windows Home。Windowsの前で、管理者のPowerShell）
+
+**Homeには「ローカル セキュリティ ポリシー」（`secpol.msc`）の画面が無い。**同じことを`secedit`というコマンドで行う。
+やり方は「今の設定に、デプロイ用ユーザーを1人足した設定ファイルを作り、それをWindowsに読ませる」である。
+上の「決める前に読むこと」で書き出した`C:\card-digger-check\rights.cfg`を使うので、**先にそれを済ませておく。**
+
+**① デプロイ用ユーザーの番号（SID）を調べる（ここだけ書き換える）**
+
+Windowsは、権利の設定に名前ではなく番号（SID）を書く。
+
+```powershell
+$sid = (Get-LocalUser -Name "<デプロイ用ユーザー>").SID.Value
+$sid
+```
+
+`S-1-5-21-…`で始まる長い番号が出ればよい。`<デプロイ用ユーザー>`には、コンピューター名を付けずに名前だけを入れる。
+
+**② 今の設定の行に、その番号を足す**
+
+```powershell
+$now = (Select-String -Path C:\card-digger-check\rights.cfg -Pattern '^SeBatchLogonRight').Line
+$new = "$now,*$sid"
+$new
+```
+
+| 行 | 何をしているか |
+|---|---|
+| `$now = …` | 書き出した設定から、`SeBatchLogonRight = …`の行を取り出す。**今の3つ（Administratorsなど）を消さないため** |
+| `$new = "$now,*$sid"` | その行の最後に、デプロイ用ユーザーの番号を足す。番号の前の`*`は「名前ではなく番号」という印 |
+
+`SeBatchLogonRight = *S-1-5-32-544,*S-1-5-32-551,*S-1-5-32-559,*S-1-5-21-…`と出ればよい。**前の3つが残っていることを確かめる。**
+
+**③ 設定ファイルを作る**
+
+```powershell
+Set-Content -Encoding Unicode -Path C:\card-digger-check\batch.inf -Value @('[Unicode]', 'Unicode=yes', '[Version]', 'signature="$CHICAGO$"', 'Revision=1', '[Privilege Rights]', $new)
+Get-Content C:\card-digger-check\batch.inf
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `[Unicode]`〜`Revision=1` | `secedit`が読む設定ファイルの決まった書き出し |
+| `[Privilege Rights]` | ここから下が権利の設定 |
+| `$new` | ②で作った1行。**このファイルには、この1つの権利しか書かない** |
+| `-Encoding Unicode` | `Unicode=yes`と書いたので、ファイルもUnicode（UTF-16）で書く |
+
+**④ Windowsに読ませる**
+
+```powershell
+secedit /configure /db C:\card-digger-check\batch.sdb /cfg C:\card-digger-check\batch.inf /areas USER_RIGHTS
+```
+
+| 部分 | 何をしているか |
+|---|---|
+| `/configure` | 設定ファイルの内容を、Windowsに当てる |
+| `/db C:\card-digger-check\batch.sdb` | 作業用の新しいファイル。**Windowsの本来の設定のファイル（`secedit.sdb`）は使わない** |
+| `/areas USER_RIGHTS` | 権利の設定だけを当てる。ほかの種類の設定は触らない |
+
+**設定ファイルに書いた権利（`SeBatchLogonRight`）だけが書き換わる。**ファイルに無いほかの権利は変わらない。
+`タスクは正常に完了しました`と出ればよい。
+
+**⑤ 確かめる**
+
+```powershell
+secedit /export /cfg C:\card-digger-check\rights-after.cfg /areas USER_RIGHTS
+Select-String -Path C:\card-digger-check\rights-after.cfg -Pattern '^SeBatchLogonRight'
+```
+
+②で出した行と同じ（最後にデプロイ用ユーザーの番号がある）なら、与えられた。
+
+**⑥ タスクが起動するか確かめる**
+
+```powershell
+Start-ScheduledTask -TaskName card-digger-check
+Start-Sleep 3
+Get-ScheduledTaskInfo -TaskName card-digger-check | Format-List LastRunTime, LastTaskResult
+curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:8000/
+```
+
+| 結果 | 意味 |
+|---|---|
+| **`LastRunTime`が今の時刻、`LastTaskResult`が`267009`、`200`** | **タスクが起動し、Pythonが動いている。**タスクで動くプロセスはジャンクションをたどれる（SSHからは起動できなかった`.venv`のPythonが動いた）。3-3へ |
+| `LastRunTime`が今の時刻、`000` | 起動したが、Pythonがすぐ終わった。`LastTaskResult`の番号を見る。SSHと同じくジャンクションで失敗した可能性がある |
+| `LastRunTime`が`1999/11/30`のまま | まだ起動しない。[3-2-2](#3-2-2-windowsに理由を聞くwindowsの前で管理者のpowershell--mac)の①〜⑤で記録を読み直す |
+
+**⑦ 作業用のファイルを消す**
+
+```powershell
+Remove-Item C:\card-digger-check\batch.inf, C:\card-digger-check\batch.sdb, C:\card-digger-check\rights-after.cfg
+```
+
+`rights.cfg`（与える前の設定）は、元に戻すときに使うので、6の片付けまで残す。
+
+#### 元に戻すとき
+
+②の`$now`（与える前の行）で、同じ③④を行う。`$now`が消えていたら、`rights.cfg`から取り出し直す（②の1行目）。
+
+```powershell
+$now = (Select-String -Path C:\card-digger-check\rights.cfg -Pattern '^SeBatchLogonRight').Line
+Set-Content -Encoding Unicode -Path C:\card-digger-check\batch.inf -Value @('[Unicode]', 'Unicode=yes', '[Version]', 'signature="$CHICAGO$"', 'Revision=1', '[Privilege Rights]', $now)
+secedit /configure /db C:\card-digger-check\batch.sdb /cfg C:\card-digger-check\batch.inf /areas USER_RIGHTS
+```
+
+**本番でも、デプロイ用ユーザーにこの権利は要る。**確かめが終わっても戻さない。戻すのは、Card Diggerをこのデプロイ用ユーザーで動かすのをやめるときである。
+
