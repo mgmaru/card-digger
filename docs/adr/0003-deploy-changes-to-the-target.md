@@ -110,7 +110,7 @@ LinuxのCIで確かめたものをWindowsへは持っていけない。**そこ�
 
 | 問題 | 場所 | 内容 |
 |---|---|---|
-| **`time.tzset()`はUnixにしか無い** | `src/backend/tests/unit/test_normalization.py` | タイムゾーンを切り替えるテストが、Windowsではエラーになる見込み（2026-11-09時点で未実行）。**Windows Jobを足すときに手当てが要る** |
+| **`time.tzset()`はUnixにしか無い** | `src/backend/tests/unit/test_normalization.py` | タイムゾーンを切り替えるテストが、Windowsではエラーになる見込みだった。**2026-11-11、`tzset`の無いOSではそのテストだけをskipする形にした。**ほかの問題は出なかった（515件が通り、3件をskip） |
 
 ### 保留 — 成果物のテスト
 
@@ -532,10 +532,10 @@ SSHで入ったデプロイ用ユーザーは`NT AUTHORITY\NETWORK`として扱�
 
 | 文書・ファイル | 直すこと | いつ |
 |---|---|---|
-| [ci-policy §2](../development/ci-policy.md#2-ciで実行する範囲) | BackendのテストをWindowsでも流すこと | 論点3を実装するPR |
+| [ci-policy §3.1・§6](../development/ci-policy.md#backend-windows-jobを足した2026-11-11) | BackendのテストをWindowsでも流すこと | **2026-11-11に実装した**（`backend-windows` Job） |
 | [ci-policy §7](../development/ci-policy.md#7-やらないこと) | 「Deploy / Release Pipeline」の行を、`dist/`を保存することに合わせて書き直す | 論点2を実装するPR |
 | [ci-policy §4](../development/ci-policy.md#4-pr運用)、`CLAUDE.md` | `deploy/`もPRを経由する | **ADR 0002の論点4で決め、PR #42で直した** |
-| `src/backend/tests/unit/test_normalization.py` | `time.tzset()`をWindowsで手当てする | 論点3を実装するPR |
+| `src/backend/tests/unit/test_normalization.py` | `time.tzset()`をWindowsで手当てする | **2026-11-11に実装した**（`tzset`の無いOSではそのテストだけをskipする） |
 | [todo](../planning/todo.md#自宅windowsで使う2026-11-08決定) | 実装の項目 | このADRと同じPR |
 | `src/backend/card_digger/api/`（`/api/health`） | 安全停止と実行中の収集の状態を返す（論点6） | **2026-11-10に実装した。**応答の形は[MVP仕様](../product/mvp-spec.md#get-apihealth)が持つ |
 | [SSHの鍵の手順書](../development/ssh-key-setup.md) | デプロイ用の一般ユーザーを作り、その人の棚に鍵を置く手順 | **PR #51で直した** |

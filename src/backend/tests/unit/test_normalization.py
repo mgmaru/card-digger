@@ -162,6 +162,14 @@ class TestCreatedAt:
 
         assert item.created_at == datetime.fromtimestamp(CREATED_EPOCH, timezone.utc)
 
+    @pytest.mark.skipif(
+        not hasattr(time, "tzset"),
+        reason=(
+            "time.tzset() exists only on Unix, so the process timezone cannot be "
+            "switched here. The instant is still checked in the machine's own "
+            "zone by the tests above."
+        ),
+    )
     @pytest.mark.parametrize("zone", ["Asia/Tokyo", "America/New_York", "UTC"])
     def test_the_instant_does_not_move_with_the_process_timezone(self, zone):
         """The fork builds naive datetimes in the local timezone.
