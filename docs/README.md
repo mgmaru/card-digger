@@ -60,7 +60,8 @@ docs/
 │   ├── 2026-11-09-what-a-reverse-proxy-is.md
 │   ├── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
 │   ├── 2026-11-10-what-a-junction-is.md
-│   └── 2026-11-10-why-switch-releases-through-current.md
+│   ├── 2026-11-10-why-switch-releases-through-current.md
+│   └── 2026-11-15-what-a-reload-throws-away.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -170,6 +171,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [2026-11-10-why-switch-releases-through-current.md](questions/2026-11-10-why-switch-releases-through-current.md):
   `current`は何を切り替えるのか。デプロイの手順、タスクの設定を書き換える場合との違い、ほかのやり方（その場で上書き、
   名前の付け替え、`current.txt`、シンボリックリンク、Blue-Green）で何が起きるか、`current`の弱点
+- [2026-11-15-what-a-reload-throws-away.md](questions/2026-11-15-what-a-reload-throws-away.md):
+  再読み込みでBrowserは何を捨てるのか。SPA fallbackと転送の違い、`dist/`に無いパス、画面の型とAPI、
+  画面の404とAPIの404、キャッシュとHTMLの指示、MPA・SSRとの違い、リンクやボタンでは捨てないこと、本当に無いパス
 
 書き方の約束。
 
