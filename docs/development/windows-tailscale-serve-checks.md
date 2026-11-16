@@ -8,14 +8,15 @@
   （画面とAPIを同じOriginから返し、振り分けは入口が担う）を、`tailscale serve`だけで組めるかを確かめる
 - 根拠: ADR 0002 論点1の[決める前の検証](../adr/0002-switch-deploy-target-by-configuration.md#決める前の検証windows15分ほどmercariへは通信しない)
 - 前提: [前回の確かめの手順書](windows-deploy-checks.md)が済んでいる（Run unattendedが有効、デプロイ用ユーザーへSSHで入れる）
-- 状態: **2026-11-11に1〜5-1まで実行し、[途中で止めた](#途中で止めた2026-11-11)。**1・4はできた。2はパスが削られたが、渡し先をパスつきにして直った。3は404。6（向け直し）と7（片付け）はまだ
+- 状態: **2026-11-11に1〜5-1まで実行し、[途中で止めた](#途中で止めた2026-11-11)。**1・4はできた。2はパスが削られたが、渡し先をパスつきにして直った。3は404。
+  **2026-11-16に[5-2](#5-2-をindexhtmlに向ける5adr-0002のe)（`/`を`index.html`に向ける）を足した。**5-2、6（向け直し）、7（片付け）はまだ
 
 **前回までの手順書の書き方をそのまま使う。**伏せ字、[どこで誰として打つか](windows-deploy-checks.md#どこで誰として打つか)、
 [コマンドの貼り方](windows-deploy-checks.md#コマンドの貼り方)は、前回の手順書にある。
 
 ## 途中で止めた（2026-11-11）
 
-**5-1まで行い、6（`current`の向け直し）の前で止めた。**再開するときは、6から始める。
+**5-1まで行い、6（`current`の向け直し）の前で止めた。**再開するときは、**2026-11-16に足した5-2から**始める。
 
 ### 止めた時点でWindowsに残っているもの
 
@@ -36,7 +37,7 @@
    ```
 
    `/`と`/api`の2行が出ればよい。出なければ4-2と5-1をもう一度行う
-3. **6から続ける**
+3. **5-2から続ける**
 
 ## 0. 何を確かめるか
 
@@ -46,6 +47,7 @@
 | **2** | `/api`をuvicornへ渡したとき、**パスが`/api/health`のまま届くか**、`/health`に削られるか | 削られると、APIが壊れる |
 | **3** | `/sellers/abc123`のような画面の住所を直接開いたとき、`index.html`が返るか、404になるか（SPA fallback） | 404なら、D（`HashRouter`）かCaddyを組み合わせる（利用者が選ぶ） |
 | **4** | 配るフォルダーが`current\dist`（デプロイ用ユーザーが作ったジャンクション）を通るとき、配れるか。**`current`を向け直すと、入口の設定を変えずに新しい画面が配られるか** | 配れなければ、入口の指し方を変える |
+| **5** | **（2026-11-16に足した）**`/`を`dist`フォルダーではなく`index.html`ファイルに向け、`/assets`を`assets`フォルダーに向けると、`/sellers/abc123`に`index.html`が返るか（[ADR 0002のE](../adr/0002-switch-deploy-target-by-configuration.md#e-入口のをフォルダーではなくindexhtmlに向けるcの中でtailscale-serveだけで組む2026-11-16に足した)） | 404なら、3の結果のとおりD（`HashRouter`）かCaddyを組み合わせる（利用者が選ぶ） |
 
 結果で何を選ぶかは、ADR 0002の[結果の表](../adr/0002-switch-deploy-target-by-configuration.md#決める前の検証windows15分ほどmercariへは通信しない)のとおり。
 
@@ -74,7 +76,8 @@ flowchart TD
     P --> E["3. 届いたパスを返すサーバーを立てる<br/>（Windowsの前、管理者のPowerShell、別のウィンドウ）"]
     E --> S["4. tailscale serveを設定する<br/>（Windowsの前、管理者のPowerShell）"]
     S --> C["5. Macから確かめる（1〜3）"]
-    C --> SW["6. currentを向け直して確かめる（4）<br/>（SSH → Mac）"]
+    C --> F["5-2. / をindex.htmlに向けて確かめる（5）<br/>（Windowsの前 → Mac）"]
+    F --> SW["6. currentを向け直して確かめる（4）<br/>（Windowsの前 → Mac）"]
     SW --> K["7. 片付ける"]
     K --> W["8. 結果を記録する"]
 ```
@@ -277,8 +280,83 @@ curl -s "https://<入口の名前>/api/search?keyword=x" ; echo
 **2026-11-11の結果。`path=/api/health`、`path=/api/search?keyword=x`。渡し先をパスつきにすると、パスもクエリもそのまま届いた。2は解決した。**
 **本番の入口も、渡し先を`http://127.0.0.1:8000/api`と書く。**
 
-**3（404）は、書き方では直らない。**ADR 0002の結果の表のとおり、**C＋D**（`HashRouter`。URLに`#`が入る）か
+**3（404）は、書き方では直らない。**2026-11-16に、`tailscale serve`だけで直せるかを[5-2](#5-2-をindexhtmlに向ける5adr-0002のe)で試すことにした。
+5-2でも404なら、ADR 0002の結果の表のとおり、**C＋D**（`HashRouter`。URLに`#`が入る）か
 **C＋Caddy**（SPA fallbackをCaddyが担う。Windowsで常駐するものが1つ増える）を、利用者が選ぶ。
+
+### 5-2. `/`を`index.html`に向ける（5。ADR 0002のE）
+
+**3で404になったのは、`/`の行き先が`dist`フォルダーだったからである。**`tailscale serve`は、`/sellers/abc123`の残りのパス
+`sellers/abc123`を、フォルダーの中のファイル名として探す。無ければ404を返す。
+
+**行き先を`index.html`というファイル1つにすると、`/`の下のどのパスにもそのファイルを返すかを試す。**
+JS・CSSは`/assets`に別の振り分けを足して、`assets`フォルダーから配る。**`dist`の中身は変えない。**
+
+```text
+tailscale serve
+  ├── /api     → http://127.0.0.1:8000/api                         （5-1のまま）
+  ├── /assets  → C:\card-digger-check\current\dist\assets（フォルダー） ← 足す
+  └── /        → C:\card-digger-check\current\dist\index.html（ファイル）← フォルダーから替える
+```
+
+**動くかは分からない。**行き先がファイルのとき、`/`ちょうどのときだけ返すのか、`/`の下のどのパスにも返すのかは、
+公式ドキュメントに記述が無い。提案者の記憶では「ちょうどのときだけ」の作りで、利用者も「効かない気がする」と見ている。
+**5分ほどで分かるので、試す。**
+
+**Windowsの前、4の管理者のPowerShell**で、1つずつ貼る。
+
+```powershell
+& $ts serve --set-path=/ off
+```
+
+```powershell
+& $ts serve --bg --set-path=/assets C:\card-digger-check\current\dist\assets
+```
+
+```powershell
+& $ts serve --bg --set-path=/ C:\card-digger-check\current\dist\index.html
+```
+
+```powershell
+& $ts serve status
+```
+
+| 行 | 何をしているか |
+|---|---|
+| `--set-path=/ off` | 今の`/`の振り分け（`dist`フォルダー）だけを消す。`/api`は残る |
+| `--set-path=/assets …\dist\assets` | `/assets`に来た要求に、`assets`フォルダーのファイルを返す。JS・CSSの通り道 |
+| `--set-path=/ …\dist\index.html` | `/`に来た要求に、`index.html`というファイル1つを返す。**`/sellers/abc123`にもこれが返るかを見る** |
+
+`serve status`に、`/`・`/api`・`/assets`の3行が出ればよい。`/`の行き先が`index.html`になっていることを見る。
+
+| エラー | 意味 |
+|---|---|
+| ファイルは指せない、という文 | 行き先にファイルを指定できない版。文をそのまま記録し、5は「できない」とする |
+
+**Macのターミナル**で確かめる。
+
+```bash
+curl -s https://<入口の名前>/ ; echo
+curl -s https://<入口の名前>/assets/app.js ; echo
+curl -s https://<入口の名前>/api/health ; echo
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://<入口の名前>/sellers/abc123
+curl -s https://<入口の名前>/sellers/abc123 | head -c 200 ; echo
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://<入口の名前>/assets/missing.js
+```
+
+| 行 | 確かめ | 期待する結果 | 期待どおりでないと |
+|---|---|---|---|
+| `/` | `/`をファイルに替えても配れるか | `card-digger-check v1`を含むHTML | ファイルを指す振り分けが効いていない |
+| `/assets/app.js` | JS・CSSの通り道 | `console.log("v1")` | `/assets`の振り分けが効いていない。`index.html`が返るなら、`/`の方が勝っている |
+| `/api/health` | 5-1が崩れていないか | `path=/api/health` | 振り分けの組み直しで`/api`が崩れた |
+| **`/sellers/abc123`の番号と種類** | **5** | **`200 text/html…`** | **`404`なら、ファイルは`/`ちょうどのときだけ返る。Eは使えない** |
+| `/sellers/abc123`の中身 | 5 | `card-digger-check v1`を含むHTML（`index.html`） | 200でも別の中身なら、記録する |
+| `/assets/missing.js`の番号と種類 | 無いJSを頼んだとき | `404` | `200 text/html`なら、無いJSにも`index.html`が返る。困ることは少ないが、記録する |
+
+**3で404が返ったのは、ファイルが無いパスだった。**5-2はそれを`index.html`へ回せるかだけを見る。
+結果に関わらず、**振り分けはこのままにして6へ進む。**6で確かめる`/`は、どちらの振り分けでも`index.html`を返すからである。
+
+**結果。**まだ行っていない。
 
 ## 6. `current`を向け直す（4）
 
@@ -306,11 +384,15 @@ cmd /c mklink /J C:\card-digger-check\current C:\card-digger-check\releases\v2
 
 ```bash
 curl -s https://<入口の名前>/ ; echo
+curl -s https://<入口の名前>/assets/app.js ; echo
+curl -s https://<入口の名前>/sellers/abc123 | head -c 200 ; echo
 ```
+
+2行目は`/assets`の振り分け、3行目は5-2で`index.html`が返った場合の`/sellers/abc123`も、`v2`に替わるかを見る。
 
 | 結果 | 意味 |
 |---|---|
-| **`card-digger-check v2`** | **入口の設定を変えずに、`current`の向け直しだけで新しい画面が配られた** |
+| **`card-digger-check v2`**、**`console.log("v2")`** | **入口の設定を変えずに、`current`の向け直しだけで新しい画面が配られた** |
 | `card-digger-check v1`のまま | 入口が古い中身を持ち続けている（キャッシュ）。数秒おいてもう一度試し、変わるまでの時間を記録する |
 | 失敗する | 入口が`current`を開いたまま離さないなど。記録する |
 
@@ -318,7 +400,7 @@ curl -s https://<入口の名前>/ ; echo
 
 | # | 何を | どこで | コマンド |
 |---|---|---|---|
-| 1 | 入口の設定を戻す | Windowsの前、管理者のPowerShell（4のウィンドウ） | 4-1で`No serve config`だったなら`& $ts serve reset`（2026-11-11はこれ）。**別の設定があったなら**、`& $ts serve --set-path=/api off`と`& $ts serve --set-path=/ off`で、足した2つだけを消す |
+| 1 | 入口の設定を戻す | Windowsの前、管理者のPowerShell（4のウィンドウ） | 4-1で`No serve config`だったなら`& $ts serve reset`（2026-11-11はこれ）。**別の設定があったなら**、`& $ts serve --set-path=/api off`、`& $ts serve --set-path=/assets off`、`& $ts serve --set-path=/ off`で、足した3つだけを消す |
 | 2 | 設定が戻ったか見る | 同じ | `& $ts serve status`。4-1で控えたのと同じ表示ならよい |
 | 3 | 届いたパスを返すサーバーを止める | 3のウィンドウ | **ウィンドウを閉じる** |
 | 4 | `current`を消す | Windowsの前、管理者のPowerShell | `cmd /c rmdir C:\card-digger-check\current` |
@@ -333,6 +415,7 @@ ADR 0002 論点1の[検証](../adr/0002-switch-deploy-target-by-configuration.md
 | 結果 | ADR 0002の結果の表では |
 |---|---|
 | 1〜4がすべて期待どおり | **C（`tailscale serve`だけ）**。Windowsで常駐するものは増えない |
-| 1・2・4は期待どおり、3が404 | **C＋D**（`HashRouter`。URLに`#`）か**C＋Caddy**（SPA fallbackをCaddyが担う）。**利用者が選ぶ** |
+| 1・2・4は期待どおり、3が404、**5で`index.html`が返る** | **C＋E**（`tailscale serve`だけ。振り分けを`/`・`/assets`・`/api`の3行にする）。Windowsで常駐するものは増えない |
+| 1・2・4は期待どおり、3も5も404 | **C＋D**（`HashRouter`。URLに`#`）か**C＋Caddy**（SPA fallbackをCaddyが担う）。**利用者が選ぶ** |
 | 1か2が期待どおりでない | C＋Caddy、またはB′に戻る。改めて決める |
 | 4が期待どおりでない（`current`をたどれない、向け直しが効かない） | 入口の指し方を変える。ADR 0003 論点5にも関わる |
