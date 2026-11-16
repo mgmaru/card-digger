@@ -61,7 +61,8 @@ docs/
 │   ├── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
 │   ├── 2026-11-10-what-a-junction-is.md
 │   ├── 2026-11-10-why-switch-releases-through-current.md
-│   └── 2026-11-15-what-a-reload-throws-away.md
+│   ├── 2026-11-15-what-a-reload-throws-away.md
+│   └── 2026-11-16-how-hashrouter-works.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -174,6 +175,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [2026-11-15-what-a-reload-throws-away.md](questions/2026-11-15-what-a-reload-throws-away.md):
   再読み込みでBrowserは何を捨てるのか。SPA fallbackと転送の違い、`dist/`に無いパス、画面の型とAPI、
   画面の404とAPIの404、キャッシュとHTMLの指示、MPA・SSRとの違い、リンクやボタンでは捨てないこと、本当に無いパス
+- [2026-11-16-how-hashrouter-works.md](questions/2026-11-16-how-hashrouter-works.md):
+  `HashRouter`は、どうやってSPA fallbackを要らなくするのか。フラグメントが送られない理由、ルーターが`#`の後ろを読む仕組み、
+  画面の中の移動と再読み込みの流れ、画面の住所とデータの住所、「戻る」や古いURL、Card Diggerで変える場所、気になる点
 
 書き方の約束。
 
