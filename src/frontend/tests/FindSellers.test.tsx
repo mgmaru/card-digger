@@ -503,7 +503,14 @@ describe("what was found", () => {
     const user = await hunt();
     await done();
 
-    await user.click(screen.getByRole("link", { name: "ゆうママ" }));
+    // The name itself opens Mercari. The seller screen is the link under it.
+    expect(screen.getByRole("link", { name: "ゆうママ" })).toHaveAttribute(
+      "href",
+      "https://jp.mercari.com/user/profile/home",
+    );
+    await user.click(
+      within(screen.getByRole("tabpanel")).getAllByRole("link", { name: "Sellerを分析" })[0] as HTMLElement,
+    );
     await screen.findByRole("link", { name: "商品検索へ戻る" });
     await user.click(screen.getByRole("link", { name: "出品者検索" }));
 

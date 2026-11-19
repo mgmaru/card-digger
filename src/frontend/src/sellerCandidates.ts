@@ -200,6 +200,19 @@ export function excludedSellerIds(
 }
 
 /**
+ * A seller's own page on Mercari.
+ *
+ * The same address the backend writes into a profile (`SELLER_URL` in the
+ * Mercari adapter). It is built here as well because a seller in a search
+ * result is known only by an identifier until somebody looks at them, and
+ * the link to their page should not wait for that look: opening Mercari costs
+ * this application no request at all.
+ */
+export function mercariSellerUrl(sellerId: string): string {
+  return `https://jp.mercari.com/user/profile/${encodeURIComponent(sellerId)}`;
+}
+
+/**
  * Split a result into what is shown and what the excluded list keeps back.
  *
  * Both halves are returned, because the screen has to say how many sellers

@@ -202,6 +202,52 @@ describe("the search form", () => {
   });
 });
 
+describe("a seller's name", () => {
+  it("opens their page on Mercari, before anybody has looked at them", async () => {
+    await searchAndOpenSellers();
+
+    const name = screen.getByRole("link", { name: "Seller home" });
+    expect(name).toHaveAttribute("href", "https://jp.mercari.com/user/profile/home");
+    expect(name).toHaveAttribute("target", "_blank");
+    expect(name).toHaveAttribute("rel", "noreferrer");
+  });
+
+  it("opens the address Mercari gave, once they have been looked at", async () => {
+    const user = await searchAndOpenSellers();
+    await user.click(lookButton());
+
+    expect(await screen.findByRole("link", { name: "ゆうママ" })).toHaveAttribute(
+      "href",
+      "https://jp.mercari.com/user/profile/home",
+    );
+  });
+
+  it("does not open this application's seller screen, which would start collecting", async () => {
+    // Asked for from use. The seller screen collects as soon as it is open,
+    // up to twelve requests; a name used to lead straight to it.
+    const user = await searchAndOpenSellers();
+
+    await user.click(screen.getByRole("link", { name: "Seller home" }));
+
+    expect(mocks.sellerAnalysis).not.toHaveBeenCalled();
+    expect(screen.getByRole("tab", { name: /出品者/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("leaves the seller screen one press away, under words that say what it does", async () => {
+    mocks.sellerAnalysis.mockRejectedValue(new ApiError("timeout"));
+    const user = await searchAndOpenSellers();
+
+    const home = rows()[1] as HTMLElement;
+    await user.click(within(home).getByRole("link", { name: "Sellerを分析" }));
+
+    await screen.findByRole("link", { name: "商品検索へ戻る" });
+    expect(mocks.sellerAnalysis.mock.calls.map(([sellerId]) => sellerId)).toEqual(["home"]);
+  });
+});
+
 describe("the 出品者 tab", () => {
   it("lays out the sellers from the search alone, without asking about any", async () => {
     await searchAndOpenSellers();
@@ -390,7 +436,8 @@ describe("looking at the sellers", () => {
     await user.click(lookButton());
     await screen.findByText("調べられる出品者は全員調べました");
 
-    await user.click(screen.getByRole("link", { name: "ゆうママ" }));
+    const home = rows().find((row) => within(row).queryByText("ゆうママ")) as HTMLElement;
+    await user.click(within(home).getByRole("link", { name: "Sellerを分析" }));
     await screen.findByRole("link", { name: "商品検索へ戻る" });
     await user.click(screen.getByRole("link", { name: "商品検索へ戻る" }));
 
