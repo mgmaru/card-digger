@@ -19,6 +19,8 @@ import styles from "./Stage.module.css";
 
 export const FETCH_STAGE_TITLE = "取得する条件";
 export const DISPLAY_STAGE_TITLE = "表示の絞り込み";
+/** The same, where the list can be put in another order as well. */
+export const DISPLAY_AND_SORT_STAGE_TITLE = "表示の絞り込み・並べ替え";
 /** The step between the two, on the seller search: whom to look at. */
 export const SELECT_STAGE_TITLE = "調べる出品者";
 

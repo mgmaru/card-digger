@@ -10,13 +10,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type EvaluationRecord,
   evaluationSeconds,
   excludedSellerIds,
   isOwedALook,
   sellerCandidates,
   sortCandidates,
+  withGoodRatings,
   withoutExcluded,
-  type EvaluationRecord,
 } from "../src/sellerCandidates";
 import type {
   Item,
@@ -48,12 +49,22 @@ function item(id: string, sellerId: string, condition: string | null = "3"): Ite
   };
 }
 
-/** A seller looked at, with this many cards among this many listings. */
-function looked(cards: number, analyzed: number): EvaluationRecord {
+/**
+ * A seller looked at, with this many cards among this many listings, and
+ * this many good ratings (`null` for a profile without a breakdown).
+ */
+function looked(
+  cards: number,
+  analyzed: number,
+  good: number | null = 10,
+): EvaluationRecord {
   return {
     status: "done",
     evaluation: {
       breadth: { analyzedItemCount: analyzed, otherItemCount: analyzed - cards },
+      seller: {
+        ratingBreakdown: good === null ? null : { good, normal: 0, bad: 0 },
+      },
     } as SellerEvaluationResponse,
   };
 }
@@ -161,6 +172,35 @@ describe("ordering", () => {
     ]);
   });
 
+  it("by card share, highest first, still puts what is not known last", () => {
+    expect(ids(sortCandidates(candidates, "cardShareHigh", evaluations))).toEqual([
+      "narrow",
+      "mixed",
+      "wide",
+      "nothing-listed",
+      "never-looked-at",
+    ]);
+  });
+
+  it("by good ratings puts the most first, and a count nobody knows last", () => {
+    const rated = new Map<string, EvaluationRecord>([
+      ["narrow", looked(19, 20, 5)],
+      ["wide", looked(2, 20, 300)],
+      // A profile that came back without a breakdown is not a seller with none.
+      ["mixed", looked(8, 20, null)],
+      ["nothing-listed", looked(0, 0, 0)],
+    ]);
+
+    const ordered = ids(sortCandidates(candidates, "goodRatings", rated));
+
+    expect(ordered.slice(0, 3)).toEqual(["wide", "narrow", "nothing-listed"]);
+    // The two nobody has a count for come after every count there is, in the
+    // order they were found.
+    expect(ordered.slice(3)).toEqual(
+      ids(candidates).filter((id) => id === "mixed" || id === "never-looked-at"),
+    );
+  });
+
   it("by condition goes by each seller's most worn hit", () => {
     // `wide` has a 目立った傷や汚れなし and a 傷や汚れあり. One good card does
     // not make a seller of good cards, so the worn one decides.
@@ -235,3 +275,40 @@ describe("what a look costs", () => {
     expect(evaluationSeconds(30)).toBe(180);
   });
 });
+
+describe("narrowing by good ratings", () => {
+  const found = sellerCandidates([
+    item("a", "many", "3"),
+    item("b", "few", "3"),
+    item("c", "unrated", "3"),
+    item("d", "unasked", "3"),
+  ]);
+  const looks = new Map<string, EvaluationRecord>([
+    ["many", looked(1, 10, 300)],
+    ["few", looked(1, 10, 2)],
+    ["unrated", looked(1, 10, null)],
+  ]);
+
+  it("keeps everybody when no number is given", () => {
+    expect(ids(withGoodRatings(found, looks, null).kept)).toEqual(ids(found));
+  });
+
+  it("keeps back only the sellers known to have fewer", () => {
+    const narrowed = withGoodRatings(found, looks, 100);
+
+    expect(ids(narrowed.heldBack)).toEqual(["few"]);
+    // Not known is not too few: a profile without a breakdown, and a seller
+    // nobody has looked at, both stay.
+    expect(ids(narrowed.kept)).toEqual(["many", "unrated", "unasked"]);
+  });
+
+  it("includes the number itself", () => {
+    expect(ids(withGoodRatings(found, looks, 300).kept)).toContain("many");
+    expect(ids(withGoodRatings(found, looks, 301).heldBack)).toContain("many");
+  });
+
+  it("keeps everybody at nought", () => {
+    expect(withGoodRatings(found, looks, 0).heldBack).toEqual([]);
+  });
+});
+
