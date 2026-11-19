@@ -89,3 +89,20 @@ class SafetyStop(Exception):
         super().__init__(
             f"stopped reaching the marketplace after {consecutive} refusals in a row"
         )
+
+
+class SellerListUnavailable(Exception):
+    """The reader's seller lists could not be read or written.
+
+    Separate from `MarketplaceError` on purpose. That one classifies what a
+    marketplace said, and it feeds the retry budget and the safety stop; this
+    is a local file that is missing its directory or does not parse, and none
+    of that machinery has anything to say about it.
+
+    Carries a short, hand written phrase and never the path or the content:
+    the path names a home directory and the content is the reader's notes.
+    """
+
+    def __init__(self, detail: str = "") -> None:
+        self.detail = detail
+        super().__init__("seller lists unavailable" + (f" ({detail})" if detail else ""))

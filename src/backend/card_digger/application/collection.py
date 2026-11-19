@@ -89,6 +89,24 @@ SELLER_ITEMS_LIMITS = CollectionLimits(
     max_pages=5, max_items=100, max_duration_seconds=30.0
 )
 
+#: One seller, one listing status, when many sellers are looked at in a row.
+#:
+#: **One page, because the cost is multiplied by the number of sellers.** The
+#: seller screen spends up to five pages per status on one person the reader
+#: chose. Looking over everyone a search turned up spends this on each of
+#: them, two seconds a request, so the depth that is fine once is minutes when
+#: repeated thirty times. One page per status is three requests a seller with
+#: the profile, and it is still a sample of titles from both what they sell
+#: and what they sold (seller discovery specification, section 4).
+#:
+#: The other two ceilings are the seller screen's and are never the one that
+#: stops a single page.
+SELLER_EVALUATION_LIMITS = CollectionLimits(
+    max_pages=1,
+    max_items=SELLER_ITEMS_LIMITS.max_items,
+    max_duration_seconds=SELLER_ITEMS_LIMITS.max_duration_seconds,
+)
+
 
 PageFetch = Callable[[str | None], Awaitable[tuple[Sequence[MarketplaceItem], PageInfo]]]
 

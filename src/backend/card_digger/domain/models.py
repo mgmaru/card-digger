@@ -187,3 +187,35 @@ class CollectionMeta:
     #: Items at least as old as the search threshold. Searches only; None for
     #: a seller collection, where the age of a listing carries no such meaning.
     old_listing_count: int | None = None
+
+
+class SellerListKind(str, Enum):
+    """Which of the reader's two lists a seller is on.
+
+    Two lists and not a score: both are decisions a person made about a
+    seller, and neither is derived from anything collected.
+    """
+
+    #: Worth coming back to. The seller's new listings are looked at first.
+    SAVED = "saved"
+    #: Not worth looking at again. Their listings are kept out of view, and
+    #: the screen says how many were.
+    EXCLUDED = "excluded"
+
+
+@dataclass(frozen=True)
+class SellerListEntry:
+    """One seller the reader chose to remember, and nothing about the seller.
+
+    The identifier, which list, when, and the reader's own words. **No name,
+    no rating and no listing is kept here**: those are the marketplace's facts
+    and are read from it each time, so what is stored cannot go stale and
+    cannot describe a person any further than "I decided this about them"
+    (ADR 0004).
+    """
+
+    seller_id: str
+    kind: SellerListKind
+    added_at: datetime
+    #: Written by the reader. Empty when they wrote nothing.
+    note: str = ""

@@ -61,6 +61,17 @@ def seller_key(seller_id: str) -> str:
     return f"seller:{seller_id}"
 
 
+def seller_evaluation_key(seller_id: str) -> str:
+    """What makes two seller evaluations the same collection.
+
+    Not `seller_key`. An evaluation collects one page per status where an
+    analysis collects up to five, so joining one to the other would hand a
+    seller screen a sixth of what it asked for, or make a quick look wait for
+    a deep one.
+    """
+    return f"seller-evaluation:{seller_id}"
+
+
 class MarketplaceAccess:
     """One per application. Nothing here may be rebuilt per request.
 

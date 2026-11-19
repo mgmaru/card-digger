@@ -1,8 +1,9 @@
 """The HTTP surface, and the only place that wires the pieces together.
 
-Three endpoints, no database and no authentication. The application is a local
-tool for one person, so it binds to the loopback interface and allows exactly
-the origin the local frontend runs on.
+No database and no authentication. The application is a local tool for one
+person, so it binds to the loopback interface and allows exactly the origin the
+local frontend runs on. The one thing it keeps between runs is the reader's two
+seller lists, in a single file (ADR 0004).
 
 The interesting part is the status code. A collection that reached Mercari and
 came back short is not a failure: it is a result with a reason attached, and it
@@ -18,12 +19,15 @@ what that header is for and means a screen does not have to know the number.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Sequence
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from card_digger.adapters.clock import AsyncSleeper, SystemClock
+from card_digger.adapters.seller_lists import FILE_NAME, JsonFileSellerLists
 from card_digger.api.schemas import (
     CollectionErrorResponse,
     CollectionMetaResponse,
@@ -33,17 +37,34 @@ from card_digger.api.schemas import (
     SearchRequest,
     SearchResponse,
     SellerAnalysisResponse,
+    SellerBreadthResponse,
+    SellerEvaluationResponse,
     SellerItemsResponse,
     SellerKnowledgeResponse,
+    SellerListEntryResponse,
+    SellerListPutRequest,
+    SellerListsResponse,
     SellerResponse,
 )
-from card_digger.application.access import MarketplaceAccess, search_key, seller_key
+from card_digger.application.access import (
+    MarketplaceAccess,
+    search_key,
+    seller_evaluation_key,
+    seller_key,
+)
 from card_digger.application.analyze_seller import SellerAnalysis, analyze_seller
 from card_digger.application.collect_search import collect_search
+from card_digger.application.collection import SELLER_EVALUATION_LIMITS
+from card_digger.application.seller_breadth import seller_breadth
 from card_digger.application.seller_knowledge import seller_knowledge
-from card_digger.domain.errors import ErrorCode
+from card_digger.application.seller_lists import (
+    InvalidSellerListEntry,
+    list_seller,
+    unlist_seller,
+)
+from card_digger.domain.errors import ErrorCode, SellerListUnavailable
 from card_digger.domain.models import CollectionMeta, CollectionStopReason
-from card_digger.domain.ports import Clock, MarketplacePort, Sleeper
+from card_digger.domain.ports import Clock, MarketplacePort, SellerListPort, Sleeper
 
 
 #: The origins the local frontend is served from. Not a wildcard: the API
@@ -53,6 +74,16 @@ DEFAULT_ALLOWED_ORIGINS: tuple[str, ...] = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
+
+#: Names the directory the seller lists are kept in. Unset, they go under the
+#: reader's home directory.
+#:
+#: A setting rather than a path worked out from where this file sits, because
+#: where files live is the deploy target's business (architecture section 8):
+#: a release directory is replaced on every deploy, and anything stored inside
+#: one would be thrown away with it.
+DATA_DIRECTORY_VARIABLE = "CARD_DIGGER_DATA_DIR"
+DEFAULT_DATA_DIRECTORY_NAME = ".card-digger"
 
 #: Response headers a cross origin page is allowed to read. Without this the
 #: browser hands the frontend a 503 with the header stripped off, and the
@@ -128,12 +159,31 @@ def _mercari_marketplace() -> MarketplacePort:
     return MercariAdapter(Mercapi())
 
 
+def _seller_lists_on_disk() -> SellerListPort:
+    """The reader's seller lists, in the one file they are kept in.
+
+    Building this reads nothing and creates nothing: the file store touches
+    the disk only when a list is asked for. So an application that is built
+    and never asked, which is how most tests run it, leaves no trace.
+
+    The home directory is the default because it outlives a release. A deploy
+    swaps the directory the code runs from (ADR 0003), and the lists must not
+    be swapped away with it.
+    """
+    configured = os.environ.get(DATA_DIRECTORY_VARIABLE, "").strip()
+    directory = (
+        Path(configured) if configured else Path.home() / DEFAULT_DATA_DIRECTORY_NAME
+    )
+    return JsonFileSellerLists(directory / FILE_NAME)
+
+
 def create_app(
     *,
     marketplace: MarketplacePort | None = None,
     clock: Clock | None = None,
     sleeper: Sleeper | None = None,
     access: MarketplaceAccess | None = None,
+    seller_lists: SellerListPort | None = None,
     allowed_origins: Sequence[str] = DEFAULT_ALLOWED_ORIGINS,
 ) -> FastAPI:
     """Build the application.
@@ -149,6 +199,7 @@ def create_app(
     # and a request that rebuilt it would be back to promising the two
     # second interval to itself alone.
     reaching_out = access if access is not None else MarketplaceAccess(now, wait)
+    lists = seller_lists if seller_lists is not None else _seller_lists_on_disk()
 
     app = FastAPI(title="Card Digger", version="0.1.0")
     app.add_middleware(
@@ -158,7 +209,9 @@ def create_app(
         # off: allowing them would widen what a page on another origin can do
         # without buying anything.
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        # PUT and DELETE are the seller lists. They change a local file and
+        # never reach the marketplace.
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Content-Type"],
         expose_headers=list(EXPOSED_HEADERS),
     )
@@ -249,7 +302,122 @@ def create_app(
             seller_is_inactive=analysis.seller_is_inactive,
         )
 
+    @app.get(
+        "/api/sellers/{seller_id}/evaluation",
+        response_model=SellerEvaluationResponse,
+    )
+    async def seller_evaluation(
+        seller_id: str, response: Response
+    ) -> SellerEvaluationResponse:
+        """One seller, briefly: the profile and one page of each status.
+
+        Asked once for each seller a search turned up, so it is the same
+        collection as the analysis above run shallowly. Three requests instead
+        of up to twelve, and no listings in the answer.
+        """
+        analysis = await reaching_out.collect(
+            seller_evaluation_key(seller_id),
+            lambda: analyze_seller(
+                port,
+                seller_id,
+                clock=now,
+                sleeper=wait,
+                gate=reaching_out.gate(),
+                limits=SELLER_EVALUATION_LIMITS,
+                ask_whether_inactive=False,
+            ),
+        )
+        if analysis.seller is None:
+            raise _profile_failure(analysis, reaching_out)
+
+        if CollectionStopReason.SAFETY_STOP in (
+            analysis.on_sale.meta.stop_reason,
+            analysis.sold_out.meta.stop_reason,
+        ):
+            # The profile was read, so this is still an answer. The header is
+            # what tells the screen not to ask about the next seller yet.
+            _say_when_to_come_back(response.headers, reaching_out)
+        knowledge = seller_knowledge(analysis.on_sale.items, analysis.sold_out.items)
+        return SellerEvaluationResponse(
+            seller=SellerResponse.of(analysis.seller),
+            knowledge=SellerKnowledgeResponse.of(knowledge),
+            breadth=SellerBreadthResponse.of(seller_breadth(knowledge)),
+            on_sale_meta=CollectionMetaResponse.of(analysis.on_sale.meta),
+            sold_out_meta=CollectionMetaResponse.of(analysis.sold_out.meta),
+        )
+
+    def _both_lists() -> SellerListsResponse:
+        return SellerListsResponse(
+            entries=[SellerListEntryResponse.of(entry) for entry in lists.entries()]
+        )
+
+    @app.get("/api/seller-lists", response_model=SellerListsResponse)
+    async def seller_lists_read() -> SellerListsResponse:
+        """The sellers the reader saved and the ones they excluded.
+
+        Reads a local file. Sends no request to the marketplace, so it answers
+        while the safety stop is holding.
+        """
+        try:
+            return _both_lists()
+        except SellerListUnavailable as error:
+            raise _lists_unavailable() from error
+
+    @app.put("/api/seller-lists/{seller_id}", response_model=SellerListsResponse)
+    async def seller_lists_put(
+        seller_id: str, request: SellerListPutRequest
+    ) -> SellerListsResponse:
+        """Put a seller on a list, replacing the entry they already had."""
+        try:
+            list_seller(
+                lists,
+                seller_id=seller_id,
+                kind=request.kind,
+                note=request.note,
+                clock=now,
+            )
+            return _both_lists()
+        except InvalidSellerListEntry as error:
+            raise _invalid_entry(error) from error
+        except SellerListUnavailable as error:
+            raise _lists_unavailable() from error
+
+    @app.delete("/api/seller-lists/{seller_id}", response_model=SellerListsResponse)
+    async def seller_lists_delete(seller_id: str) -> SellerListsResponse:
+        """Take a seller off whichever list they are on.
+
+        Answers 200 with both lists whether or not the seller was on one. The
+        request asked for them not to be listed, and they are not.
+        """
+        try:
+            unlist_seller(lists, seller_id=seller_id)
+            return _both_lists()
+        except InvalidSellerListEntry as error:
+            raise _invalid_entry(error) from error
+        except SellerListUnavailable as error:
+            raise _lists_unavailable() from error
+
     return app
+
+
+def _invalid_entry(error: InvalidSellerListEntry) -> HTTPException:
+    """422, naming the field and never its value."""
+    return HTTPException(
+        status_code=422, detail={"code": "invalid_input", "field": error.field}
+    )
+
+
+def _lists_unavailable() -> HTTPException:
+    """500, for a list file that cannot be read or written.
+
+    Not one of the marketplace statuses: nothing upstream failed, and a screen
+    that offered "Mercari did not answer" for a broken local file would send
+    the reader looking in the wrong place. The path and the content stay out
+    of the answer.
+    """
+    return HTTPException(
+        status_code=500, detail={"code": "seller_lists_unavailable"}
+    )
 
 
 def _say_when_to_come_back(headers, reaching_out: MarketplaceAccess) -> None:

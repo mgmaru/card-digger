@@ -42,6 +42,7 @@ import os
 from fastapi import FastAPI
 
 from card_digger.adapters.clock import SystemClock
+from card_digger.adapters.seller_lists import InMemorySellerLists
 from card_digger.api.main import create_app
 from card_digger.application.access import MarketplaceAccess
 from card_digger.application.collection import (
@@ -157,6 +158,9 @@ def build_demo_app(
             min_interval_seconds=0.0,
             safety_stop_cooldown_seconds=cooldown_seconds,
         ),
+        # In memory, like the acceptance entry point: a demo leaves nothing in
+        # the home directory of whoever runs it.
+        seller_lists=InMemorySellerLists(),
     )
     serve_placeholder_photos(app)
     return app

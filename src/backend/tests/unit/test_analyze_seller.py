@@ -13,6 +13,8 @@ from conftest import ScriptedPort, make_item, make_items, make_seller_page
 from card_digger.application.analyze_seller import analyze_seller
 from card_digger.application.collection import (
     CONSECUTIVE_REFUSALS_BEFORE_STOP,
+    SELLER_EVALUATION_LIMITS,
+    SELLER_ITEMS_LIMITS,
     RequestGate,
 )
 from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation
@@ -375,3 +377,72 @@ def _raises_rate_limit():
         raise MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.SEARCH)
 
     return call
+
+
+class TestALookAcrossManySellers:
+    """The same collection, run shallowly, for when it is repeated per seller.
+
+    What matters is the request count. It is multiplied by the number of
+    sellers a search turned up and paid for at two seconds each.
+    """
+
+    async def test_it_stops_after_one_page_of_each_status(self, clock, sleeper):
+        port = port_with(
+            on_sale=[
+                make_seller_page(make_items(30), ListingStatus.ON_SALE, next_cursor="30"),
+                make_seller_page(make_items(30, start=31), ListingStatus.ON_SALE),
+            ],
+            sold_out=[
+                make_seller_page(
+                    make_items(30, start=100), ListingStatus.SOLD_OUT, next_cursor="30"
+                ),
+                make_seller_page(make_items(30, start=131), ListingStatus.SOLD_OUT),
+            ],
+        )
+
+        analysis = await analyze_seller(
+            port,
+            SELLER_ID,
+            clock=clock,
+            sleeper=sleeper,
+            limits=SELLER_EVALUATION_LIMITS,
+            ask_whether_inactive=False,
+        )
+
+        assert len(port.calls_to("seller_items:on_sale")) == 1
+        assert len(port.calls_to("seller_items:sold_out")) == 1
+        for collection in (analysis.on_sale, analysis.sold_out):
+            assert len(collection.items) == 30
+            # Said, not hidden: the bands were computed over the first page.
+            assert collection.meta.stop_reason is CollectionStopReason.MAX_PAGES
+            assert collection.meta.truncated is True
+            assert collection.meta.reached_end is False
+
+    async def test_it_spends_three_requests_on_a_seller(self, clock, sleeper):
+        """The profile and one page of each status, and not the item detail."""
+        port = port_with(
+            on_sale=[make_seller_page(make_items(3), ListingStatus.ON_SALE)],
+            sold_out=[make_seller_page(make_items(2, start=10), ListingStatus.SOLD_OUT)],
+        )
+
+        analysis = await analyze_seller(
+            port,
+            SELLER_ID,
+            clock=clock,
+            sleeper=sleeper,
+            limits=SELLER_EVALUATION_LIMITS,
+            ask_whether_inactive=False,
+        )
+
+        assert len(port.calls) == 3
+        assert port.calls_to("item") == []
+        # Not asked is not the same as answered no.
+        assert analysis.seller_is_inactive is None
+
+    def test_only_the_page_count_differs_from_the_seller_screen(self):
+        assert SELLER_EVALUATION_LIMITS.max_pages == 1
+        assert SELLER_EVALUATION_LIMITS.max_items == SELLER_ITEMS_LIMITS.max_items
+        assert (
+            SELLER_EVALUATION_LIMITS.max_duration_seconds
+            == SELLER_ITEMS_LIMITS.max_duration_seconds
+        )

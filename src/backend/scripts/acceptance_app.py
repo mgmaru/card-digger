@@ -8,13 +8,16 @@ what runs here is the same application, not a second one that behaves similarly.
 
     uv run uvicorn --factory scripts.acceptance_app:create_acceptance_app
 
-Three things are deliberately different from production, and only three.
+Four things are deliberately different from production, and only four.
 
 - **The marketplace is `MockAdapter`.** It answers from `SEED`.
 - **There is no interval between requests.** The two second rule is a promise
   about Mercari, and no request here reaches Mercari. What the rule is worth is
   measured by the unit tests around `RequestPacer`, not by making a browser
   wait for it.
+- **The seller lists are kept in memory.** Production writes them to a file
+  under the home directory. A flow that did the same would start its second
+  run with whatever its first run saved.
 - **The clock is frozen.** Every elapsed time on the screen is counted to
   `collectedAt`, so a moving clock would slowly turn `2年前` into `3年前` and
   quietly break an assertion months from now.
@@ -32,6 +35,7 @@ from fastapi import FastAPI, Response
 
 from card_digger.adapters.mercari import ITEM_CONDITIONS
 from card_digger.adapters.mock import MockAdapter
+from card_digger.adapters.seller_lists import InMemorySellerLists
 from card_digger.api.main import create_app
 from card_digger.application.access import MarketplaceAccess
 from card_digger.domain.models import (
@@ -280,6 +284,10 @@ def create_acceptance_app() -> FastAPI:
         # No interval: nothing here reaches Mercari, and a browser waiting two
         # seconds per page would be measuring the wrong thing slowly.
         access=MarketplaceAccess(clock, NoWait(), min_interval_seconds=0.0),
+        # In memory, so every run starts with nobody saved and nobody
+        # excluded, and nothing is written to the home directory of whoever
+        # runs the flow.
+        seller_lists=InMemorySellerLists(),
     )
     serve_placeholder_photos(app)
     return app
