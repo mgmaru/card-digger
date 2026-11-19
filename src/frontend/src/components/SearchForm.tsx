@@ -29,6 +29,19 @@ import {
 import styles from "./SearchForm.module.css";
 
 /**
+ * Where a keyword is looked for, said beside every field a keyword is typed
+ * into (出品者探索 §13.7).
+ *
+ * The first sentence is Mercari's own account of its search: the title and
+ * the description. The second is what was seen in use — a search for
+ * ポケモンカード 押入れ brought back a listing that says ポケモン nowhere — and
+ * is worded as "not necessarily" because how Mercari weighs the words is not
+ * something this application knows.
+ */
+export const KEYWORD_SCOPE =
+  "キーワードは、Mercariが商品名と商品の説明から探します。語をすべて含む出品だけが返るとは限りません。";
+
+/**
  * Section 9's initial state asks for examples. These are chosen, not decorative.
  *
  * "引退", "まとめ売り" and "大量" are what everyone selling a bulk lot writes,
@@ -149,6 +162,7 @@ export function SearchForm({
           </p>
         ))}
 
+      <p className={styles.fixed}>{KEYWORD_SCOPE}</p>
       <p className={styles.fixed}>
         販売中の商品だけを取得します。価格を狭めるほど、更新されていない古い出品まで遡れます。
       </p>
