@@ -92,7 +92,7 @@ export function SellerPage() {
   return (
     <section>
       <p className={styles.back}>
-        <Link to="/">検索へ戻る</Link>
+        <Link to="/">商品検索へ戻る</Link>
       </p>
 
       {status === "loading" && (

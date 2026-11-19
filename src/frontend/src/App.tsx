@@ -50,11 +50,13 @@ function Navigation() {
 
   return (
     <nav className={styles.nav} aria-label="画面">
+      {/* 商品検索, not 検索: the screen beside it looks for sellers, and 検索
+          alone no longer says which of the two it is. */}
       <NavLink to="/" end className={link}>
-        検索
+        商品検索
       </NavLink>
       <NavLink to="/find-sellers" className={link}>
-        出品者を探す
+        出品者検索
       </NavLink>
       <NavLink to="/seller-lists" className={link}>
         出品者リスト

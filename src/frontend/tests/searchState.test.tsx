@@ -149,7 +149,7 @@ describe("returning from a seller", () => {
     await user.click(firstSellerLink());
     expect(await screen.findByText("テスト出品者")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
+    await user.click(screen.getByRole("link", { name: "商品検索へ戻る" }));
 
     expect(await screen.findByLabelText("取得範囲")).toBeInTheDocument();
     // The whole point. One press of the button, one collection.
@@ -171,7 +171,7 @@ describe("returning from a seller", () => {
 
     await user.click(firstSellerLink());
     await screen.findByText("テスト出品者");
-    await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
+    await user.click(screen.getByRole("link", { name: "商品検索へ戻る" }));
 
     expect(await screen.findByLabelText("並び")).toHaveValue("updated_asc");
     expect(searchMock).toHaveBeenCalledTimes(1);
@@ -195,7 +195,7 @@ describe("returning from a seller", () => {
 
     await user.click(firstSellerLink());
     await screen.findByText("テスト出品者");
-    await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
+    await user.click(screen.getByRole("link", { name: "商品検索へ戻る" }));
 
     expect(await screen.findByLabelText("掲載開始日")).toHaveValue("2024-01-01");
     expect(screen.getByLabelText("販売形式")).toHaveValue("fixed_price");

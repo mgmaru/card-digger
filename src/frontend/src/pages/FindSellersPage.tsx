@@ -91,25 +91,26 @@ function durationHint(seconds: number): string {
 type FormErrors = { keywords?: string; minPriceYen?: string; maxPriceYen?: string };
 
 const PILES: Record<HuntPile, { label: string; about: string; empty: string }> = {
-  candidates: {
-    label: "候補",
-    about: "TCG以外も出品している出品者です。出品の幅が「広い」か「中」の人を出しています。",
-    empty: "候補になる出品者は、まだ見つかっていません",
+  varied: {
+    label: "混ざっている",
+    about:
+      "出品のうち、カード（TCG）が半分に満たない出品者です。カード以外の物も出品しています。",
+    empty: "ここに入る出品者は、まだ見つかっていません",
   },
   few: {
-    label: "少数出品",
+    label: "出品が少ない",
     about:
-      "TCGが中心ですが、調べた出品が30件に満たない出品者です。引退や整理で数点だけ出している人がここに入ります。専門かどうかは、この件数では判断できません。",
+      "出品はカード（TCG）が中心ですが、調べた出品が30件に満たない出品者です。引退や整理で数点だけ出している人がここに入ります。カード専門かどうかは、この件数では判断できません。",
     empty: "ここに入る出品者は、まだ見つかっていません",
   },
   specialists: {
-    label: "専門らしい",
+    label: "カード専門",
     about:
-      "調べた出品が30件以上あり、その半分以上がTCGの出品者です。除外リストへ入れると、次からは調べる対象に入りません。",
-    empty: "専門らしい出品者は、まだ見つかっていません",
+      "調べた出品が30件以上あり、その半分以上がカード（TCG）の出品者です。ポケモンカードに限らず、カード全般で数えています。",
+    empty: "ここに入る出品者は、まだ見つかっていません",
   },
   others: {
-    label: "その他",
+    label: "未調査・不明",
     about:
       "まだ調べていない出品者、取得できなかった出品者、出品が無く判定できなかった出品者です。",
     empty: "ここに入る出品者はいません",
@@ -164,7 +165,7 @@ export function FindSellersPage() {
     () => hunt.request?.sellerBudget ?? DEFAULT_SELLER_BUDGET,
   );
   const [errors, setErrors] = useState<FormErrors>({});
-  const [pile, setPile] = useState<HuntPile>("candidates");
+  const [pile, setPile] = useState<HuntPile>("varied");
   const id = useId();
 
   const typed = keywordsFrom(fields);
@@ -213,12 +214,12 @@ export function FindSellersPage() {
     if (Object.keys(found).length > 0) {
       return;
     }
-    setPile("candidates");
+    setPile("varied");
     hunt.start({ keywords: typed, band, sellerBudget: budget });
   };
 
   // The excluded list is applied to what is shown, live. Somebody excluded
-  // from the 専門らしい tab leaves it at once, and the count below says where
+  // from the カード専門 tab leaves it at once, and the count below says where
   // they went.
   const held = useMemo(
     () => withoutExcluded(hunt.items, excludedSellerIds(entries)),
@@ -236,7 +237,7 @@ export function FindSellersPage() {
   const candidates = useMemo(() => sellerCandidates(titled.kept), [titled.kept]);
   const piles = useMemo(() => {
     const sorted: Record<HuntPile, SellerCandidate[]> = {
-      candidates: [],
+      varied: [],
       few: [],
       specialists: [],
       others: [],
@@ -269,10 +270,10 @@ export function FindSellersPage() {
   };
 
   return (
-    <section aria-label="出品者を探す">
-      <h2 className={styles.heading}>出品者を探す</h2>
+    <section aria-label="出品者検索">
+      <h2 className={styles.heading}>出品者検索</h2>
       <p className={styles.about}>
-        キーワードごとに検索し、出てきた出品者を順に調べて、TCG以外も出品している人を集めます。
+        キーワードごとに検索し、出てきた出品者を順に調べて、出品にカードがどれだけあるかで分けます。
       </p>
 
       <form className={styles.form} onSubmit={submit} noValidate>
@@ -502,6 +503,13 @@ export function FindSellersPage() {
               >
                 この{people(piles.specialists.length)}を除外リストへ入れる
               </button>
+              {/* What the button does, and nothing about whether to. A card
+                  specialist is somebody to exclude on a day spent looking for
+                  bargains and somebody to read on a day spent looking for
+                  cards in good condition. */}
+              <span className={styles.bulkNote}>
+                除外リストへ入れた出品者は、次から調べる対象に入らず、検索結果にも出なくなります。
+              </span>
             </p>
           )}
 

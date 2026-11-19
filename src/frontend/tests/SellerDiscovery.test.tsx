@@ -391,8 +391,8 @@ describe("looking at the sellers", () => {
     await screen.findByText("調べられる出品者は全員調べました");
 
     await user.click(screen.getByRole("link", { name: "ゆうママ" }));
-    await screen.findByRole("link", { name: "検索へ戻る" });
-    await user.click(screen.getByRole("link", { name: "検索へ戻る" }));
+    await screen.findByRole("link", { name: "商品検索へ戻る" });
+    await user.click(screen.getByRole("link", { name: "商品検索へ戻る" }));
 
     // Still on the 出品者 tab, still filled in, and nothing was asked twice.
     expect(rowNames()).toEqual(["カード専門店", "ゆうママ", "引っ越し中"]);

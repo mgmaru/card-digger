@@ -126,7 +126,7 @@ export type SellerDiscoveryState = {
    * The words a title has to contain one of, as typed (出品者探索 §13).
    *
    * Held here, beside the other things that decide what of a result is
-   * shown, so the search screen and 出品者を探す narrow by the same words.
+   * shown, so the search screen and 出品者検索 narrow by the same words.
    * Empty narrows nothing. Not stored: it is gone on a reload, like the
    * result it narrows.
    */
