@@ -291,15 +291,25 @@ describe("one field, one search", () => {
     expect(screen.queryByLabelText("キーワード 2")).not.toBeInTheDocument();
   });
 
-  it("says in words how many searches the fields will make", async () => {
+  it("says where a keyword is looked for, beside the field", async () => {
+    mount();
+
+    // Asked for from use: a reader who typed two words had no way to tell,
+    // from the screen, where Mercari looks for them or how strictly.
+    expect(field()).toHaveAccessibleDescription(
+      "キーワードは、Mercariが商品名と商品の説明から探します。語をすべて含む出品だけが返るとは限りません。",
+    );
+  });
+
+  it("says, once there are two, that they are searched apart and added together", async () => {
     const user = userEvent.setup();
     mount();
-    expect(screen.getByText(/1つの欄が1回の検索です/)).toBeInTheDocument();
+    expect(screen.queryByText(/別々に検索し/)).not.toBeInTheDocument();
 
     await typeKeywords(user, ["ポケカ 押入れ", "ポケカ 物置"]);
 
     expect(
-      screen.getByText("2つのキーワードを別々に検索し、見つかった出品を合わせます。"),
+      screen.getByText(/2つのキーワードは別々に検索し、見つかった出品を合わせます。/),
     ).toBeInTheDocument();
   });
 

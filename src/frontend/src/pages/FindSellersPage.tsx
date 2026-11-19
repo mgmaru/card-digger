@@ -22,7 +22,7 @@ import { useId, useMemo, useState, type FormEvent } from "react";
 import type { ApiFailureKind } from "../api/client";
 import { SEARCH_PAGE_LIMIT, rangeNote } from "../collectionRange";
 import { FailureNotice } from "../components/FailureNotice";
-import { EXAMPLES } from "../components/SearchForm";
+import { EXAMPLES, KEYWORD_SCOPE } from "../components/SearchForm";
 import {
   SellerCandidateLimits,
   SellerCandidateList,
@@ -306,12 +306,14 @@ export function FindSellersPage() {
               )}
             </div>
           ))}
-          {/* What the fields mean, where they are typed. One field is one
-              search; a second field is a second search, added to the first. */}
+          {/* Where a keyword is looked for, in the search screen's own words.
+              With a second field, also that the two are searched apart and
+              added together — the one thing about several fields that the
+              result alone would not show. */}
           <p id={`${id}-keywords-how`} className={styles.how}>
-            {typed.length > 1
-              ? `${typed.length}つのキーワードを別々に検索し、見つかった出品を合わせます。`
-              : "1つの欄が1回の検索です。空白で区切った語は、検索画面と同じく、まとめて1回で検索します。"}
+            {KEYWORD_SCOPE}
+            {typed.length > 1 &&
+              ` ${typed.length}つのキーワードは別々に検索し、見つかった出品を合わせます。`}
           </p>
           {errors.keywords && (
             <p className={styles.error} role="alert">

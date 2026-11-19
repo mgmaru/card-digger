@@ -190,6 +190,18 @@ beforeEach(() => {
   });
 });
 
+describe("the search form", () => {
+  it("says where a keyword is looked for", () => {
+    mount();
+
+    expect(
+      screen.getByText(
+        "キーワードは、Mercariが商品名と商品の説明から探します。語をすべて含む出品だけが返るとは限りません。",
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("the 出品者 tab", () => {
   it("lays out the sellers from the search alone, without asking about any", async () => {
     await searchAndOpenSellers();
