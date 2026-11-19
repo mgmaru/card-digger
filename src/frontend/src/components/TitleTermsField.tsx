@@ -1,7 +1,7 @@
 /**
  * The words a listing's title has to contain one of (出品者探索 §13).
  *
- * One field, shared by the search screen and 出品者を探す: both read the same
+ * One field, shared by the search screen and 出品者検索: both read the same
  * kind of result, and a word set on one and not the other would bring back
  * the disagreement the field exists to remove.
  *

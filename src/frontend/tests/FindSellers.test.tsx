@@ -439,7 +439,7 @@ describe("what the screens and the piles are called", () => {
     const menu = within(screen.getByRole("navigation", { name: "画面" }));
     expect(menu.getAllByRole("link").map((link) => link.textContent)).toEqual([
       "商品検索",
-      "出品者を探す",
+      "出品者検索",
       "出品者リスト",
     ]);
   });
@@ -505,7 +505,7 @@ describe("what was found", () => {
 
     await user.click(screen.getByRole("link", { name: "ゆうママ" }));
     await screen.findByRole("link", { name: "商品検索へ戻る" });
-    await user.click(screen.getByRole("link", { name: "出品者を探す" }));
+    await user.click(screen.getByRole("link", { name: "出品者検索" }));
 
     expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
     expect(field(1)).toHaveValue("ポケカ 押入れ");

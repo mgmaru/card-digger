@@ -18,7 +18,7 @@ below and names no Mercari adapter, and a test asserts that.
 
 Search for `ポケカ まとめ`, open the 出品者 tab and press the button.
 
-| Seller | What their shelf is | 出品の幅 | 「出品者を探す」での分類 |
+| Seller | What their shelf is | 出品の幅 | 「出品者検索」での分類 |
 |---|---|---|---|
 | `seller-household` | Clothes and kitchenware, two card lots | 広い | 混ざっている |
 | `seller-clearing-out` | About a third trading cards | 中 | 混ざっている |
@@ -28,7 +28,7 @@ Search for `ポケカ まとめ`, open the 出品者 tab and press the button.
 | `300000006` | No profile. The look fails for this one alone | 取得できませんでした | 未調査・不明 |
 
 The same sellers serve both screens: the 出品者 tab under a search, and
-出品者を探す, where `ポケカ まとめ` and `ポケモンカード` in two fields show two
+出品者検索, where `ポケカ まとめ` and `ポケモンカード` in two fields show two
 searches being merged.
 
 Three things differ from `acceptance_app`, and only three.

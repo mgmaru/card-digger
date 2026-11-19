@@ -155,11 +155,11 @@ test("going looking for sellers from one press", async ({ page }) => {
   });
 
   await page.goto("/");
-  await page.getByRole("link", { name: "出品者を探す" }).click();
+  await page.getByRole("link", { name: "出品者検索" }).click();
   // Wait for the screen itself. The search screen being left has a box
   // labelled キーワード too, and a fill that arrives before the route has
   // changed goes into that one.
-  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "出品者検索" })).toBeVisible();
 
   // --- Nothing is sent until the press, and the press says what it can cost -
   // By role: each field's 外す button is named after the field as well.
@@ -202,7 +202,7 @@ test("going looking for sellers from one press", async ({ page }) => {
 
   // --- And the search screen then leaves their listings out too ------------
   await page.getByRole("link", { name: "商品検索" }).click();
-  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "出品者検索" })).toBeHidden();
   // Exact as well: the box on the screen just left is labelled キーワード…
   await page.getByLabel("キーワード", { exact: true }).fill(KEYWORD);
   await page.getByRole("button", { name: "検索", exact: true }).click();
@@ -239,7 +239,7 @@ test("narrowing a result by the words in its titles", async ({ page }) => {
 
   // --- The same words are waiting on the other screen ----------------------
   await page.getByLabel("タイトルに含む語").fill("ポケ");
-  await page.getByRole("link", { name: "出品者を探す" }).click();
-  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeVisible();
+  await page.getByRole("link", { name: "出品者検索" }).click();
+  await expect(page.getByRole("heading", { name: "出品者検索" })).toBeVisible();
   await expect(page.getByLabel("タイトルに含む語")).toHaveValue("ポケ");
 });

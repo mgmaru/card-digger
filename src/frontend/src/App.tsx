@@ -56,7 +56,7 @@ function Navigation() {
         商品検索
       </NavLink>
       <NavLink to="/find-sellers" className={link}>
-        出品者を探す
+        出品者検索
       </NavLink>
       <NavLink to="/seller-lists" className={link}>
         出品者リスト

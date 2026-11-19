@@ -270,8 +270,8 @@ export function FindSellersPage() {
   };
 
   return (
-    <section aria-label="出品者を探す">
-      <h2 className={styles.heading}>出品者を探す</h2>
+    <section aria-label="出品者検索">
+      <h2 className={styles.heading}>出品者検索</h2>
       <p className={styles.about}>
         キーワードごとに検索し、出てきた出品者を順に調べて、出品にカードがどれだけあるかで分けます。
       </p>
