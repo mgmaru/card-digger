@@ -118,6 +118,14 @@
   text-decoration-style: dashed;
 }
 
+/* この画面の中のSeller画面へ行くLink。名前（Mercariへ出る）とは行き先が違うので、
+   名前の隣ではなく下に、何をするLinkかを書いて置く。 */
+.analyze {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
 .facts {
   margin: 0;
   min-width: 0;

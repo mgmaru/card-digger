@@ -26,14 +26,15 @@ import { toDateTimeString } from "../jst";
 import {
   CANDIDATE_SORT_LABELS,
   CANDIDATE_SORT_ORDER,
-  REQUESTS_PER_EVALUATION,
-  evaluationSeconds,
-  isOwedALook,
-  sellerCandidates,
-  sortCandidates,
   type CandidateSort,
   type EvaluationRecord,
+  evaluationSeconds,
+  isOwedALook,
+  mercariSellerUrl,
+  REQUESTS_PER_EVALUATION,
   type SellerCandidate,
+  sellerCandidates,
+  sortCandidates,
 } from "../sellerCandidates";
 import { useSellerDiscovery } from "../sellerDiscoveryState";
 import type { BreadthLevel, Item, SellerEvaluationResponse } from "../types/api";
@@ -136,8 +137,22 @@ export function SellerCandidateRow({
   return (
     <li className={styles.row}>
       <div className={styles.who}>
+        {/* The name opens the seller's page on Mercari, in another tab. It
+            used to open this application's own seller screen, which starts
+            collecting as soon as it is opened — up to twelve requests for
+            having pressed a name. Looking at somebody on Mercari costs
+            nothing here, and is what a reader pressing a name expects
+            (出品者探索 §5.4). The seller screen is still one press away,
+            under the words that say what it does. */}
         <h3 className={styles.name}>
-          <Link to={`/sellers/${candidate.sellerId}`}>{label}</Link>
+          <a
+            href={evaluation?.seller.url ?? mercariSellerUrl(candidate.sellerId)}
+            target="_blank"
+            rel="noreferrer"
+            title="Mercariの出品者ページを開きます"
+          >
+            {label}
+          </a>
         </h3>
         {first && (
           <p className={styles.sample}>
@@ -151,6 +166,9 @@ export function SellerCandidateRow({
             </a>
           </p>
         )}
+        <p className={styles.analyze}>
+          <Link to={`/sellers/${candidate.sellerId}`}>Sellerを分析</Link>
+        </p>
       </div>
 
       <dl className={styles.facts}>
