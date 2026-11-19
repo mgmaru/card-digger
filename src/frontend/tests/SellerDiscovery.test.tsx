@@ -198,6 +198,31 @@ describe("the 出品者 tab", () => {
     const shop = rows()[0] as HTMLElement;
     expect(shop).toHaveTextContent("一致した出品2件");
     expect(shop).toHaveTextContent("目立った傷や汚れなし 1件、傷や汚れあり 1件");
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("names the condition after the listings it describes, not as a fact about the seller", async () => {
+    await searchAndOpenSellers();
+
+    // 商品の状態 alone read as something about the seller. The first two
+    // lines are about the listings this search found; the last two are about
+    // the seller.
+    const shop = within(rows()[0] as HTMLElement);
+    expect(shop.getAllByRole("term").map((term) => term.textContent)).toEqual([
+      "一致した出品",
+      "一致した出品の状態",
+      "出品の幅",
+      "評価",
+    ]);
+    expect(shop.getAllByRole("definition")[1]).toHaveTextContent(
+      "目立った傷や汚れなし 1件、傷や汚れあり 1件",
+    );
+  });
+
+  it("has not looked at anybody by laying them out", async () => {
+    await searchAndOpenSellers();
+
+    const shop = rows()[0] as HTMLElement;
     expect(shop).toHaveTextContent("未調査");
     expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
   });

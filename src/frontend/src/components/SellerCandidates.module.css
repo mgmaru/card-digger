@@ -134,8 +134,8 @@
 .fact dt {
   font-size: var(--text-note);
   color: var(--ink-quiet);
-  /* 値の左端を揃える。全角6字で「一致した出品」まで収まる。 */
-  flex: 0 0 6.5em;
+  /* 値の左端を揃える。全角9字で「一致した出品の状態」まで収まる。 */
+  flex: 0 0 9.5em;
 }
 
 .fact dd {
