@@ -407,6 +407,68 @@ describe("one press", () => {
   });
 });
 
+describe("what is sent, and what is done to the result", () => {
+  const fetching = () => screen.getByRole("region", { name: "取得する条件" });
+  const showing = () => screen.getByRole("region", { name: "表示の絞り込み" });
+
+  it("are two blocks, the one that is sent first", () => {
+    mount();
+
+    expect(
+      fetching().compareDocumentPosition(showing()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("keeps everything that goes to Mercari in the first, with the button", () => {
+    mount();
+
+    const sent = within(fetching());
+    expect(sent.getByLabelText("キーワード 1")).toBeInTheDocument();
+    expect(sent.getByLabelText("最低価格")).toBeInTheDocument();
+    expect(sent.getByLabelText("最高価格")).toBeInTheDocument();
+    expect(sent.getByLabelText("調べる出品者")).toBeInTheDocument();
+    expect(sent.getByRole("button", { name: "探す" })).toBeInTheDocument();
+    // Reported from use: this field sat between the keyword and the prices,
+    // and nothing said it was a different kind of thing.
+    expect(sent.queryByLabelText("タイトルに含む語")).not.toBeInTheDocument();
+  });
+
+  it("keeps the words that narrow the view in the second, and says they are not sent", () => {
+    mount();
+
+    expect(within(showing()).getByLabelText("タイトルに含む語")).toBeInTheDocument();
+    expect(showing()).toHaveTextContent("Mercariへは送りません");
+  });
+
+  it("says the one way the second changes what is sent", () => {
+    mount();
+
+    // The words also decide whom a press looks at. That is why the block is
+    // on screen before the first press, and why it has to say so.
+    expect(showing()).toHaveTextContent(
+      "「探す」は、ここで外れた出品しか無い出品者を調べないので、その分の問い合わせは減ります。",
+    );
+  });
+
+  it("puts the record of what was collected between the two", async () => {
+    await hunt();
+    await done();
+
+    const record = screen.getByRole("region", { name: "探した範囲" });
+    expect(
+      fetching().compareDocumentPosition(record) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      record.compareDocumentPosition(showing()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      showing().compareDocumentPosition(
+        screen.getByRole("tablist", { name: "見つかった出品者" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
 describe("what the screens and the piles are called", () => {
   it("names the piles after what a seller's shelf is, in this order", async () => {
     await hunt();
@@ -706,9 +768,12 @@ describe("the words a title has to contain", () => {
 
     expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["shop"]]);
     expect(record()).toHaveTextContent("3件の出品から 2人の出品者");
-    expect(record()).toHaveTextContent(
+    // Said beside the field that did it, not in the record of what was
+    // collected: nothing about the collection changed.
+    expect(screen.getByRole("region", { name: "表示の絞り込み" })).toHaveTextContent(
       "タイトルに「ポケモン」「ポケカ」のどれも含まない出品 1件は対象から外しています（出品者 1人は、ほかに残る出品がありません）。",
     );
+    expect(record()).not.toHaveTextContent("含まない出品");
     expect(screen.queryByText("屋根裏の人")).not.toBeInTheDocument();
   });
 

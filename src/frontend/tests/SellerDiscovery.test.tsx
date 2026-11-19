@@ -190,6 +190,40 @@ beforeEach(() => {
   });
 });
 
+describe("what is sent, and what is done to the result, on the search screen", () => {
+  it("names the form as what goes to Mercari", () => {
+    mount();
+
+    const sent = within(screen.getByRole("region", { name: "取得する条件" }));
+    expect(sent.getByLabelText("キーワード")).toBeInTheDocument();
+    expect(sent.getByLabelText("最低価格")).toBeInTheDocument();
+    expect(sent.getByLabelText("最高価格")).toBeInTheDocument();
+    expect(sent.getByRole("button", { name: "検索" })).toBeInTheDocument();
+  });
+
+  it("offers nothing to narrow before there is a result", () => {
+    mount();
+
+    expect(screen.queryByRole("region", { name: "表示の絞り込み" })).not.toBeInTheDocument();
+  });
+
+  it("puts what narrows the view in a block of its own, after the record and above the tabs", async () => {
+    await searchAndOpenSellers();
+
+    const showing = screen.getByRole("region", { name: "表示の絞り込み" });
+    expect(within(showing).getByLabelText("タイトルに含む語")).toBeInTheDocument();
+    expect(showing).toHaveTextContent("Mercariへは送りません");
+    expect(
+      screen.getByLabelText("取得範囲").compareDocumentPosition(showing) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      showing.compareDocumentPosition(screen.getByRole("tablist")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
 describe("the search form", () => {
   it("says where a keyword is looked for", () => {
     mount();
