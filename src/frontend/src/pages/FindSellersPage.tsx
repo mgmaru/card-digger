@@ -43,12 +43,13 @@ import { useSellerDiscovery } from "../sellerDiscoveryState";
 import {
   DEFAULT_SELLER_BUDGET,
   HUNT_PILES,
-  MAX_KEYWORDS,
-  SELLER_BUDGETS,
   huntCeiling,
-  keywordsFrom,
-  pileOf,
   type HuntPile,
+  keywordsFrom,
+  MAX_KEYWORDS,
+  pileOf,
+  SELLER_BUDGETS,
+  SPECIALIST_FROM_CARD_PERCENT,
 } from "../sellerHunt";
 import { parseTitleTerms, quoteTerms, withTitleTerms } from "../titleTerms";
 import { useSellerHunt, type KeywordOutcome } from "../sellerHuntState";
@@ -95,19 +96,19 @@ const PILES: Record<HuntPile, { label: string; about: string; empty: string }> =
   varied: {
     label: "混ざっている",
     about:
-      "出品のうち、カード（TCG）が半分に満たない出品者です。カード以外の物も出品しています。",
+      `出品のうち、カード（TCG）が${SPECIALIST_FROM_CARD_PERCENT}%に満たない出品者です。カード以外の物も出品しています。`,
     empty: "ここに入る出品者は、まだ見つかっていません",
   },
   few: {
     label: "出品が少ない",
     about:
-      "出品はカード（TCG）が中心ですが、調べた出品が30件に満たない出品者です。引退や整理で数点だけ出している人がここに入ります。カード専門かどうかは、この件数では判断できません。",
+      `出品の${SPECIALIST_FROM_CARD_PERCENT}%以上がカード（TCG）ですが、調べた出品が30件に満たない出品者です。引退や整理で数点だけ出している人がここに入ります。カード専門かどうかは、この件数では判断できません。`,
     empty: "ここに入る出品者は、まだ見つかっていません",
   },
   specialists: {
     label: "カード専門",
     about:
-      "調べた出品が30件以上あり、その半分以上がカード（TCG）の出品者です。ポケモンカードに限らず、カード全般で数えています。",
+      `調べた出品が30件以上あり、その${SPECIALIST_FROM_CARD_PERCENT}%以上がカード（TCG）の出品者です。ポケモンカードに限らず、カード全般で数えています。`,
     empty: "ここに入る出品者は、まだ見つかっていません",
   },
   others: {
@@ -243,9 +244,8 @@ export function FindSellersPage() {
       specialists: [],
       others: [],
     };
-    // Widest shelf first within a pile, which only orders the first one:
-    // the other two hold a single band or none.
-    for (const candidate of sortCandidates(candidates, "breadth", evaluations)) {
+    // Fewest cards first within a pile.
+    for (const candidate of sortCandidates(candidates, "cardShare", evaluations)) {
       sorted[pileOf(evaluations.get(candidate.sellerId))].push(candidate);
     }
     return sorted;

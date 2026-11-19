@@ -507,6 +507,44 @@ describe("what the screens and the piles are called", () => {
   });
 });
 
+describe("who is called a card specialist", () => {
+  it("is not a seller with nearly half their shelf being something else", async () => {
+    // Reported from use: カード専門 held a row that read
+    // 「TCG以外 24件 / 53件（45.3%）」. Two things were wrong with it. The line
+    // was at half, and the number shown was the part that is not cards.
+    mocks.sellerEvaluation.mockImplementation(async (id: string) => ({
+      ...look(id, `出品者${id}`, "narrow", 53, "medium"),
+      breadth: {
+        analyzedItemCount: 53,
+        otherItemCount: 24,
+        otherRatio: 24 / 53,
+        level: "narrow" as const,
+      },
+    }));
+    await hunt(["ポケカ 押入れ"]);
+    await done();
+
+    expect(tab(/カード専門/)).toHaveTextContent("0");
+    expect(tab(/混ざっている/)).toHaveTextContent("2");
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveTextContent("カードの割合54.7%カード 29件 / 53件");
+    expect(panel).not.toHaveTextContent("TCG以外");
+    expect(panel).toHaveTextContent("カード（TCG）が80%に満たない出品者です");
+  });
+
+  it("says the line on the tab that draws it", async () => {
+    const user = await hunt();
+    await done();
+
+    await user.click(tab(/カード専門/));
+
+    expect(screen.getByRole("tabpanel")).toHaveTextContent(
+      "調べた出品が30件以上あり、その80%以上がカード（TCG）の出品者です。",
+    );
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("カードの割合100.0%");
+  });
+});
+
 describe("what was found", () => {
   it("is sorted into piles, with the one the reader came for in front", async () => {
     await hunt();

@@ -19,7 +19,6 @@ import {
   type EvaluationRecord,
 } from "../src/sellerCandidates";
 import type {
-  BreadthLevel,
   Item,
   SellerEvaluationResponse,
   SellerListEntry,
@@ -49,10 +48,13 @@ function item(id: string, sellerId: string, condition: string | null = "3"): Ite
   };
 }
 
-function looked(level: BreadthLevel): EvaluationRecord {
+/** A seller looked at, with this many cards among this many listings. */
+function looked(cards: number, analyzed: number): EvaluationRecord {
   return {
     status: "done",
-    evaluation: { breadth: { level } } as SellerEvaluationResponse,
+    evaluation: {
+      breadth: { analyzedItemCount: analyzed, otherItemCount: analyzed - cards },
+    } as SellerEvaluationResponse,
   };
 }
 
@@ -118,14 +120,14 @@ describe("ordering", () => {
     item("f", "wide", "3"),
   ]);
   const evaluations = new Map<string, EvaluationRecord>([
-    ["narrow", looked("narrow")],
-    ["wide", looked("wide")],
-    ["mixed", looked("mixed")],
-    ["nothing-listed", looked("unknown")],
+    ["narrow", looked(19, 20)],
+    ["wide", looked(2, 20)],
+    ["mixed", looked(8, 20)],
+    ["nothing-listed", looked(0, 0)],
   ]);
 
-  it("by breadth puts the widest shelf first and the unasked last", () => {
-    expect(ids(sortCandidates(candidates, "breadth", evaluations))).toEqual([
+  it("by card share puts the fewest cards first and the unasked last", () => {
+    expect(ids(sortCandidates(candidates, "cardShare", evaluations))).toEqual([
       "wide",
       "mixed",
       "narrow",
@@ -135,12 +137,28 @@ describe("ordering", () => {
     ]);
   });
 
-  it("by breadth changes nothing before anyone has been looked at", () => {
+  it("by card share changes nothing before anyone has been looked at", () => {
     // Shuffling the list on a sort that has nothing to sort by would read as
     // the sort having found something.
-    expect(ids(sortCandidates(candidates, "breadth", new Map()))).toEqual(
+    expect(ids(sortCandidates(candidates, "cardShare", new Map()))).toEqual(
       ids(candidates),
     );
+  });
+
+  it("by card share goes by the share itself, not by a band it falls in", () => {
+    // 10% and 40% used to be two bands and 40% and 45% one. The number is
+    // what the row shows, so the number is what orders it.
+    const shares = new Map<string, EvaluationRecord>([
+      ["narrow", looked(9, 20)],
+      ["wide", looked(8, 20)],
+      ["mixed", looked(2, 20)],
+    ]);
+
+    expect(ids(sortCandidates(candidates, "cardShare", shares)).slice(0, 3)).toEqual([
+      "mixed",
+      "wide",
+      "narrow",
+    ]);
   });
 
   it("by condition goes by each seller's most worn hit", () => {
@@ -172,7 +190,7 @@ describe("who is still owed a look", () => {
     [undefined, true],
     [{ status: "queued" }, true],
     [{ status: "failed" }, true],
-    [looked("wide"), false],
+    [looked(2, 20), false],
     // Mercari said there is no such seller. Asking again buys nothing.
     [{ status: "gone" }, false],
   ] as [EvaluationRecord | undefined, boolean][])("%j → %s", (record, owed) => {

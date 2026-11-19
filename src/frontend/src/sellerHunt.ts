@@ -15,6 +15,7 @@ import { SEARCH_PAGE_LIMIT } from "./collectionRange";
 import {
   REQUESTS_PER_EVALUATION,
   SECONDS_BETWEEN_REQUESTS,
+  cardShare,
   isOwedALook,
   type EvaluationRecord,
   type SellerCandidate,
@@ -153,12 +154,12 @@ export function huntCeiling(
  * bargain: the same piles, read for two purposes. So each is named after the
  * fact it sorts by, and the purpose is left to the reader (出品者探索 §12.5).
  *
- * - `varied` (混ざっている): less than half of the shelf is trading cards.
- * - `few` (出品が少ない): trading cards for the most part, but over fewer
- *   than thirty listings. Somebody retiring from the hobby with three lots
- *   lands here, and so does a shop that opened last week. The count cannot
- *   tell them apart, so the pile does not pretend to.
- * - `specialists` (カード専門): at least half trading cards, over thirty
+ * - `varied` (混ざっている): less than 80% of the shelf is trading cards.
+ * - `few` (出品が少ない): 80% trading cards or more, but over fewer than
+ *   thirty listings. Somebody retiring from the hobby with three lots lands
+ *   here, and so does a shop that opened last week. The count cannot tell
+ *   them apart, so the pile does not pretend to.
+ * - `specialists` (カード専門): 80% trading cards or more, over thirty
  *   listings or more.
  * - `others` (未調査・不明): everything that is not an answer either way — not
  *   reached, not found, failed, or looked at and found to have nothing listed
@@ -174,10 +175,26 @@ export function huntCeiling(
  * listings analysed is `sampleConfidence: "low"` (MVP specification section
  * 7.6). It is read from there, not written again, and it is a full page of
  * one status, which is what a seller with a real shelf fills.
- *
- * Breadth 中 goes with 広い on purpose: both have a shelf that is not mostly
- * cards, and splitting them would be a second line drawn on the same guess.
  */
+
+/**
+ * The share of cards from which a seller is called a card specialist.
+ *
+ * **Eighty, chosen by the reader on 2026-11-19, and still a guess.** The
+ * line was fifty, borrowed from the breadth band (狭い from half), and it put
+ * a seller whose shelf was 54.7% cards under カード専門 — the reader found
+ * them there with nearly half of their listings being something else.
+ *
+ * It is not higher because the share runs low. A listing counts as a card
+ * only when its title says so (ポケカ, トレカ, 遊戯王…), and a shop that titles
+ * a card by its name and number alone has that listing counted as something
+ * else. A line near a hundred would leave real specialists out.
+ *
+ * A percentage and whole counts, compared as integers: 80% is exactly the
+ * kind of boundary a division lands a hair under.
+ */
+export const SPECIALIST_FROM_CARD_PERCENT = 80;
+
 export type HuntPile = "varied" | "few" | "specialists" | "others";
 
 export const HUNT_PILES: readonly HuntPile[] = [
@@ -191,14 +208,14 @@ export function pileOf(record: EvaluationRecord | undefined): HuntPile {
   if (record?.status !== "done") {
     return "others";
   }
-  const { breadth, knowledge } = record.evaluation;
-  switch (breadth.level) {
-    case "wide":
-    case "mixed":
-      return "varied";
-    case "narrow":
-      return knowledge.sampleConfidence === "low" ? "few" : "specialists";
-    case "unknown":
-      return "others";
+  const share = cardShare(record.evaluation);
+  if (share === null) {
+    return "others";
   }
+  if (share.cardCount * 100 < share.analyzedCount * SPECIALIST_FROM_CARD_PERCENT) {
+    return "varied";
+  }
+  return record.evaluation.knowledge.sampleConfidence === "low"
+    ? "few"
+    : "specialists";
 }
