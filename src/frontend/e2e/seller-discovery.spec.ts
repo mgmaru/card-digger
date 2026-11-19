@@ -156,6 +156,10 @@ test("going looking for sellers from one press", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("link", { name: "出品者を探す" }).click();
+  // Wait for the screen itself. The search screen being left has a box
+  // labelled キーワード too, and a fill that arrives before the route has
+  // changed goes into that one.
+  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeVisible();
 
   // --- Nothing is sent until the press, and the press says what it can cost -
   await page.getByLabel(/^キーワード/).fill(`${KEYWORD}\nどこにも無い語`);
@@ -194,8 +198,8 @@ test("going looking for sellers from one press", async ({ page }) => {
 
   // --- And the search screen then leaves their listings out too ------------
   await page.getByRole("link", { name: "検索", exact: true }).click();
-  // Exact: the box on the screen being left is also labelled キーワード…, and
-  // a loose match fills that one if it is still there.
+  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeHidden();
+  // Exact as well: the box on the screen just left is labelled キーワード…
   await page.getByLabel("キーワード", { exact: true }).fill(KEYWORD);
   await page.getByRole("button", { name: "検索", exact: true }).click();
   await expect(
