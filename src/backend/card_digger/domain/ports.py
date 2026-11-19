@@ -16,6 +16,7 @@ from card_digger.domain.models import (
     SearchPage,
     Seller,
     SellerItemsPage,
+    SellerListEntry,
 )
 
 
@@ -90,5 +91,39 @@ class MarketplacePort(Protocol):
 
         `ListingStatus.UNKNOWN` is not a request. It describes what came back,
         so asking for it is rejected as invalid input.
+        """
+        ...
+
+
+class SellerListPort(Protocol):
+    """Where the reader's two seller lists are kept.
+
+    The only thing this application stores between runs (ADR 0004). Behind a
+    port for the same reason the marketplace is: the tests and the acceptance
+    flow run against memory, and neither may leave a file in somebody's home
+    directory.
+
+    A seller is on at most one list. `put` replaces whatever entry that seller
+    had, so moving someone from one list to the other is one call and there is
+    no moment at which they are on both.
+
+    Every method either succeeds or raises `SellerListUnavailable`. A store
+    that cannot be read is never reported as an empty one: the next `put`
+    would then write that emptiness over everything the reader had saved.
+    """
+
+    def entries(self) -> tuple[SellerListEntry, ...]:
+        """Every entry, oldest first."""
+        ...
+
+    def put(self, entry: SellerListEntry) -> None:
+        """Add the entry, replacing the one this seller already had."""
+        ...
+
+    def remove(self, seller_id: str) -> bool:
+        """Take the seller off whichever list they are on.
+
+        Returns whether there was anything to remove. Removing a seller who is
+        on neither list is not an error.
         """
         ...

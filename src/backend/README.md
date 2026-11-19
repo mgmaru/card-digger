@@ -1,10 +1,12 @@
 # Card Digger Backend
 
 Domain型、`MarketplacePort`、Mercari Adapter、収集Policy、そしてFrontendが使うHTTP APIを置く。
-Databaseと認証は持たない。実装基準は次の文書を正本とする。
+Databaseと認証は持たない。**保存するのは出品者リストのファイル1つだけである**
+（[ADR 0004](../../docs/adr/0004-store-seller-lists-in-a-local-file.md)）。実装基準は次の文書を正本とする。
 
 - [Mercari Adapter実装仕様](../../docs/phase-0/phase-0-f-adapter-spec.md)
 - [MVP実装仕様](../../docs/product/mvp-spec.md)
+- [出品者探索 実装仕様](../../docs/product/seller-discovery-spec.md)
 - [Test運用規約](../../docs/development/test-policy.md)
 - [mercapi Fork運用手順](../../docs/development/mercapi-fork-operations.md)
 
@@ -13,37 +15,43 @@ Databaseと認証は持たない。実装基準は次の文書を正本とする
 ```text
 card_digger/
 ├── domain/
-│   ├── models.py      # Domain型、収集Metadata、停止理由
-│   ├── ports.py       # MarketplacePort、Clock、Sleeper
-│   └── errors.py      # 共通Error Code、安全停止
+│   ├── models.py      # Domain型、収集Metadata、停止理由、出品者リストの1件
+│   ├── ports.py       # MarketplacePort、SellerListPort、Clock、Sleeper
+│   └── errors.py      # 共通Error Code、安全停止、出品者リストを読めないError
 ├── application/
 │   ├── collection.py       # Page収集、1回だけの再試行、RequestPacer、SafetyBrake
 │   ├── access.py           # Process全体で共有する外部アクセス制御
 │   ├── collect_search.py
 │   ├── analyze_seller.py
-│   └── seller_knowledge.py # Titleだけを見る純粋関数。時計も通信も持たない
+│   ├── seller_knowledge.py # Titleだけを見る純粋関数。時計も通信も持たない
+│   ├── seller_breadth.py   # 出品の幅。Seller Knowledgeと同じ標本・同じ閾値を逆向きに読む
+│   └── seller_lists.py     # 出品者をリストへ入れる・外す。Mercariへ出ない
 ├── adapters/
 │   ├── mercari.py       # 管理下のmercapi Fork経由の本番実装
 │   ├── mock.py          # 外部通信しない実装
+│   ├── seller_lists.py  # 出品者リストの置き場所。Memory実装とJSON File実装
 │   ├── error_mapping.py # 例外 → Error Codeの純粋関数
 │   └── clock.py         # 実時計と実待機
 └── api/
-    ├── main.py          # 3 Endpointと、部品を1か所で組み立てるcreate_app
+    ├── main.py          # Endpointと、部品を1か所で組み立てるcreate_app
     └── schemas.py       # FrontendへのJSON。Domainより狭い
 
 scripts/
 ├── live_acceptance.py   # ライブ受入検証（L4）。実Mercariへ通信する
 ├── acceptance_app.py    # E2E受入Flow用。Mock Adapterで同じApplicationを起動する
-└── safety_stop_demo.py  # 安全停止を画面で見る。断るMarketplaceを被せる。外へ出ない
+├── safety_stop_demo.py  # 安全停止を画面で見る。断るMarketplaceを被せる。外へ出ない
+└── seller_discovery_demo.py  # 出品者探索を画面で見る。幅の違う出品者6人を持つ。外へ出ない
 ```
 
 `domain`と`application`は`mercapi`をimportしない。この境界は
 `tests/unit/test_layering.py`が静的に検査する。
 
 実Mercariへ接続しうるのは`create_app()`（引数なしの場合）と`scripts/live_acceptance.py`の
-2つだけで、**Testはどちらも通らない。**`acceptance_app.py`と`safety_stop_demo.py`は
-同じ`create_app()`を呼ぶが、**Mock Adapterを渡すので外へ出ない。**
-それを`tests/unit/test_acceptance_app.py`と`tests/unit/test_safety_stop_demo.py`が検査する。
+2つだけで、**Testはどちらも通らない。**`acceptance_app.py`、`safety_stop_demo.py`、
+`seller_discovery_demo.py`は同じ`create_app()`を呼ぶが、**Mock Adapterを渡すので外へ出ない。**
+それを`tests/unit/test_acceptance_app.py`、`tests/unit/test_safety_stop_demo.py`、
+`tests/unit/test_seller_discovery_demo.py`が検査する。**3つとも出品者リストをMemoryに持ち、
+ファイルを書かない。**
 
 ## 依存
 
@@ -74,6 +82,11 @@ uv run pytest tests/api          # Backend API（L3と同じ扱い）
 ```bash
 uv run uvicorn --factory card_digger.api.main:create_app --reload
 ```
+
+出品者リストは、環境変数`CARD_DIGGER_DATA_DIR`が指すDirectoryの`seller-lists.json`へ保存する。
+**未設定ならHome Directoryの`.card-digger/`に置く。**Repositoryの中へは置かない。デプロイが
+版のDirectoryを差し替えても残すためである
+（[ADR 0004 論点2](../../docs/adr/0004-store-seller-lists-in-a-local-file.md#論点2--どこへどんな形で保存するか)）。
 
 `uvicorn`の既定Bind先は`127.0.0.1`である。**`--host 0.0.0.0`を付けない。** 認証が無いまま
 LANへ公開することになる（[MVP仕様 §10](../../docs/product/mvp-spec.md#10-data取扱い)）。

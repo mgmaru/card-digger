@@ -1,0 +1,23 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+.panel {
+  max-width: var(--measure);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.state {
+  margin: 0 0 var(--space-3);
+  line-height: var(--leading-dense);
+}
+
+.since {
+  margin-left: var(--space-3);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.buttons {
+  margin-top: var(--space-3);
+}

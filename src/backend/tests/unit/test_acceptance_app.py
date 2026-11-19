@@ -169,3 +169,27 @@ class TestTheSeedSupportsTheFlow:
         ids = [item.id for item in acceptance_app.SEED]
 
         assert len(set(ids)) == len(ids)
+
+
+class TestWhatItLeavesBehind:
+    def test_the_seller_lists_are_kept_in_memory(self, tmp_path, monkeypatch):
+        """Every run of the flow starts with nobody saved and nobody excluded.
+
+        Production writes the lists under the home directory. The flow doing
+        the same would begin its second run with what its first one saved, and
+        would write into the home directory of whoever ran it.
+        """
+        directory = tmp_path / "would-be-written"
+        monkeypatch.setenv("CARD_DIGGER_DATA_DIR", str(directory))
+        client = TestClient(acceptance_app.create_acceptance_app())
+
+        client.put("/api/seller-lists/100000001", json={"kind": "saved"})
+
+        assert len(client.get("/api/seller-lists").json()["entries"]) == 1
+        assert not directory.exists()
+        assert (
+            TestClient(acceptance_app.create_acceptance_app())
+            .get("/api/seller-lists")
+            .json()
+            == {"entries": []}
+        )

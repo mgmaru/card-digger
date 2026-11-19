@@ -1,0 +1,88 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+/* 記録の声（視覚方針 §3.4）。画面の見出しであって、道具の名前より一段下。 */
+.heading {
+  font-family: var(--font-record);
+  font-weight: 400;
+  font-size: var(--text-sub);
+  margin: var(--space-5) 0 0;
+}
+
+.loading {
+  margin: var(--space-6) 0;
+  color: var(--ink-quiet);
+}
+
+.about {
+  max-width: var(--measure);
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+}
+
+.empty {
+  max-width: var(--measure);
+  margin: var(--space-5) 0;
+  color: var(--ink-quiet);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* 誰か / メモ / どうするか。出品者Tabの行と同じ3つの塊で、順番も同じ。 */
+.row {
+  display: grid;
+  grid-template-columns: minmax(11em, 1fr) minmax(16em, 2.4fr) auto;
+  gap: var(--space-3) var(--space-5);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.who {
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: var(--leading-dense);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.added {
+  margin: 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 朱の縦罫は1つの意味しか持たない —— Card Diggerが持っていないものの断り書き
+   （視覚方針 §3.3）。文字は墨のまま。 */
+.limits {
+  max-width: var(--measure);
+  margin-top: var(--space-5);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.limits p {
+  margin: 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}

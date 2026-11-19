@@ -61,7 +61,17 @@ async def analyze_seller(
     sleeper: Sleeper,
     gate: RequestGate | None = None,
     limits: CollectionLimits = SELLER_ITEMS_LIMITS,
+    ask_whether_inactive: bool = True,
 ) -> SellerAnalysis:
+    """Collect one seller.
+
+    `limits` and `ask_whether_inactive` are how the same collection is run
+    shallowly when many sellers are looked at in a row: fewer pages per status,
+    and without the one extra item detail that the seller screen spends to
+    read Mercari's `is_inactive`. The order of the requests and what a failure
+    means are the same either way, which is the reason this is one function
+    with two knobs and not two functions.
+    """
     gate = gate or RequestGate(clock, sleeper)
 
     seller: Seller | None = None
@@ -102,7 +112,11 @@ async def analyze_seller(
         seller=seller,
         on_sale=on_sale,
         sold_out=sold_out,
-        seller_is_inactive=await _is_inactive(port, on_sale, sold_out, gate=gate),
+        seller_is_inactive=(
+            await _is_inactive(port, on_sale, sold_out, gate=gate)
+            if ask_whether_inactive
+            else None
+        ),
     )
 
 

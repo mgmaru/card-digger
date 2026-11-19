@@ -16,3 +16,41 @@
   letter-spacing: 0.06em;
   margin: 0;
 }
+
+/* 道具の名前と、行き先の2つ。狭い画面では折り返して2段になる。 */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-5);
+}
+
+.nav {
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* 今いる場所だけが墨の下線を持つ。Tabと同じ示し方（視覚方針 §3.5）で、
+   下線の無いほうは「行ける場所」、あるほうは「今いる場所」。 */
+.link {
+  color: var(--ink-quiet);
+  text-decoration: none;
+  padding: var(--space-1) 0;
+  border-bottom: 2px solid transparent;
+}
+
+.link:hover {
+  color: var(--ink);
+}
+
+.current {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.count {
+  margin-left: var(--space-2);
+  font-size: var(--text-note);
+  font-variant-numeric: tabular-nums;
+}

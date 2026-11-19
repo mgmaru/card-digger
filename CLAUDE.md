@@ -1,7 +1,8 @@
 # Card Digger
 
 Mercariの大量出品・引退品を検索し、画像で一次選別し、SellerがTCGに詳しそうかを確認する道具。
-**単一利用者のLocal実行。** 認証もDatabaseも持たない。
+**単一利用者のLocal実行。** 認証もDatabaseも持たない。保存するのは出品者リストのファイル1つだけ
+（[ADR 0004](docs/adr/0004-store-seller-lists-in-a-local-file.md)）。
 
 ## まず読むもの
 
@@ -12,6 +13,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 |---|---|
 | 今やること・進捗 | [docs/planning/todo.md](docs/planning/todo.md) |
 | 機能・画面・API・完了条件 | [docs/product/mvp-spec.md](docs/product/mvp-spec.md) |
+| 出品者探索（「出品者」Tab・出品者リスト・除外） | [docs/product/seller-discovery-spec.md](docs/product/seller-discovery-spec.md) |
 | 色・書体・余白 | [docs/product/design-tokens.md](docs/product/design-tokens.md) |
 | 層・依存の向き・固有語 | [docs/development/architecture.md](docs/development/architecture.md) |
 | CI・PR・Merge・Branch | [docs/development/ci-policy.md](docs/development/ci-policy.md) |
@@ -38,6 +40,11 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
   （[§20](docs/product/concept.md#20-効率的かは利用者にしか答えられない2026-09-05決定)）
 - **デプロイ先を`src/`に持たない。** デプロイ先の違いは設定で吸収する。デプロイ先を替える変更が
   `src/`を触ったら方針違反（[architecture §8](docs/development/architecture.md#8-デプロイ先をソースコードに持たない2026-11-08決定)）
+- **出品者リストに、Mercariが言ったことを保存しない。** 保存するのはSeller ID・種別・追加日時・
+  読み手のメモだけ。名前や評価を足すなら、先にADRを書き直す
+  （[ADR 0004 論点1](docs/adr/0004-store-seller-lists-in-a-local-file.md#論点1--何を保存するか)）
+- **出品者を調べるのは、押されたときだけ。** 検索やTabを開いた拍子に`/evaluation`を呼ばない。
+  1人あたりMercariへ3回かかる（[出品者探索 §4](docs/product/seller-discovery-spec.md#4-出品者を調べる)）
 - **相場データをCard Diggerで作らない。** カードの相場も、Mercariの成約価格の分布も
   [card-pulse](https://github.com/mgmaru/card-pulse)の担当。Card Diggerは受け取って表示する側
   （[§19](docs/product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)）
@@ -56,6 +63,9 @@ cd src/backend && uv run uvicorn --factory scripts.acceptance_app:create_accepta
 
 # Backend（Mercariへ通信しない。安全停止を画面で見るとき。3回検索すると止まる）
 cd src/backend && uv run uvicorn --factory scripts.safety_stop_demo:create_safety_stop_demo_app --reload
+
+# Backend（Mercariへ通信しない。出品者探索を画面で見るとき。「ポケカ まとめ」で検索する）
+cd src/backend && uv run uvicorn --factory scripts.seller_discovery_demo:create_seller_discovery_demo_app --reload
 ```
 
 CIと同じ検査をローカルで通すとき。

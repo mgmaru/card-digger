@@ -47,9 +47,9 @@ flowchart TD
 
 | 層 | 置くもの | importしてよいもの |
 |---|---|---|
-| `domain/` | 型、`MarketplacePort`、Error Code | 標準ライブラリだけ |
-| `application/` | 収集Policy、停止条件、Seller Knowledge | `domain`のみ |
-| `adapters/` | Fork呼び出し、正規化、Error分類、時計 | `domain` + `mercapi` |
+| `domain/` | 型、`MarketplacePort`、`SellerListPort`、Error Code | 標準ライブラリだけ |
+| `application/` | 収集Policy、停止条件、Seller Knowledge、出品の幅、出品者リストの規則 | `domain`のみ |
+| `adapters/` | Fork呼び出し、正規化、Error分類、時計、**出品者リストのファイル** | `domain` + `mercapi` |
 | `api/` | Endpoint、JSON、Status規則、**組み立て** | すべて |
 | `frontend/` | 画面、Sort / Filter | Backend APIのJSONだけ |
 
@@ -63,6 +63,29 @@ Interfaceだけに依存させておくと、`MercariAdapter`と`MockAdapter`を
 
 これは一般に **Ports and Adapters**（Hexagonal Architecture）と呼ばれる形で、
 `MarketplacePort`が**Port**、`MercariAdapter` / `MockAdapter`が**Adapter**にあたる。
+
+### 2.1.1 2つ目のPort — `SellerListPort`（2026-11-19追加）
+
+**出品者リスト（保存 / 除外）の置き場所も、Portの向こうに置く。**理由は`MarketplacePort`と同じで、
+同じUse caseをファイルとMemoryの両方で動かすためである。
+
+| 実装 | 使う場所 |
+|---|---|
+| `JsonFileSellerLists` | 本番。`create_app()`が既定で作る |
+| `InMemorySellerLists` | Test、`acceptance_app`、`safety_stop_demo`、`seller_discovery_demo` |
+
+**このアプリが初めて持つ、Processより長く生きる状態である。**何を保存し何を保存しないかは
+[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)が決めた。ここは構造だけを書く。
+
+| 性質 | 内容 |
+|---|---|
+| Mercariへ出ない | `MarketplaceAccess`を通らない。**間隔も安全停止も関係しない**ので、安全停止の最中でも読み書きできる |
+| `Operation`に足さない | `Operation`はMercariの操作の名前である（[§4.2](#42-2つ目の相手card-pulseはmercariの条件を継がない2026-09-05決定)）。リストの失敗は`SellerListUnavailable`という別の例外で、再試行にも安全停止にも数えない |
+| 置き場所は設定が渡す | 環境変数`CARD_DIGGER_DATA_DIR`。[§8.1](#81-デプロイ先固有のものとその置き場所)の「ファイルの配置」にあたる |
+| 1 Process前提 | 読んでから書くまでのあいだに他の書き手がいないことを、[§7](#7-分かっている構造上の弱点)の1に頼っている |
+
+**2つの実装は同じTestで検査する**（`tests/unit/test_seller_lists.py`の`TestEitherStore`）。
+Contract Testと同じ考え方だが、相手が外部サービスではないのでL3には数えない。
 
 ### 2.2 状態の寿命 — 置き場所は「何についての事実か」で決まる
 
@@ -82,6 +105,8 @@ Interfaceだけに依存させておくと、`MercariAdapter`と`MockAdapter`を
   いることで、拒む相手は1つしかない | アプリに1つ |
 | 安全停止をいつ始めたか | 同上 | アプリに1つ |
 | 再試行した回数 | **その収集についての事実。** `CollectionMeta`に出る値 | 収集ごと |
+| 出品者をどちらのリストに入れたか | **読み手についての事実。**画面にもProcessにも属さない | **ファイル**（[§2.1.1](#211-2つ目のport--sellerlistport2026-11-19追加)） |
+| 出品者を調べた結果 | **その出品者についての事実。**ただし保存しないと決めた（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)） | Frontendの、Routerより上のState。再読み込みで消える |
 
 **「連続で拒否された回数」は2026-09-05に置き場所が変わった。** それまでは「その収集についての事実
 （この実行の中で連続）」と書いてあったが、**その読み方では3に到達できない。** 収集は最初の失敗で
@@ -306,6 +331,7 @@ card-pulseへ実際に出すときに、この節へ追記する。
 |---|---|---|
 | `MarketplacePort` | **Port**（Ports and Adapters / Hexagonal） | ほぼ同じ |
 | `MarketValuePort` | 同上。**名前だけ決めてある**（[§4.2](#42-2つ目の相手card-pulseはmercariの条件を継がない2026-09-05決定)） | ほぼ同じ |
+| `SellerListPort` | 同上。出品者リストの置き場所（[§2.1.1](#211-2つ目のport--sellerlistport2026-11-19追加)） | **Repository**（Ports and Adaptersの「駆動される側」のPort）とほぼ同じ |
 | `MercariAdapter` / `MockAdapter` | **Adapter** | 同じ |
 | `create_app()` | **Composition Root** | 同じ |
 | `Clock` / `Sleeper`の注入 | **Dependency Injection** | 同じ |
@@ -387,6 +413,9 @@ closed（通常）  ──失敗が続く──▶  open（遮断）  ──一�
 | **L1〜L4** | Test層。L1〜L3は外部通信なし、**L4だけ実Mercariへ接続する**（[Test運用規約 §3](test-policy.md#3-test層)） |
 | **ライブ受入検証（L4）** | 実Mercariへ接続する**手動・低頻度の作業**。Green / RedではなくMarkdownの結果文書を作る |
 | **Seller Knowledge** | 出品Titleから推定する専門性の指標。**購入判断ではなく探索順の補助** |
+| **出品の幅** | 出品のうちTCG以外がどれだけあるか。**Seller Knowledgeと同じ標本・同じ閾値を逆向きに読んだもの**（[出品者探索 §3](../product/seller-discovery-spec.md#3-出品の幅)） |
+| **調べる（evaluation）** | 出品者1人を**浅く**収集すること。Profileと各状態1ページで3 Request。Seller画面の収集（analysis）と同じUse caseを、上限だけ変えて呼ぶ |
+| **出品者リスト** | 読み手が出品者について下した決定の記録。保存リストと除外リストの2つ |
 
 **`CollectionMeta`がこのProductの中心にある。** 「取れた範囲」と「Mercari全体」を混同させないことが
 Product要件だからで、件数だけを返して範囲を黙るAPIにはしていない。
@@ -441,6 +470,7 @@ Yahoo!フリマのような2つ目を足す場合を想定する。
 | 1 | **`uvicorn --workers 2`で、共有している4つが2つずつできる。** 間隔も安全停止も壊れる | **恒久的な限界。** 1 Process前提とし、[src/backend/README.md](../../src/backend/README.md)へ明記した |
 | 2 | `MarketplacePort`の中立性が、実Marketplace1つでしか確かめられていない | 2つ目を足すまで検証不能 |
 | 3 | `created_at`が「出品日時」かを検証する手段が無い | **恒久的な限界。** 画面へ明示する（[TODO](../planning/todo.md#created_atcreated-最優先)） |
+| 4 | **出品者リストのファイルを書くのが1 Processであることに頼っている。**読んでから書くまでに排他が無い | 1の前提がある限り起きない。**Processを増やすなら、1と一緒に壊れる** |
 
 **消さずに残す。** 弱点の欄が空の文書は、弱点が無いことではなく探していないことを意味する。
 

@@ -15,8 +15,13 @@ import { FailureNotice } from "../components/FailureNotice";
 import { FilterControls } from "../components/FilterControls";
 import { ItemGrid } from "../components/ItemGrid";
 import { SearchForm } from "../components/SearchForm";
+import { SellerCandidates } from "../components/SellerCandidates";
+import { SellerListError } from "../components/SellerListNote";
+import { Tabs } from "../components/Tabs";
 import { conditionChoices, hasActiveFilter, visibleItems } from "../searchQuery";
 import { useSearchState } from "../searchState";
+import { excludedSellerIds, withoutExcluded } from "../sellerCandidates";
+import { useSellerDiscovery, type SearchTab } from "../sellerDiscoveryState";
 import type { ApiFailureKind } from "../api/client";
 import {
   EMPTY_SEARCH_FORM,
@@ -109,12 +114,31 @@ export function SearchPage() {
     void runSearch(checked.keyword, checked.band);
   };
 
+  const { entries, searchTab, setSearchTab, showExcluded, setShowExcluded } =
+    useSellerDiscovery();
+
+  // The excluded list is applied before anything else narrows the result, and
+  // it is applied here rather than in the backend: the response stays the
+  // whole range the search reached, and what the reader chose not to see is
+  // counted on screen instead of silently missing (出品者探索 §7).
+  const held = useMemo(
+    () =>
+      result ? withoutExcluded(result.items, excludedSellerIds(entries)) : null,
+    [result, entries],
+  );
+  const inView = useMemo(
+    () => (result && held ? (showExcluded ? result.items : held.kept) : []),
+    [result, held, showExcluded],
+  );
+
   const shown = useMemo(
     () =>
-      result
-        ? visibleItems(result.items, filters, sort, result.meta.collectedAt)
-        : [],
-    [result, filters, sort],
+      result ? visibleItems(inView, filters, sort, result.meta.collectedAt) : [],
+    [result, inView, filters, sort],
+  );
+  const sellerCount = useMemo(
+    () => new Set(inView.map((item) => item.sellerId)).size,
+    [inView],
   );
 
   // Built from what came back, not from a second copy of Mercari's table:
@@ -173,29 +197,69 @@ export function SearchPage() {
             busy={busy}
           />
 
-          <FilterControls
-            values={filterForm}
-            errors={filterErrors}
-            sort={sort}
-            conditions={conditions}
-            onChange={setFilterForm}
-            onSortChange={setSort}
-          />
+          {held && held.heldBack.length > 0 && (
+            // Above the tabs because it is true of both of them. The count is
+            // the point: an excluded seller's listings are not gone, and the
+            // reader can always see how many were kept back and look at them.
+            <p className={styles.heldBack}>
+              除外リストの出品者 {held.heldBackSellerCount.toLocaleString("ja-JP")}人・
+              {held.heldBack.length.toLocaleString("ja-JP")}件を
+              {showExcluded ? "含めて表示しています" : "表示していません"}
+              <button
+                type="button"
+                className={styles.toggle}
+                onClick={() => setShowExcluded(!showExcluded)}
+              >
+                {showExcluded ? "隠す" : "表示する"}
+              </button>
+            </p>
+          )}
 
-          {result.items.length === 0 && (
+          {result.items.length === 0 ? (
             <p className={styles.empty}>
               条件を変えて、もう一度お試しください
             </p>
-          )}
+          ) : (
+            <Tabs<SearchTab>
+              label="検索結果の見方"
+              tabs={[
+                { key: "items", label: "商品", count: shown.length },
+                { key: "sellers", label: "出品者", count: sellerCount },
+              ]}
+              active={searchTab}
+              onChange={setSearchTab}
+            >
+              {searchTab === "items" ? (
+                <>
+                  <FilterControls
+                    values={filterForm}
+                    errors={filterErrors}
+                    sort={sort}
+                    conditions={conditions}
+                    onChange={setFilterForm}
+                    onSortChange={setSort}
+                  />
 
-          {result.items.length > 0 && shown.length === 0 && (
-            <p className={styles.empty}>
-              取得範囲内では一致なし（取得した{result.meta.uniqueItemCount.toLocaleString("ja-JP")}件のうち0件）
-            </p>
-          )}
+                  {shown.length === 0 && (
+                    <p className={styles.empty}>
+                      取得範囲内では一致なし（取得した{result.meta.uniqueItemCount.toLocaleString("ja-JP")}件のうち0件）
+                    </p>
+                  )}
 
-          {shown.length > 0 && (
-            <ItemGrid items={shown} collectedAt={result.meta.collectedAt} />
+                  {shown.length > 0 && (
+                    <ItemGrid
+                      items={shown}
+                      collectedAt={result.meta.collectedAt}
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <SellerListError />
+                  <SellerCandidates items={inView} />
+                </>
+              )}
+            </Tabs>
           )}
         </>
       )}

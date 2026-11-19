@@ -21,6 +21,18 @@ from mercapi.models import Item, Profile, SearchResults, SellerItemsPage
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def no_seller_lists_in_the_real_home_directory(tmp_path, monkeypatch):
+    """Point the seller lists at a directory that belongs to this test.
+
+    `create_app` keeps the reader's seller lists in a file under the home
+    directory unless told otherwise. A test that asked about them through the
+    default would then read, or write, the lists of whoever ran the suite.
+    Nothing is created here: the file store touches no disk until it is used.
+    """
+    monkeypatch.setenv("CARD_DIGGER_DATA_DIR", str(tmp_path / "card-digger-data"))
+
+
 def load_fixture(name: str) -> dict:
     """Read one fixture file.
 

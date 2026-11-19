@@ -1,7 +1,7 @@
 /**
  * The only place the frontend reaches the backend.
  *
- * Components and pages never call `fetch`. Everything goes through the two
+ * Components and pages never call `fetch`. Everything goes through the
  * functions below, which is what makes a cache, a retry or a measurement a
  * change to one file rather than a change to every screen
  * (MVP specification section 2.1). The backend counterpart of this seam is
@@ -18,6 +18,9 @@ import type {
   Operation,
   SearchResponse,
   SellerAnalysisResponse,
+  SellerEvaluationResponse,
+  SellerListKind,
+  SellerListsResponse,
 } from "../types/api";
 
 /**
@@ -30,6 +33,15 @@ import type {
  */
 export const SEARCH_TIMEOUT_MS = 40_000;
 export const SELLER_ANALYSIS_TIMEOUT_MS = 70_000;
+/**
+ * A brief look at one seller: three Mercari requests, two seconds apart.
+ *
+ * Longer than that takes, because the backend runs one collection at a time
+ * and this one may be waiting behind a search that is still going.
+ */
+export const SELLER_EVALUATION_TIMEOUT_MS = 50_000;
+/** The seller lists are a local file. Nothing here waits on Mercari. */
+export const SELLER_LISTS_TIMEOUT_MS = 5_000;
 
 /**
  * What the screen reacts to, from the section 9 table.
@@ -341,6 +353,64 @@ export function sellerAnalysis(
     `/api/sellers/${encodeURIComponent(sellerId)}/analysis`,
     { method: "GET" },
     SELLER_ANALYSIS_TIMEOUT_MS,
+  );
+}
+
+/**
+ * The profile and one page of each status, with the bands computed over them.
+ *
+ * What is asked once for each seller a search turned up. It returns no
+ * listings; opening the seller collects those.
+ */
+export function sellerEvaluation(
+  sellerId: string,
+): Promise<SellerEvaluationResponse> {
+  return request<SellerEvaluationResponse>(
+    `/api/sellers/${encodeURIComponent(sellerId)}/evaluation`,
+    { method: "GET" },
+    SELLER_EVALUATION_TIMEOUT_MS,
+  );
+}
+
+/** The sellers the reader saved and excluded. Sends no request to Mercari. */
+export function sellerLists(): Promise<SellerListsResponse> {
+  return request<SellerListsResponse>(
+    "/api/seller-lists",
+    { method: "GET" },
+    SELLER_LISTS_TIMEOUT_MS,
+  );
+}
+
+/**
+ * Put a seller on a list, replacing the entry they already had.
+ *
+ * Answers with both lists as they now stand, so the screen shows what was
+ * stored rather than what it believes it sent.
+ */
+export function putSellerListEntry(
+  sellerId: string,
+  kind: SellerListKind,
+  note: string,
+): Promise<SellerListsResponse> {
+  return request<SellerListsResponse>(
+    `/api/seller-lists/${encodeURIComponent(sellerId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, note }),
+    },
+    SELLER_LISTS_TIMEOUT_MS,
+  );
+}
+
+/** Take a seller off whichever list they are on. Answers with what is left. */
+export function removeSellerListEntry(
+  sellerId: string,
+): Promise<SellerListsResponse> {
+  return request<SellerListsResponse>(
+    `/api/seller-lists/${encodeURIComponent(sellerId)}`,
+    { method: "DELETE" },
+    SELLER_LISTS_TIMEOUT_MS,
   );
 }
 

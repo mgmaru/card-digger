@@ -201,6 +201,65 @@ export type SellerAnalysisResponse = {
   sellerIsInactive: boolean | null;
 };
 
+/**
+ * How much of a seller's shelf is something other than trading cards.
+ *
+ * `narrow` is at least half trading cards, `mixed` a fifth to a half, `wide`
+ * under a fifth. The two thresholds are the ones Seller Knowledge uses, read
+ * the other way, so this is a hypothesis exactly as that is.
+ */
+export type BreadthLevel = "unknown" | "narrow" | "mixed" | "wide";
+
+export type SellerBreadth = {
+  analyzedItemCount: number;
+  /** Listings whose title matched no trading card keyword. */
+  otherItemCount: number;
+  /** `0` when nothing was analysed. Meaningless then; `level` is `unknown`. */
+  otherRatio: number;
+  level: BreadthLevel;
+};
+
+/**
+ * One seller, looked at briefly.
+ *
+ * The profile and one page of each status, and **no listings**: this is asked
+ * once per seller a search turned up, so it carries the bands and the counts
+ * behind them and leaves the listings to the seller screen.
+ *
+ * `truncated` on either `meta` is the usual answer and not a fault. It says
+ * the bands were computed over the first page and no further.
+ */
+export type SellerEvaluationResponse = {
+  seller: Seller;
+  knowledge: SellerKnowledge;
+  breadth: SellerBreadth;
+  onSaleMeta: CollectionMeta;
+  soldOutMeta: CollectionMeta;
+};
+
+/** Which of the reader's two lists a seller is on. */
+export type SellerListKind = "saved" | "excluded";
+
+/**
+ * One seller the reader chose to remember.
+ *
+ * The identifier and the reader's own decision. **Nothing the marketplace said
+ * about the seller is stored**, so there is no name here: it is read from
+ * Mercari when the seller is opened (ADR 0004).
+ */
+export type SellerListEntry = {
+  sellerId: string;
+  kind: SellerListKind;
+  addedAt: IsoDateTime;
+  /** The reader's own words. Empty when they wrote nothing. */
+  note: string;
+};
+
+/** Both lists as one sequence, oldest entry first. Every change returns this. */
+export type SellerListsResponse = {
+  entries: SellerListEntry[];
+};
+
 /** Whether the safety stop is holding, and for how long. */
 export type SafetyStopStatus = {
   active: boolean;

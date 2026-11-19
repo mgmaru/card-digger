@@ -7,17 +7,18 @@
 1. [アプリコンセプト](product/concept.md)
 2. [MVP実装仕様](product/mvp-spec.md)
 3. [商品画面 実装仕様](product/item-screen-spec.md)
-4. [視覚方針 — 色・書体・余白](product/design-tokens.md)
-5. [開発ロードマップ / TODO](planning/todo.md)
-6. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
-7. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
-8. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
-9. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
-10. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
-11. [アーキテクチャと用語](development/architecture.md)
-12. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
-13. [Test運用規約](development/test-policy.md)
-14. [CIとMerge基準](development/ci-policy.md)
+4. [出品者探索 実装仕様](product/seller-discovery-spec.md)
+5. [視覚方針 — 色・書体・余白](product/design-tokens.md)
+6. [開発ロードマップ / TODO](planning/todo.md)
+7. [Phase 0-E Mercari取得方式の選定結果](phase-0/phase-0-e-selection.md)
+8. [Phase 0-F Mercari Adapter実装仕様](phase-0/phase-0-f-adapter-spec.md)
+9. [Phase 0-F Auction情報の追加検証計画](phase-0/phase-0-f-auction-validation.md)
+10. [Phase 0-F ライブ受入検証実施計画](phase-0/phase-0-f-live-acceptance.md)
+11. [Phase 0-F ライブ受入検証結果](phase-0/phase-0-f-live-acceptance-result.md)
+12. [アーキテクチャと用語](development/architecture.md)
+13. [mercapi Fork運用手順](development/mercapi-fork-operations.md)
+14. [Test運用規約](development/test-policy.md)
+15. [CIとMerge基準](development/ci-policy.md)
 
 振り返りは実装に必要ではないが、同じ失敗を繰り返さないために残す。
 
@@ -32,7 +33,8 @@ docs/
 │   ├── concept.md
 │   ├── design-tokens.md
 │   ├── item-screen-spec.md
-│   └── mvp-spec.md
+│   ├── mvp-spec.md
+│   └── seller-discovery-spec.md
 ├── planning/
 │   └── todo.md
 ├── development/
@@ -46,7 +48,8 @@ docs/
 ├── adr/
 │   ├── 0001-run-on-home-windows-via-tailscale.md
 │   ├── 0002-switch-deploy-target-by-configuration.md
-│   └── 0003-deploy-changes-to-the-target.md
+│   ├── 0003-deploy-changes-to-the-target.md
+│   └── 0004-store-seller-lists-in-a-local-file.md
 ├── questions/
 │   ├── 2026-11-08-reaching-home-server-from-devices.md
 │   ├── 2026-11-08-what-binding-to-0000-means.md
@@ -79,6 +82,8 @@ docs/
 - [mvp-spec.md](product/mvp-spec.md): **MVPの3画面**（検索・Seller・Seller Knowledge）の正本
 - [item-screen-spec.md](product/item-screen-spec.md):
   **商品画面**（商品1件について買うかを決める画面）の振る舞いと受入条件の正本。**2026-09-05設計**
+- [seller-discovery-spec.md](product/seller-discovery-spec.md):
+  **出品者探索**（検索結果の「出品者」Tab、出品者リスト画面、除外）の振る舞いと受入条件の正本。**2026-11-19決定**
 - [design-tokens.md](product/design-tokens.md):
   色・書体・余白・Badgeの見え方を決めるときの制約と、決めた値。**2026-09-02決定**
 
@@ -123,6 +128,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
   デプロイ先を設定だけで切り替えられる形にする。5論点の選択肢とメリット・デメリット。**保留**
 - [0003-deploy-changes-to-the-target.md](adr/0003-deploy-changes-to-the-target.md):
   変更をデプロイ先へ反映する方法。きっかけ・成果物・CIでの検査・可用性の目標・切り替え方・事前確認・細部を**2026-11-09決定**
+- [0004-store-seller-lists-in-a-local-file.md](adr/0004-store-seller-lists-in-a-local-file.md):
+  出品者リスト（保存 / 除外）をローカルのファイルへ保存する。何を保存するか、どこへ置くか、除外をどこで適用するか。
+  **2026-11-19決定。**形式と置き場所は利用者の確認待ち
 
 書き方の約束。
 

@@ -298,6 +298,15 @@ DOM向けのexportを持つ。
 
 これらはMVP完成後に、価値と運用条件を再評価して追加する。
 
+**2026-11-19に、次の3件を再評価して[出品者探索](seller-discovery-spec.md)として追加した。**
+この節の一覧は「MVPに含めなかったもの」の記録として、書き換えずに残す。
+
+| 上の項目 | 再評価の結果 |
+|---|---|
+| お気に入り、確認済みFlag、商品・Seller Memo | **出品者についてだけ**追加した。保存リスト・除外リストとメモ（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)）。商品には無い |
+| Seller Knowledgeによる検索結果全体のFilter / Ranking | 検索結果の出品者を**並べ替える**画面を追加した。自動では調べず、絞り込みもしない（[出品者探索 §4](seller-discovery-spec.md#4-出品者を調べる)） |
+| 検索条件保存、除外Keyword | **出品者の除外だけ**追加した。Keywordによる除外は[O-7](../planning/todo.md#オプション--判断済みで保留しているもの)のまま保留 |
+
 ## 5. 検索画面
 
 ### 5.1 入力
@@ -1264,7 +1273,8 @@ Buttonが消えて理由が分からないことより良い。
 - Backendは既定で`127.0.0.1`へBindし、認証なしの状態でLAN・Internetへ公開しない
 - 他の端末からは`tailscale serve`を経由してTailnet内だけで使う（[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)）
 - CORSは実際に使用するLocal Frontend Originだけを許可する
-- 商品・Seller情報をDatabaseへ保存しない
+- 商品・Seller情報をDatabaseへ保存しない。**保存するのは出品者リスト（Seller ID、種別、追加日時、
+  読み手のメモ）だけで、ファイル1つに置く**（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)、2026-11-19）
 - 画像はMercariのHTTPS URLをBrowserで表示し、Backendに保存しない
 - 検索・分析結果は画面を閉じた後の復元を保証しない
 - 検索・分析結果をBrowserの永続Storage（localStorage / sessionStorage / IndexedDB）へ保存しない

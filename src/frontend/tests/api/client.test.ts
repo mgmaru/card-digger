@@ -8,7 +8,16 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, health, search, sellerAnalysis } from "../../src/api/client";
+import {
+  ApiError,
+  health,
+  putSellerListEntry,
+  removeSellerListEntry,
+  search,
+  sellerAnalysis,
+  sellerEvaluation,
+  sellerLists,
+} from "../../src/api/client";
 
 function respondWith(
   status: number,
@@ -314,6 +323,10 @@ describe("the seller analysis request", () => {
   it.each([
     ["search", () => search("ポケカ")],
     ["sellerAnalysis", () => sellerAnalysis("100000001")],
+    ["sellerEvaluation", () => sellerEvaluation("100000001")],
+    ["sellerLists", () => sellerLists()],
+    ["putSellerListEntry", () => putSellerListEntry("100000001", "saved", "")],
+    ["removeSellerListEntry", () => removeSellerListEntry("100000001")],
     ["health", () => health()],
   ])("%s asks by a root path, without an origin", async (_name, call) => {
     let requested: string | undefined;
@@ -331,5 +344,82 @@ describe("the seller analysis request", () => {
     await call();
 
     expect(requested).toMatch(/^\/api\//);
+  });
+});
+
+describe("the requests behind finding sellers", () => {
+  function recordRequests(body: unknown = { entries: [] }) {
+    const sent: { url: string; init: RequestInit | undefined }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        sent.push({ url: String(input), init });
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    return sent;
+  }
+
+  it("asks for a brief look by its own path, not the analysis one", async () => {
+    // The two differ in depth by a factor of five. Asking for the wrong one
+    // would spend up to twelve Mercari requests on each seller in a result.
+    const sent = recordRequests({});
+
+    await sellerEvaluation("a b/c");
+
+    expect(sent[0]?.url).toBe("/api/sellers/a%20b%2Fc/evaluation");
+    expect(sent[0]?.init?.method).toBe("GET");
+  });
+
+  it("puts a seller on a list with the kind and the note in the body", async () => {
+    const sent = recordRequests();
+
+    await putSellerListEntry("100 1", "excluded", "専門の出品者");
+
+    expect(sent[0]?.url).toBe("/api/seller-lists/100%201");
+    expect(sent[0]?.init?.method).toBe("PUT");
+    expect(JSON.parse(String(sent[0]?.init?.body))).toEqual({
+      kind: "excluded",
+      note: "専門の出品者",
+    });
+  });
+
+  it("takes a seller off the lists with a DELETE and no body", async () => {
+    const sent = recordRequests();
+
+    await removeSellerListEntry("1001");
+
+    expect(sent[0]?.url).toBe("/api/seller-lists/1001");
+    expect(sent[0]?.init?.method).toBe("DELETE");
+    expect(sent[0]?.init?.body).toBeUndefined();
+  });
+
+  it("returns the lists as the backend holds them after a change", async () => {
+    const entries = [
+      { sellerId: "1001", kind: "saved", addedAt: "2026-11-19T03:00:00Z", note: "" },
+    ];
+    recordRequests({ entries });
+
+    await expect(putSellerListEntry("1001", "saved", "")).resolves.toEqual({ entries });
+  });
+
+  it("reports a note too long to keep as invalid input", async () => {
+    respondWith(422, { detail: { code: "invalid_input", field: "note" } });
+
+    expect(await kindOf(() => putSellerListEntry("1001", "saved", "…"))).toBe(
+      "invalid_input",
+    );
+  });
+
+  it("does not call a list file that cannot be read a marketplace failure", async () => {
+    // 500 is not one of the statuses section 8 gives the marketplace. A
+    // screen that read it as `upstream` would tell the reader Mercari had
+    // not answered, about a file on their own disk.
+    respondWith(500, { detail: { code: "seller_lists_unavailable" } });
+
+    expect(await kindOf(() => sellerLists())).toBe("unexpected");
   });
 });

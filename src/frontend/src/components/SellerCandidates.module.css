@@ -1,0 +1,208 @@
+/* 出品者の一覧。値は tokens.css の変数だけを使う（視覚方針 §3）。
+   主役は写真ではなく人なので、Gridではなく行で並べる。1行が1人。 */
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+/* 記録の声（視覚方針 §3.4）。こちらが数えた値なので明朝で組む。 */
+.tally {
+  margin: 0;
+  font-family: var(--font-record);
+  font-size: var(--text-sub);
+}
+
+.tally b {
+  font-weight: 400;
+  font-size: var(--text-head);
+  font-variant-numeric: tabular-nums;
+}
+
+.sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sortLabel {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+/* 調べるButtonと、その代償。Buttonの隣に必ず「何回問い合わせるか」を置く。
+   押す前に分かることが、この画面でいちばん大事な情報である。 */
+.look {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.cost,
+.progress {
+  margin: 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+}
+
+.progress {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.quiet {
+  background: none;
+  color: var(--ink);
+  border-color: var(--ink-quiet);
+}
+
+.quiet:hover {
+  background: var(--sheet);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 広い画面では3つの塊を横に並べる: 誰か / 分かったこと / どうするか。
+   狭い画面ではそのまま縦に積む。列を別の体系にはしない。 */
+.row {
+  display: grid;
+  /* 3列目は固定幅にする。行ごとに別のGridなので、`auto`だとButtonの数で
+     2列目の左端が行ごとにずれ、縦に読み比べられなくなる。
+     17emは「保存リスト」の印と2つのButtonが1行に収まる幅。 */
+  grid-template-columns: minmax(12em, 1.1fr) minmax(18em, 2fr) 17em;
+  gap: var(--space-3) var(--space-5);
+  align-items: start;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.who {
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: var(--leading-dense);
+  overflow-wrap: anywhere;
+}
+
+/* 一致した出品のうち最初の1件のTitle。誰のことかを思い出す手掛かりで、
+   読ませる文ではないので1行で切る。全文はtitle属性とリンク先にある。 */
+.sample {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sample a {
+  color: inherit;
+  text-decoration-style: dashed;
+}
+
+.facts {
+  margin: 0;
+  min-width: 0;
+}
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+  line-height: var(--leading-dense);
+}
+
+.fact dt {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  /* 値の左端を揃える。全角6字で「一致した出品」まで収まる。 */
+  flex: 0 0 6.5em;
+}
+
+.fact dd {
+  margin: 0;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 帯は判定、件数はその根拠。Seller Knowledgeの帯と同じく、判定だけを
+   記録の声で少し大きく組み、根拠は静かに添える。太らせない。 */
+.band {
+  font-family: var(--font-record);
+  font-size: var(--text-sub);
+  line-height: 1;
+}
+
+.basis {
+  margin-left: var(--space-3);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+/* まだ分かっていないことは、値の濃さで書かない。 */
+.pending {
+  color: var(--ink-quiet);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.taken {
+  margin: 0;
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: var(--space-6) 0;
+  color: var(--ink-quiet);
+}
+
+/* 朱の縦罫は1つの意味しか持たない —— Card Diggerが自分の限界を書き足した行。
+   文字は墨のまま（視覚方針 §3.3）。 */
+.limits {
+  max-width: var(--measure);
+  margin-top: var(--space-5);
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.limits p {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    align-items: flex-start;
+  }
+}

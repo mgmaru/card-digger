@@ -31,3 +31,24 @@
 .price {
   font-variant-numeric: tabular-nums;
 }
+
+/* 除外リストで出していない件数。読み手が自分で決めたことの確認であって
+   取得の限界ではないので、朱の縦罫は使わない（視覚方針 §3.3）。 */
+.heldBack {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+}
+
+.toggle {
+  margin-left: var(--space-3);
+  background: none;
+  color: var(--ink);
+  border-color: var(--ink-quiet);
+  font-size: var(--text-note);
+}
+
+.toggle:hover {
+  background: var(--sheet);
+}

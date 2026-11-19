@@ -22,6 +22,7 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
+from card_digger.application.seller_breadth import BreadthLevel, SellerBreadth
 from card_digger.application.seller_knowledge import KnowledgeLevel, SellerKnowledge
 from card_digger.domain.errors import ErrorCode, Operation
 from card_digger.domain.models import (
@@ -33,6 +34,8 @@ from card_digger.domain.models import (
     RatingBreakdown,
     SaleFormat,
     Seller,
+    SellerListEntry,
+    SellerListKind,
 )
 
 
@@ -324,6 +327,96 @@ class SellerAnalysisResponse(CamelModel):
     #: the profile: the profile carries no such field, and this is read from one
     #: of the seller's listings.
     seller_is_inactive: bool | None = None
+
+
+class SellerBreadthResponse(CamelModel):
+    """How much of a seller's shelf is something other than trading cards.
+
+    The same sample as `SellerKnowledgeResponse`, read the other way, with the
+    same two thresholds. A band with its counts, and a hypothesis like the
+    indicator it is derived from.
+    """
+
+    analyzed_item_count: int
+    other_item_count: int
+    other_ratio: float
+    level: BreadthLevel
+
+    @classmethod
+    def of(cls, breadth: SellerBreadth) -> "SellerBreadthResponse":
+        return cls(
+            analyzed_item_count=breadth.analyzed_item_count,
+            other_item_count=breadth.other_item_count,
+            other_ratio=breadth.other_ratio,
+            level=breadth.level,
+        )
+
+
+class SellerEvaluationResponse(CamelModel):
+    """One seller, looked at briefly: who they are and what their shelf is like.
+
+    **No listings.** This is asked once per seller a search turned up, so it
+    carries the two bands and the counts behind them and leaves the listings
+    to the seller screen, which collects them properly when one seller is
+    opened.
+
+    The two `meta` say how far each status got. One page each is the plan, so
+    `truncated` is the usual answer and is not a fault: it is what tells a
+    screen that the bands were computed over the first page and no further.
+    """
+
+    seller: SellerResponse
+    knowledge: SellerKnowledgeResponse
+    breadth: SellerBreadthResponse
+    on_sale_meta: CollectionMetaResponse
+    sold_out_meta: CollectionMetaResponse
+
+
+class SellerListEntryResponse(CamelModel):
+    """One seller the reader chose to remember.
+
+    The identifier and the reader's own decision about it. Nothing the
+    marketplace said about the seller is stored, so nothing of that kind is
+    here to return (ADR 0004).
+    """
+
+    seller_id: str
+    kind: SellerListKind
+    added_at: datetime
+    note: str
+
+    @classmethod
+    def of(cls, entry: SellerListEntry) -> "SellerListEntryResponse":
+        return cls(
+            seller_id=entry.seller_id,
+            kind=entry.kind,
+            added_at=entry.added_at,
+            note=entry.note,
+        )
+
+
+class SellerListsResponse(CamelModel):
+    """Both lists, as one sequence, oldest entry first.
+
+    Every change answers with this, the whole of it. The screen then shows
+    what is stored rather than what it believes it sent, and there is no
+    second copy on the frontend to fall out of step.
+    """
+
+    entries: list[SellerListEntryResponse]
+
+
+class SellerListPutRequest(CamelModel):
+    """Which list to put a seller on, and the reader's note about them.
+
+    The note's length is not checked here. It is measured after the whitespace
+    in it is collapsed, which is the application's rule, and a second limit
+    written here would be a second rule that could disagree with it. The
+    endpoint turns the application's refusal into the same 422.
+    """
+
+    kind: SellerListKind
+    note: str = ""
 
 
 class SafetyStopStatusResponse(CamelModel):

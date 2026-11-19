@@ -1,0 +1,45 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1 1 12em;
+  min-width: 0;
+}
+
+/* 行の主な操作ではないので枠だけにする。変更が無いあいだは押せない。 */
+.save {
+  background: none;
+  color: var(--ink);
+  border-color: var(--ink-quiet);
+}
+
+.save:hover {
+  background: var(--sheet);
+}
+
+.save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 朱の縦罫だけ。文字は墨のまま（視覚方針 §3.3）。 */
+.error {
+  max-width: var(--measure);
+  margin: var(--space-4) 0;
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
