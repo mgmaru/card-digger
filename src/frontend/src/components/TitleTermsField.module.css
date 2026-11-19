@@ -1,0 +1,30 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+.field {
+  max-width: var(--measure);
+  margin-top: var(--space-3);
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.how {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+}

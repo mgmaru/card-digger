@@ -36,6 +36,7 @@ import { ApiError, search, type ApiFailureKind } from "./api/client";
 import { excludedSellerIds, sellerCandidates, withoutExcluded } from "./sellerCandidates";
 import { useSellerDiscovery } from "./sellerDiscoveryState";
 import { chooseTargets, mergeItems } from "./sellerHunt";
+import { parseTitleTerms, withTitleTerms } from "./titleTerms";
 import type { CollectionMeta, Item } from "./types/api";
 import type { PriceBand } from "./validation";
 
@@ -96,7 +97,7 @@ const ENDS_THE_RUN: ReadonlySet<ApiFailureKind> = new Set([
 const SellerHuntContext = createContext<SellerHuntState | null>(null);
 
 export function SellerHuntProvider({ children }: { children: ReactNode }) {
-  const { entries, evaluations, evaluate, stopEvaluating, run } =
+  const { entries, evaluations, evaluate, stopEvaluating, run, titleTermsText } =
     useSellerDiscovery();
 
   const [phase, setPhase] = useState<HuntPhase>("idle");
@@ -113,8 +114,8 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
   // started several searches ago, and the lists and the looks may both have
   // changed since: somebody excluded while the searches ran must not be
   // looked at just because they were not excluded when the button was pressed.
-  const latest = useRef({ entries, evaluations });
-  latest.current = { entries, evaluations };
+  const latest = useRef({ entries, evaluations, titleTermsText });
+  latest.current = { entries, evaluations, titleTermsText };
   const looking = run.active;
 
   const start = useCallback(
@@ -180,9 +181,17 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
         }
 
         if (fatal === null && !stopRequested.current && found.length > 0) {
-          const { kept } = withoutExcluded(
+          const { kept: notExcluded } = withoutExcluded(
             found,
             excludedSellerIds(latest.current.entries),
+          );
+          // Nobody is looked at for a listing the reader's words keep back.
+          // A seller found only by a loose match would otherwise be first in
+          // line — one listing is the fewest there is — and cost three
+          // requests to be told about (出品者探索 §13).
+          const { kept } = withTitleTerms(
+            notExcluded,
+            parseTitleTerms(latest.current.titleTermsText),
           );
           const targets = chooseTargets(
             sellerCandidates(kept),

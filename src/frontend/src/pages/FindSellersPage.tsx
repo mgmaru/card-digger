@@ -29,6 +29,7 @@ import {
 } from "../components/SellerCandidates";
 import { SellerListError } from "../components/SellerListNote";
 import { Tabs } from "../components/Tabs";
+import { TitleTermsField } from "../components/TitleTermsField";
 import {
   REQUESTS_PER_EVALUATION,
   excludedSellerIds,
@@ -48,6 +49,7 @@ import {
   pileOf,
   type HuntPile,
 } from "../sellerHunt";
+import { parseTitleTerms, quoteTerms, withTitleTerms } from "../titleTerms";
 import { useSellerHunt, type KeywordOutcome } from "../sellerHuntState";
 import { NO_BAND, validateSearch, type PriceBand } from "../validation";
 
@@ -135,8 +137,15 @@ function KeywordRecord({ outcome }: { outcome: KeywordOutcome }) {
 
 export function FindSellersPage() {
   const hunt = useSellerHunt();
-  const { entries, evaluations, run, listSeller, listBusy, listsStatus } =
-    useSellerDiscovery();
+  const {
+    entries,
+    evaluations,
+    run,
+    listSeller,
+    listBusy,
+    listsStatus,
+    titleTermsText,
+  } = useSellerDiscovery();
 
   // One field to begin with, which is the search screen's own form. A second
   // search is a field the reader adds, never something a keystroke starts.
@@ -215,7 +224,16 @@ export function FindSellersPage() {
     () => withoutExcluded(hunt.items, excludedSellerIds(entries)),
     [hunt.items, entries],
   );
-  const candidates = useMemo(() => sellerCandidates(held.kept), [held.kept]);
+  // Then the reader's words, live as well. The run applied them when it
+  // chose whom to look at; here they decide who is on the list, so emptying
+  // the field brings back the sellers it kept off — not yet looked at, and
+  // said to be so.
+  const titleTerms = useMemo(() => parseTitleTerms(titleTermsText), [titleTermsText]);
+  const titled = useMemo(
+    () => withTitleTerms(held.kept, titleTerms),
+    [held.kept, titleTerms],
+  );
+  const candidates = useMemo(() => sellerCandidates(titled.kept), [titled.kept]);
   const piles = useMemo(() => {
     const sorted: Record<HuntPile, SellerCandidate[]> = {
       candidates: [],
@@ -312,6 +330,8 @@ export function FindSellersPage() {
             </p>
           )}
         </fieldset>
+
+        <TitleTermsField />
 
         <div className={styles.row}>
           {/* The unit sits outside the label, as on the search form, so the
@@ -431,6 +451,16 @@ export function FindSellersPage() {
                 {count(held.heldBack.length)}は対象から外しています。
               </p>
             )}
+            {titled.heldBack.length > 0 && (
+              <p>
+                タイトルに{quoteTerms(titleTerms)}
+                {titleTerms.length > 1 ? "のどれも" : "を"}含まない出品{" "}
+                {count(titled.heldBack.length)}は対象から外しています
+                {titled.goneSellerCount > 0 &&
+                  `（出品者 ${people(titled.goneSellerCount)}は、ほかに残る出品がありません）`}
+                。
+              </p>
+            )}
             {hunt.stoppedByReader && <p>途中で止めました。</p>}
           </div>
         </section>
@@ -487,6 +517,17 @@ export function FindSellersPage() {
           <SellerCandidateLimits />
         </Tabs>
       )}
+
+      {hunt.phase === "done" &&
+        hunt.items.length > 0 &&
+        candidates.length === 0 &&
+        titled.heldBack.length > 0 && (
+          // Found, and all of it kept back by the reader's own words. Saying
+          // nothing here would read as the search having found nothing.
+          <p className={styles.empty}>
+            見つかった出品は、すべて「タイトルに含む語」で外れています。語を変えるか、空欄にすると表示されます
+          </p>
+        )}
 
       {hunt.phase === "done" && hunt.items.length === 0 && !failure && (
         <p className={styles.empty}>

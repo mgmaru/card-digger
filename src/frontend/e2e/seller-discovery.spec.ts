@@ -210,3 +210,36 @@ test("going looking for sellers from one press", async ({ page }) => {
     page.getByText("除外リストの出品者 1人・10件を表示していません"),
   ).toBeVisible();
 });
+
+test("narrowing a result by the words in its titles", async ({ page }) => {
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname.startsWith("/api/") && pathname !== "/api/seller-lists") {
+      sent.push(pathname);
+    }
+  });
+
+  await page.goto("/");
+  await page.getByLabel("キーワード", { exact: true }).fill(KEYWORD);
+  await page.getByRole("button", { name: "検索", exact: true }).click();
+  await expect(page.getByRole("tab", { name: /出品者/ })).toContainText("2");
+
+  // --- A word no title contains keeps back everything, and says so ---------
+  await page.getByLabel("タイトルに含む語").fill("どの題名にも無い語");
+  await expect(page.getByText(/を含まない出品 12件を表示していません/)).toBeVisible();
+  await expect(page.getByRole("tab", { name: /商品/ })).toContainText("0");
+  await expect(page.getByRole("tab", { name: /出品者/ })).toContainText("0");
+
+  // --- Emptying the field brings it all back, and nothing was sent ---------
+  await page.getByLabel("タイトルに含む語").fill("");
+  await expect(page.getByRole("tab", { name: /出品者/ })).toContainText("2");
+  await expect(page.getByText(/含まない出品/)).toBeHidden();
+  expect(sent).toEqual(["/api/search"]);
+
+  // --- The same words are waiting on the other screen ----------------------
+  await page.getByLabel("タイトルに含む語").fill("ポケ");
+  await page.getByRole("link", { name: "出品者を探す" }).click();
+  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeVisible();
+  await expect(page.getByLabel("タイトルに含む語")).toHaveValue("ポケ");
+});

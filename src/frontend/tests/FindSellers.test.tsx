@@ -605,3 +605,91 @@ describe("when it cannot go on", () => {
     expect(screen.queryByRole("tablist", { name: "見つかった出品者" })).not.toBeInTheDocument();
   });
 });
+
+describe("the words a title has to contain", () => {
+  const titled = (id: string, sellerId: string, title: string): Item => ({
+    ...item(id, sellerId),
+    title,
+  });
+  const termsField = () => screen.getByLabelText("タイトルに含む語");
+  const record = () => screen.getByRole("region", { name: "探した範囲" });
+
+  beforeEach(() => {
+    // Reported from use: ポケモンカード 押入れ, one field, one search — and a
+    // NARUTO lot that says ポケモン nowhere. Mercari returns it; the title is
+    // what this side can check.
+    mocks.search.mockResolvedValue(
+      result([
+        titled("a", "home", "ポケモンカード まとめ"),
+        titled("b", "attic", "NARUTO カードゲーム まとめ売り ② 初期 ナルト"),
+        titled("c", "shop", "ポケカ 引退品"),
+      ]),
+    );
+  });
+
+  async function huntWith(terms: string) {
+    const user = userEvent.setup();
+    mount();
+    await user.type(field(), "ポケモンカード 押入れ");
+    if (terms !== "") {
+      await user.type(termsField(), terms);
+    }
+    await user.click(go());
+    await done();
+    return user;
+  }
+
+  it("look at everybody when no word is given, as before", async () => {
+    await huntWith("");
+
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["attic"], ["shop"]]);
+    expect(record()).not.toHaveTextContent("含まない出品");
+  });
+
+  it("spend no requests on a seller found only by a listing they keep back", async () => {
+    await huntWith("ポケモン ポケカ");
+
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["shop"]]);
+    expect(record()).toHaveTextContent("3件の出品から 2人の出品者");
+    expect(record()).toHaveTextContent(
+      "タイトルに「ポケモン」「ポケカ」のどれも含まない出品 1件は対象から外しています（出品者 1人は、ほかに残る出品がありません）。",
+    );
+    expect(screen.queryByText("屋根裏の人")).not.toBeInTheDocument();
+  });
+
+  it("bring the seller back, not yet looked at, when the field is emptied", async () => {
+    const user = await huntWith("ポケモン ポケカ");
+
+    await user.clear(termsField());
+
+    expect(record()).toHaveTextContent("3件の出品から 3人の出品者");
+    await user.click(tab(/その他/));
+    expect(rowNames()).toEqual(["Seller attic"]);
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("未調査");
+    // Emptying the field showed them. It did not go and ask about them.
+    expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(2);
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+  });
+
+  it("say so when the words keep back everything that was found", async () => {
+    await huntWith("遊戯王");
+
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/見つかった出品は、すべて「タイトルに含む語」で外れています/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/一致する出品がありませんでした/)).not.toBeInTheDocument();
+  });
+
+  it("are the same words on the search screen", async () => {
+    const user = await huntWith("ポケモン ポケカ");
+
+    await user.click(screen.getByRole("link", { name: "検索" }));
+    await user.type(screen.getByLabelText("キーワード"), "ポケモンカード 押入れ");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    expect(await screen.findByLabelText("タイトルに含む語")).toHaveValue("ポケモン ポケカ");
+    expect(screen.getByText(/含まない出品 1件を表示していません/)).toBeInTheDocument();
+  });
+});
+

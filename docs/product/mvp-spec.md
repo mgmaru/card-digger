@@ -305,7 +305,7 @@ DOM向けのexportを持つ。
 |---|---|
 | お気に入り、確認済みFlag、商品・Seller Memo | **出品者についてだけ**追加した。保存リスト・除外リストとメモ（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)）。商品には無い |
 | Seller Knowledgeによる検索結果全体のFilter / Ranking | 検索結果の出品者を**並べ替える**画面を追加した。自動では調べず、絞り込みもしない（[出品者探索 §4](seller-discovery-spec.md#4-出品者を調べる)） |
-| 検索条件保存、除外Keyword | **出品者の除外だけ**追加した。Keywordによる除外は[O-7](../planning/todo.md#オプション--判断済みで保留しているもの)のまま保留 |
+| 検索条件保存、除外Keyword | **出品者の除外だけ**追加した。Keywordによる除外は[O-7](../planning/todo.md#オプション--判断済みで保留しているもの)のまま保留。**取得した後にタイトルで絞る欄は足した**（[出品者探索 §13](seller-discovery-spec.md#13-タイトルに含む語2026-11-19追加)。Mercariへは送らない） |
 
 ## 5. 検索画面
 
