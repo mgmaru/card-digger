@@ -18,14 +18,18 @@ below and names no Mercari adapter, and a test asserts that.
 
 Search for `ポケカ まとめ`, open the 出品者 tab and press the button.
 
-| Seller | What their shelf is | 出品の幅 |
-|---|---|---|
-| `seller-household` | Clothes and kitchenware, two card lots | 広い |
-| `seller-clearing-out` | About a third trading cards | 中 |
-| `seller-card-shop` | Trading cards, in the words of the trade | 狭い |
-| `seller-retiring` | Three listings, all cards | 狭い（標本は少ない） |
-| `seller-one-listing` | Only the listing the search found | 狭い（1件） |
-| `300000006` | No profile. The look fails for this one alone | 取得できませんでした |
+| Seller | What their shelf is | 出品の幅 | 「出品者を探す」での分類 |
+|---|---|---|---|
+| `seller-household` | Clothes and kitchenware, two card lots | 広い | 候補 |
+| `seller-clearing-out` | About a third trading cards | 中 | 候補 |
+| `seller-card-shop` | Trading cards, in the words of the trade | 狭い | 専門らしい |
+| `seller-retiring` | Three listings, all cards | 狭い（標本は少ない） | 少数出品 |
+| `seller-one-listing` | Only the listing the search found | 狭い（1件） | 少数出品 |
+| `300000006` | No profile. The look fails for this one alone | 取得できませんでした | その他 |
+
+The same sellers serve both screens: the 出品者 tab under a search, and
+出品者を探す, where `ポケカ まとめ` and `ポケモンカード` on two lines show two
+searches being merged.
 
 Three things differ from `acceptance_app`, and only three.
 
@@ -176,7 +180,10 @@ _SHELVES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ),
         tuple(
             f"ポケカ {term} #{index}"
-            for index, term in enumerate(("SR", "AR", "BOX シュリンク付き", "PSA10") * 3)
+            # Sixteen, so that the shelf comes to thirty three listings. Thirty
+            # is where a sample stops being "low", and a shop that fell short
+            # of it would be filed with the people who listed three cards.
+            for index, term in enumerate(("SR", "AR", "BOX シュリンク付き", "PSA10") * 4)
         ),
     ),
     RETIRING.id: (("ポケモンカード スリーブ付き",), ("ポケカ デッキケース",)),
