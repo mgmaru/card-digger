@@ -14,8 +14,8 @@ import {
   MAX_KEYWORDS,
   chooseTargets,
   huntCeiling,
+  keywordsFrom,
   mergeItems,
-  parseKeywords,
   pileOf,
 } from "../src/sellerHunt";
 import type {
@@ -54,25 +54,35 @@ function looked(
   };
 }
 
-describe("the keywords in the box", () => {
-  it("are one to a line, trimmed, with blank lines dropped", () => {
-    expect(parseKeywords("  ポケカ 押入れ \n\n ポケモンカード 物置\n   ")).toEqual([
+describe("the keyword fields", () => {
+  it("are one search each, trimmed, with empty fields dropped", () => {
+    expect(keywordsFrom(["  ポケカ 押入れ ", "", " ポケモンカード 物置", "   "])).toEqual([
       "ポケカ 押入れ",
       "ポケモンカード 物置",
     ]);
   });
 
+  it("never split one field into two searches", () => {
+    // Two words on two lines of one box used to become two searches, and a
+    // listing that matched 押入れ alone came back under a question that had
+    // asked for both words. Whatever separates the words — a space, a
+    // full-width space, a line break pasted in — one field is one search.
+    expect(keywordsFrom(["ポケモンカード 押入れ"])).toEqual(["ポケモンカード 押入れ"]);
+    expect(keywordsFrom(["ポケモンカード　押入れ"])).toEqual(["ポケモンカード　押入れ"]);
+    expect(keywordsFrom(["ポケモンカード\n押入れ"])).toHaveLength(1);
+  });
+
   it("search for a keyword written twice only once", () => {
     // The second search would cost up to ten pages to bring back the same
     // listings.
-    expect(parseKeywords("ポケカ 断捨離\nポケカ 断捨離 \nポケカ 実家")).toEqual([
+    expect(keywordsFrom(["ポケカ 断捨離", "ポケカ 断捨離 ", "ポケカ 実家"])).toEqual([
       "ポケカ 断捨離",
       "ポケカ 実家",
     ]);
   });
 
   it("are nothing when nothing was typed", () => {
-    expect(parseKeywords("\n \n")).toEqual([]);
+    expect(keywordsFrom(["", " "])).toEqual([]);
   });
 });
 

@@ -21,31 +21,47 @@
   border-bottom: 1px solid var(--rule);
 }
 
-.field {
-  max-width: var(--measure);
-}
-
 .label {
   font-size: var(--text-note);
   color: var(--ink-quiet);
   white-space: nowrap;
 }
 
-/* 入力欄はinputと同じ面（視覚方針 §3.2）。base.cssはtextareaを含まないので、
-   ここで同じ値を当てる。 */
+/* キーワードの欄。1つの欄が1回の検索なので、欄を縦に並べて数が見えるようにする。
+   fieldsetの既定の枠と余白は消す（枠は操作できるものにだけ付ける。視覚方針 §3.2）。 */
 .keywords {
-  display: block;
-  width: 100%;
+  max-width: var(--measure);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.keywords legend {
+  padding: 0;
+}
+
+.keywordRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-1);
-  font: inherit;
-  letter-spacing: inherit;
+}
+
+.keyword {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.how {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-note);
   line-height: var(--leading-dense);
-  color: var(--ink);
-  background: var(--sheet);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-3);
-  resize: vertical;
+  color: var(--ink-quiet);
+}
+
+.more {
+  margin: var(--space-2) 0 0;
 }
 
 .row {

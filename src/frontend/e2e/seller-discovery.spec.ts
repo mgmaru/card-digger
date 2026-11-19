@@ -162,12 +162,16 @@ test("going looking for sellers from one press", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeVisible();
 
   // --- Nothing is sent until the press, and the press says what it can cost -
-  await page.getByLabel(/^キーワード/).fill(`${KEYWORD}\nどこにも無い語`);
+  // By role: each field's 外す button is named after the field as well.
+  await page.getByRole("textbox", { name: "キーワード 1" }).fill(KEYWORD);
+  await page.getByRole("button", { name: "別のキーワードでも探す" }).click();
+  await page.getByRole("textbox", { name: "キーワード 2" }).fill("どこにも無い語");
   await expect(page.getByText(/Mercariへ最大80回問い合わせます/)).toBeVisible();
   expect(sent).toEqual([]);
 
   // --- One press: both searches, then both sellers -------------------------
-  await page.getByRole("button", { name: "探す" }).click();
+  // Exact: the button that adds a field ends in the same word.
+  await page.getByRole("button", { name: "探す", exact: true }).click();
   await expect(page.getByText("12件の出品から 2人の出品者")).toBeVisible();
   expect(sent).toEqual([
     "/api/search",
