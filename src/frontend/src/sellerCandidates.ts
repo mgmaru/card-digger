@@ -114,7 +114,7 @@ export type CandidateSort = "found" | "breadth" | "condition" | "hits";
 export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
   found: "検索結果に出た順",
   breadth: "出品の幅が広い順",
-  condition: "商品の状態が良い順",
+  condition: "一致した出品の状態が良い順",
   hits: "一致した出品が多い順",
 };
 

@@ -144,6 +144,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 一致した出品の内訳。出品者についての項目（出品の幅、評価）と同じ段に並べると
+   出品者の性質に読めるので、件数の下へ1段下げて書く。値は墨のまま。 */
+.ofThose {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.ofThoseLabel {
+  margin-right: var(--space-3);
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
 /* 帯は判定、件数はその根拠。Seller Knowledgeの帯と同じく、判定だけを
    記録の声で少し大きく組み、根拠は静かに添える。太らせない。 */
 .band {

@@ -154,13 +154,19 @@ export function SellerCandidateRow({
       </div>
 
       <dl className={styles.facts}>
+        {/* The condition is not a fourth fact about the seller. It is a fact
+            about the listings counted on this line, so it is written under
+            that count and not beside 出品の幅 and 評価 as their equal
+            (出品者探索 §5.4). */}
         <div className={styles.fact}>
           <dt>一致した出品</dt>
-          <dd>{count(candidate.hits.length)}</dd>
-        </div>
-        <div className={styles.fact}>
-          <dt>商品の状態</dt>
-          <dd>{conditionSummary(candidate) || MISSING}</dd>
+          <dd>
+            {count(candidate.hits.length)}
+            <span className={styles.ofThose}>
+              <span className={styles.ofThoseLabel}>その商品の状態</span>
+              {conditionSummary(candidate) || MISSING}
+            </span>
+          </dd>
         </div>
         <div className={styles.fact}>
           <dt>出品の幅</dt>
@@ -334,7 +340,8 @@ export function SellerCandidateLimits() {
   return (
     <div className={styles.limits}>
       <p>
-        「一致した出品」と「商品の状態」は、この検索で取得した範囲の出品だけを数えています。
+        「一致した出品」と、その商品の状態は、この検索で取得した出品についてのものです。
+        出品者の出品全体の状態ではありません。
         商品の状態は出品者が選んだ区分であり、実物を確認したものではありません。
       </p>
       <p>
