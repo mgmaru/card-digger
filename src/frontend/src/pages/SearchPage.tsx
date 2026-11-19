@@ -17,6 +17,7 @@ import { ItemGrid } from "../components/ItemGrid";
 import { SearchForm } from "../components/SearchForm";
 import { SellerCandidates } from "../components/SellerCandidates";
 import { SellerListError } from "../components/SellerListNote";
+import { DISPLAY_STAGE_TITLE, FETCH_STAGE_TITLE, Stage } from "../components/Stage";
 import { Tabs } from "../components/Tabs";
 import { TitleTermsField } from "../components/TitleTermsField";
 import { conditionChoices, hasActiveFilter, visibleItems } from "../searchQuery";
@@ -173,14 +174,20 @@ export function SearchPage() {
 
   return (
     <section>
-      <SearchForm
-        values={draft}
-        errors={searchErrors}
-        busy={busy}
-        showExamples={status === "idle"}
-        onChange={setDraft}
-        onSubmit={submit}
-      />
+      <Stage
+        as="h2"
+        title={FETCH_STAGE_TITLE}
+        note="Mercariへ送ります。変えたときは「検索」を押して取得し直します。"
+      >
+        <SearchForm
+          values={draft}
+          errors={searchErrors}
+          busy={busy}
+          showExamples={status === "idle"}
+          onChange={setDraft}
+          onSubmit={submit}
+        />
+      </Stage>
 
       {status === "loading" && (
         // Section 9: no running count. A number climbing during collection
@@ -216,6 +223,12 @@ export function SearchPage() {
             busy={busy}
           />
 
+          {result.items.length > 0 && (
+          <Stage
+            as="h2"
+            title={DISPLAY_STAGE_TITLE}
+            note="取得した結果を手元で絞ります。Mercariへは送りません。変えるとすぐ反映され、戻せば元に戻ります。"
+          >
           {held && held.heldBack.length > 0 && (
             // Above the tabs because it is true of both of them. The count is
             // the point: an excluded seller's listings are not gone, and the
@@ -234,9 +247,8 @@ export function SearchPage() {
             </p>
           )}
 
-          {result.items.length > 0 && (
-            // Above the tabs, like the line about the excluded list: it
-            // decides what both of them hold.
+            {/* Above the tabs, like the line about the excluded list: it
+                decides what both of them hold. */}
             <>
               <TitleTermsField />
               {titled.heldBack.length > 0 && (
@@ -249,6 +261,7 @@ export function SearchPage() {
                 </p>
               )}
             </>
+          </Stage>
           )}
 
           {result.items.length === 0 ? (

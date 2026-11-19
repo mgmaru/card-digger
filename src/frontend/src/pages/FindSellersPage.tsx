@@ -29,6 +29,7 @@ import {
 } from "../components/SellerCandidates";
 import { SellerListError } from "../components/SellerListNote";
 import { Tabs } from "../components/Tabs";
+import { DISPLAY_STAGE_TITLE, FETCH_STAGE_TITLE, Stage } from "../components/Stage";
 import { TitleTermsField } from "../components/TitleTermsField";
 import {
   REQUESTS_PER_EVALUATION,
@@ -276,6 +277,10 @@ export function FindSellersPage() {
         キーワードごとに検索し、出てきた出品者を順に調べて、出品にカードがどれだけあるかで分けます。
       </p>
 
+      <Stage
+        title={FETCH_STAGE_TITLE}
+        note="Mercariへ送ります。変えたときは「探す」を押して取得し直します。"
+      >
       <form className={styles.form} onSubmit={submit} noValidate>
         <fieldset className={styles.keywords}>
           <legend className={styles.label}>キーワード</legend>
@@ -333,8 +338,6 @@ export function FindSellersPage() {
             </p>
           )}
         </fieldset>
-
-        <TitleTermsField />
 
         <div className={styles.row}>
           {/* The unit sits outside the label, as on the search form, so the
@@ -406,6 +409,7 @@ export function FindSellersPage() {
           </p>
         )}
       </form>
+      </Stage>
 
       {hunt.phase !== "idle" && (
         <section className={styles.record} aria-label="探した範囲">
@@ -454,20 +458,31 @@ export function FindSellersPage() {
                 {count(held.heldBack.length)}は対象から外しています。
               </p>
             )}
-            {titled.heldBack.length > 0 && (
-              <p>
-                タイトルに{quoteTerms(titleTerms)}
-                {titleTerms.length > 1 ? "のどれも" : "を"}含まない出品{" "}
-                {count(titled.heldBack.length)}は対象から外しています
-                {titled.goneSellerCount > 0 &&
-                  `（出品者 ${people(titled.goneSellerCount)}は、ほかに残る出品がありません）`}
-                。
-              </p>
-            )}
             {hunt.stoppedByReader && <p>途中で止めました。</p>}
           </div>
         </section>
       )}
+
+      {/* After what was collected, before what is shown of it. Here before
+          the first press as well: the words also decide whom a press looks
+          at, so they have to be settable before it — the one place where
+          narrowing the view changes what is sent, and the note says so. */}
+      <Stage
+        title={DISPLAY_STAGE_TITLE}
+        note="取得した結果を手元で絞ります。Mercariへは送りません。ただし「探す」は、ここで外れた出品しか無い出品者を調べないので、その分の問い合わせは減ります。"
+      >
+        <TitleTermsField />
+        {titled.heldBack.length > 0 && (
+          <p className={styles.narrowed}>
+            タイトルに{quoteTerms(titleTerms)}
+            {titleTerms.length > 1 ? "のどれも" : "を"}含まない出品{" "}
+            {count(titled.heldBack.length)}は対象から外しています
+            {titled.goneSellerCount > 0 &&
+              `（出品者 ${people(titled.goneSellerCount)}は、ほかに残る出品がありません）`}
+            。
+          </p>
+        )}
+      </Stage>
 
       {failure && failed && (
         <FailureNotice

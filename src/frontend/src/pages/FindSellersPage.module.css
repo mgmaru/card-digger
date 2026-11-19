@@ -123,7 +123,18 @@
 
 .record {
   max-width: var(--measure);
-  padding: var(--space-4) 0 0;
+  padding: var(--space-4) 0 var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* 表示の絞り込みで外れた件数。読み手が自分で決めたことの確認なので、朱は使わない
+   （出品者探索 §7 の除外の行と同じ扱い）。 */
+.narrowed {
+  max-width: var(--measure);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
 }
 
 .progress {
