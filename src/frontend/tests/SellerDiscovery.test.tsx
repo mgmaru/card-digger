@@ -303,7 +303,7 @@ describe("the 出品者 tab", () => {
     expect(shop.getAllByRole("term").map((term) => term.textContent)).toEqual([
       "一致した出品",
       "一致した出品の状態",
-      "出品の幅",
+      "カードの割合",
       "評価",
     ]);
     expect(shop.getAllByRole("definition")[1]).toHaveTextContent(
@@ -364,25 +364,30 @@ describe("looking at the sellers", () => {
     expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(3);
   });
 
-  it("fills in the name, the band with its counts, and the ratings", async () => {
+  it("fills in the name, the share of cards with its counts, and the ratings", async () => {
     const user = await searchAndOpenSellers();
     await user.click(lookButton());
     await screen.findByText("調べられる出品者は全員調べました");
 
     expect(rowNames()).toEqual(["カード専門店", "ゆうママ", "引っ越し中"]);
     const home = rows()[1] as HTMLElement;
-    expect(home).toHaveTextContent("広い");
-    // The counts travel with the band: 広い over 20 listings, not over 2.
-    expect(home).toHaveTextContent("TCG以外 18件 / 20件（90.0%）");
+    // The share of cards, not of everything else: 2 of this seller's 20
+    // listings are cards. The row once said 90.0%, the other 18, and read
+    // backwards beside a tab called カード専門.
+    expect(home).toHaveTextContent("カードの割合10.0%カード 2件 / 20件");
+    expect(home).not.toHaveTextContent("TCG以外");
+    // The counts travel with the share: 10% over 20 listings, not over 2.
+    const shop = rows()[0] as HTMLElement;
+    expect(shop).toHaveTextContent("カードの割合100.0%カード 20件 / 20件");
     expect(home).toHaveTextContent("良い 10・普通 2・悪い 0");
   });
 
-  it("sorts by breadth once there is a breadth to sort by", async () => {
+  it("sorts by the share of cards once there is one to sort by", async () => {
     const user = await searchAndOpenSellers();
     await user.click(lookButton());
     await screen.findByText("調べられる出品者は全員調べました");
 
-    await user.selectOptions(screen.getByLabelText("並び順"), "breadth");
+    await user.selectOptions(screen.getByLabelText("並び順"), "cardShare");
 
     expect(rowNames()).toEqual(["ゆうママ", "引っ越し中", "カード専門店"]);
     // Reading order only. Nobody was asked about again.

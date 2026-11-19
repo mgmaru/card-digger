@@ -18,7 +18,6 @@
 
 import { grade } from "./searchQuery";
 import type {
-  BreadthLevel,
   Item,
   SellerEvaluationResponse,
   SellerListEntry,
@@ -109,48 +108,72 @@ export function isOwedALook(record: EvaluationRecord | undefined): boolean {
   return record?.status !== "done" && record?.status !== "gone";
 }
 
-export type CandidateSort = "found" | "breadth" | "condition" | "hits";
+/**
+ * How much of a seller's shelf is trading cards, with the counts it rests on.
+ *
+ * **The share of cards, not of everything else.** The backend reports the
+ * other side — listings whose title named no trading card, as "breadth" —
+ * and the row once showed that number as it came. Under tabs named カード専門
+ * and 混ざっている it read backwards: a seller filed as a card specialist
+ * showed 45.3%, which was the part of their shelf that was *not* cards
+ * (reported from use, 2026-11-19). The same two counts, said from the side
+ * the rest of the screen speaks from.
+ *
+ * Null when nothing was analysed: there is no share of nothing.
+ */
+export type CardShare = { cardCount: number; analyzedCount: number; ratio: number };
+
+export function cardShare(evaluation: SellerEvaluationResponse): CardShare | null {
+  const { analyzedItemCount, otherItemCount } = evaluation.breadth;
+  if (analyzedItemCount === 0) {
+    return null;
+  }
+  const cardCount = analyzedItemCount - otherItemCount;
+  return {
+    cardCount,
+    analyzedCount: analyzedItemCount,
+    ratio: cardCount / analyzedItemCount,
+  };
+}
+
+export type CandidateSort = "found" | "cardShare" | "condition" | "hits";
 
 export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
   found: "検索結果に出た順",
-  breadth: "出品の幅が広い順",
+  cardShare: "カードの割合が低い順",
   condition: "一致した出品の状態が良い順",
   hits: "一致した出品が多い順",
 };
 
 export const CANDIDATE_SORT_ORDER: CandidateSort[] = [
   "found",
-  "breadth",
+  "cardShare",
   "condition",
   "hits",
 ];
 
 /**
- * Where a band sits when ordering by breadth. Smaller comes first.
+ * Where a seller sits when ordering by the share of cards. Smaller first.
  *
- * `unknown` — a seller looked at who had nothing listed to analyse — comes
- * after every real band. It is an answer, so it still comes before a seller
- * nobody has looked at yet.
+ * The share itself, lowest first. A seller looked at who had nothing listed
+ * to analyse comes after every real share: it is an answer, so it still comes
+ * before a seller nobody has looked at yet.
  */
-const BREADTH_ORDER: Record<BreadthLevel, number> = {
-  wide: 0,
-  mixed: 1,
-  narrow: 2,
-  unknown: 3,
-};
-const NOT_LOOKED_AT = 4;
+const NOTHING_TO_ANALYSE = 2;
+const NOT_LOOKED_AT = 3;
 
-function breadthOrder(record: EvaluationRecord | undefined): number {
-  return record?.status === "done"
-    ? BREADTH_ORDER[record.evaluation.breadth.level]
-    : NOT_LOOKED_AT;
+function cardShareOrder(record: EvaluationRecord | undefined): number {
+  if (record?.status !== "done") {
+    return NOT_LOOKED_AT;
+  }
+  return cardShare(record.evaluation)?.ratio ?? NOTHING_TO_ANALYSE;
 }
 
 /**
  * Order a copy of the candidates.
  *
  * Every order falls back to the order found, so two sellers that tie do not
- * swap places between renders — and so that sorting by breadth before anyone
+ * swap places between renders — and so that sorting by card share before anyone
  * has been looked at changes nothing, rather than shuffling the list.
  *
  * By condition, the seller whose *most worn* hit is least worn comes first: a
@@ -171,10 +194,10 @@ export function sortCandidates(
     switch (sort) {
       case "found":
         return found(a, b);
-      case "breadth":
+      case "cardShare":
         return (
-          breadthOrder(evaluations.get(a.sellerId)) -
-            breadthOrder(evaluations.get(b.sellerId)) || found(a, b)
+          cardShareOrder(evaluations.get(a.sellerId)) -
+            cardShareOrder(evaluations.get(b.sellerId)) || found(a, b)
         );
       case "condition":
         return (

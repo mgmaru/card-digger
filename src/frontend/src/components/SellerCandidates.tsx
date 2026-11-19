@@ -27,6 +27,7 @@ import {
   CANDIDATE_SORT_LABELS,
   CANDIDATE_SORT_ORDER,
   type CandidateSort,
+  cardShare,
   type EvaluationRecord,
   evaluationSeconds,
   isOwedALook,
@@ -37,18 +38,11 @@ import {
   sortCandidates,
 } from "../sellerCandidates";
 import { useSellerDiscovery } from "../sellerDiscoveryState";
-import type { BreadthLevel, Item, SellerEvaluationResponse } from "../types/api";
+import type { Item, SellerEvaluationResponse } from "../types/api";
 
 import { FailureNotice } from "./FailureNotice";
 import styles from "./SellerCandidates.module.css";
 import { SellerListButtons } from "./SellerListButtons";
-
-const BREADTH_LABELS: Record<BreadthLevel, string> = {
-  unknown: "判定不能",
-  narrow: "狭い",
-  mixed: "中",
-  wide: "広い",
-};
 
 const MISSING = "-";
 
@@ -132,7 +126,7 @@ export function SellerCandidateRow({
   const label = evaluation?.seller.name || `Seller ${candidate.sellerId}`;
   const first = candidate.hits[0];
   const ratings = evaluation?.seller.ratingBreakdown ?? null;
-  const breadth = evaluation?.breadth ?? null;
+  const share = evaluation ? cardShare(evaluation) : null;
 
   return (
     <li className={styles.row}>
@@ -184,27 +178,29 @@ export function SellerCandidateRow({
           <dt>一致した出品の状態</dt>
           <dd>{conditionSummary(candidate) || MISSING}</dd>
         </div>
+        {/* The share of cards, in the words the tabs use. It was the share
+            of everything else, under 出品の幅, and read backwards beside a tab
+            called カード専門 (出品者探索 §5.4). */}
         <div className={styles.fact}>
-          <dt>出品の幅</dt>
+          <dt>カードの割合</dt>
           <dd>
-            {breadth === null ? (
+            {evaluation === null ? (
               <span className={styles.pending}>
                 {record && record.status !== "done"
                   ? WAITING[record.status]
                   : NOT_LOOKED_AT}
               </span>
+            ) : share === null ? (
+              // Looked at, and nothing listed to count.
+              <span className={styles.pending}>判定不能</span>
             ) : (
               <>
-                <span className={styles.band}>{BREADTH_LABELS[breadth.level]}</span>
-                {/* The counts are not detail. 広い over three listings and
-                    over sixty are the same band and different claims. */}
-                {breadth.analyzedItemCount > 0 && (
-                  <span className={styles.basis}>
-                    TCG以外 {count(breadth.otherItemCount)} /{" "}
-                    {count(breadth.analyzedItemCount)}（
-                    {percent(breadth.otherRatio)}）
-                  </span>
-                )}
+                <span className={styles.band}>{percent(share.ratio)}</span>
+                {/* The counts are not detail. 100% over three listings and
+                    over sixty are the same share and different claims. */}
+                <span className={styles.basis}>
+                  カード {count(share.cardCount)} / {count(share.analyzedCount)}
+                </span>
               </>
             )}
           </dd>
@@ -361,8 +357,8 @@ export function SellerCandidateLimits() {
         商品の状態は出品者が選んだ区分であり、実物を確認したものではありません。
       </p>
       <p>
-        「出品の幅」は、販売中と売却済みそれぞれ最初の1ページのTitleから計算しています。
-        TCG以外の出品が多いほど広いと表示します。
+        「カードの割合」は、販売中と売却済みそれぞれ最初の1ページのTitleから数えています。
+        Titleにカードの語（ポケカ、トレカ、遊戯王など）が無い出品は、カードでも数えないので、実際より低めに出ます。
       </p>
       <p>
         閾値は仮説であり、精度を実証した値ではありません。

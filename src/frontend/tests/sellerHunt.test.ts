@@ -11,15 +11,15 @@ import { describe, expect, it } from "vitest";
 
 import { sellerCandidates, type EvaluationRecord } from "../src/sellerCandidates";
 import {
-  MAX_KEYWORDS,
   chooseTargets,
   huntCeiling,
   keywordsFrom,
+  MAX_KEYWORDS,
   mergeItems,
   pileOf,
+  SPECIALIST_FROM_CARD_PERCENT,
 } from "../src/sellerHunt";
 import type {
-  BreadthLevel,
   Item,
   KnowledgeLevel,
   SellerEvaluationResponse,
@@ -41,14 +41,16 @@ function item(id: string, sellerId: string): Item {
   };
 }
 
+/** A seller looked at, with this many cards among this many listings. */
 function looked(
-  level: BreadthLevel,
+  cards: number,
+  analyzed: number,
   sampleConfidence: KnowledgeLevel = "medium",
 ): EvaluationRecord {
   return {
     status: "done",
     evaluation: {
-      breadth: { level },
+      breadth: { analyzedItemCount: analyzed, otherItemCount: analyzed - cards },
       knowledge: { sampleConfidence },
     } as SellerEvaluationResponse,
   };
@@ -134,7 +136,7 @@ describe("choosing who to look at", () => {
 
   it("spends none of the budget on a seller already looked at", () => {
     const evaluations = new Map<string, EvaluationRecord>([
-      ["home", looked("wide")],
+      ["home", looked(2, 40)],
       // Mercari said there is no such seller. Not asked about again.
       ["garage", { status: "gone" }],
     ]);
@@ -175,29 +177,51 @@ describe("what a press can cost", () => {
 
 describe("which pile a seller lands in", () => {
   it.each([
-    [looked("wide"), "varied"],
-    // Shown, not hidden. Showing someone costs a glance; hiding them costs
-    // the find.
-    [looked("mixed"), "varied"],
-    [looked("narrow", "medium"), "specialists"],
-    [looked("narrow", "high"), "specialists"],
-    [looked("unknown"), "others"],
+    // [cards, listings analysed, confidence in the sample, pile]
+    [2, 40, "medium", "varied"],
+    [16, 40, "medium", "varied"],
+    [40, 40, "medium", "specialists"],
+    [58, 60, "high", "specialists"],
+  ] as const)("%i cards of %i (%s) → %s", (cards, analyzed, confidence, pile) => {
+    expect(pileOf(looked(cards, analyzed, confidence))).toBe(pile);
+  });
+
+  it.each([
     [undefined, "others"],
     [{ status: "queued" }, "others"],
     [{ status: "failed" }, "others"],
     [{ status: "gone" }, "others"],
+    // Looked at, and nothing listed to count.
+    [looked(0, 0), "others"],
   ] as [EvaluationRecord | undefined, string][])("%j → %s", (record, pile) => {
     expect(pileOf(record)).toBe(pile);
+  });
+
+  it("does not call a seller a card specialist when nearly half their shelf is something else", () => {
+    // Reported from use: 29 cards of 53, which is 54.7%, was under カード専門.
+    // The line was at half.
+    expect(pileOf(looked(29, 53))).toBe("varied");
+  });
+
+  it("draws the line at eighty percent, and includes it", () => {
+    expect(SPECIALIST_FROM_CARD_PERCENT).toBe(80);
+    expect(pileOf(looked(40, 50))).toBe("specialists");
+    expect(pileOf(looked(39, 50))).toBe("varied");
+    // Counts that divide to a hair under 0.8 in floating point would fall on
+    // the wrong side if the share were compared as a fraction.
+    expect(pileOf(looked(48, 60))).toBe("specialists");
+    expect(pileOf(looked(28, 35))).toBe("specialists");
   });
 
   it("does not call somebody with a handful of listings a specialist", () => {
     // All trading cards, over fewer than thirty listings. The single card
     // from a cupboard reads exactly as a shop does, and the specialists pile
     // can be excluded in one press.
-    expect(pileOf(looked("narrow", "low"))).toBe("few");
+    expect(pileOf(looked(3, 3, "low"))).toBe("few");
+    expect(pileOf(looked(1, 1, "low"))).toBe("few");
   });
 
-  it("keeps a wide shelf a candidate however few listings it was read from", () => {
-    expect(pileOf(looked("wide", "low"))).toBe("varied");
+  it("keeps a mixed shelf under 混ざっている however few listings it was read from", () => {
+    expect(pileOf(looked(1, 8, "low"))).toBe("varied");
   });
 });

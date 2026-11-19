@@ -8,8 +8,8 @@
  * that what one screen stores the next one reads. That is all this checks.
  *
  * Runs against `scripts/acceptance_app.py` like the acceptance flow. Its seed
- * has two sellers and both sell cards for the most part, so every band here
- * reads 狭い. Telling sellers apart is `scripts/seller_discovery_demo.py`'s
+ * has two sellers and both sell cards for the most part, so every share here
+ * is high. Telling sellers apart is `scripts/seller_discovery_demo.py`'s
  * job and is pinned by its own unit test; here the point is the wiring.
  *
  * **The backend is shared with the acceptance flow and keeps the lists in
@@ -76,7 +76,7 @@ test("looking at the sellers behind a result, then saving one and excluding one"
 
   const one = rows(page).filter({ hasText: "seller-sample-1" });
   await expect(one).toContainText("一致した出品10件");
-  await expect(one).toContainText("狭い");
+  await expect(one).toContainText(/カードの割合\s*\d+\.\d%\s*カード \d+件 \/ \d+件/);
   await expect(one).toContainText("良い 245・普通 2・悪い 0");
 
   // --- Saving and excluding go through to the backend ----------------------
