@@ -170,7 +170,8 @@ test("going looking for sellers from one press", async ({ page }) => {
   expect(sent).toEqual([]);
 
   // --- One press: both searches, then both sellers -------------------------
-  await page.getByRole("button", { name: "探す" }).click();
+  // Exact: the button that adds a field ends in the same word.
+  await page.getByRole("button", { name: "探す", exact: true }).click();
   await expect(page.getByText("12件の出品から 2人の出品者")).toBeVisible();
   expect(sent).toEqual([
     "/api/search",
