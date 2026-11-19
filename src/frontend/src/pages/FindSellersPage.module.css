@@ -1,0 +1,202 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+/* 記録の声（視覚方針 §3.4）。出品者リスト画面の見出しと同じ段。 */
+.heading {
+  font-family: var(--font-record);
+  font-weight: 400;
+  font-size: var(--text-sub);
+  margin: var(--space-5) 0 0;
+}
+
+.about {
+  max-width: var(--measure);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+}
+
+.form {
+  padding: var(--space-4) 0 var(--space-5);
+  border-bottom: 1px solid var(--rule);
+}
+
+.field {
+  max-width: var(--measure);
+}
+
+.label {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+/* 入力欄はinputと同じ面（視覚方針 §3.2）。base.cssはtextareaを含まないので、
+   ここで同じ値を当てる。 */
+.keywords {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-1);
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: var(--leading-dense);
+  color: var(--ink);
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin-top: var(--space-3);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.number {
+  width: 7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
+/* 朱の縦罫だけ。文字は墨のまま（視覚方針 §3.3）。 */
+.error {
+  max-width: var(--measure);
+  margin: var(--space-2) 0 0;
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+/* 押すものと、その代償。出品者Tabの「調べる」と同じ並べ方。 */
+.go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.go button:disabled,
+.bulk button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cost {
+  margin: 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.record {
+  max-width: var(--measure);
+  padding: var(--space-4) 0 0;
+}
+
+.progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.progress p {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.quiet {
+  background: none;
+  color: var(--ink);
+  border-color: var(--ink-quiet);
+}
+
+.quiet:hover {
+  background: var(--sheet);
+}
+
+.keywordList {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.keyword {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  line-height: var(--leading-dense);
+}
+
+.word {
+  flex: 0 0 auto;
+}
+
+.said {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 記録の声。こちらが数えた値なので明朝で組む（視覚方針 §3.4）。 */
+.tally {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-record);
+  font-size: var(--text-sub);
+}
+
+.tally b {
+  font-weight: 400;
+  font-size: var(--text-head);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 朱の縦罫は1つの意味しか持たない —— Card Diggerが見ていない範囲の断り書き
+   （視覚方針 §3.3）。文字は墨のまま。 */
+.limits {
+  border-left: 2px solid var(--shu);
+  padding-left: var(--space-3);
+}
+
+.limits p {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
+.pileAbout {
+  max-width: var(--measure);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+  color: var(--ink-quiet);
+}
+
+.bulk {
+  margin: 0 0 var(--space-3);
+}
+
+.empty {
+  max-width: var(--measure);
+  margin: var(--space-5) 0;
+  color: var(--ink-quiet);
+}

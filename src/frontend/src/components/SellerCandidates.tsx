@@ -111,7 +111,14 @@ const WAITING: Record<Exclude<EvaluationRecord["status"], "done">, string> = {
   gone: "この出品者は見つかりませんでした",
 };
 
-function Row({
+/**
+ * One seller: who, what is known about them, and what to do about it.
+ *
+ * Exported because the same row is read in two places — under a search
+ * result, and on the screen that goes looking for sellers. A seller should
+ * read the same wherever they turn up.
+ */
+export function SellerCandidateRow({
   candidate,
   record,
 }: {
@@ -286,30 +293,58 @@ export function SellerCandidates({ items }: { items: readonly Item[] }) {
         />
       )}
 
-      <ul className={styles.list}>
-        {shown.map((candidate) => (
-          <Row
-            key={candidate.sellerId}
-            candidate={candidate}
-            record={evaluations.get(candidate.sellerId)}
-          />
-        ))}
-      </ul>
+      <SellerCandidateList
+        candidates={shown}
+        evaluations={evaluations}
+      />
 
-      <div className={styles.limits}>
-        <p>
-          「一致した出品」と「商品の状態」は、この検索で取得した範囲の出品だけを数えています。
-          商品の状態は出品者が選んだ区分であり、実物を確認したものではありません。
-        </p>
-        <p>
-          「出品の幅」は、販売中と売却済みそれぞれ最初の1ページのTitleから計算しています。
-          TCG以外の出品が多いほど広いと表示します。
-        </p>
-        <p>
-          閾値は仮説であり、精度を実証した値ではありません。
-          購入判断ではなく、確認順を決める補助情報です。
-        </p>
-      </div>
+      <SellerCandidateLimits />
     </section>
+  );
+}
+
+/** The rows, as one list. */
+export function SellerCandidateList({
+  candidates,
+  evaluations,
+}: {
+  candidates: readonly SellerCandidate[];
+  evaluations: ReadonlyMap<string, EvaluationRecord>;
+}) {
+  return (
+    <ul className={styles.list}>
+      {candidates.map((candidate) => (
+        <SellerCandidateRow
+          key={candidate.sellerId}
+          candidate={candidate}
+          record={evaluations.get(candidate.sellerId)}
+        />
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * What the figures in a row do not say (出品者探索 §5.6).
+ *
+ * Printed once under a list rather than on each row. Written once here so the
+ * two screens that show these rows cannot come to describe them differently.
+ */
+export function SellerCandidateLimits() {
+  return (
+    <div className={styles.limits}>
+      <p>
+        「一致した出品」と「商品の状態」は、この検索で取得した範囲の出品だけを数えています。
+        商品の状態は出品者が選んだ区分であり、実物を確認したものではありません。
+      </p>
+      <p>
+        「出品の幅」は、販売中と売却済みそれぞれ最初の1ページのTitleから計算しています。
+        TCG以外の出品が多いほど広いと表示します。
+      </p>
+      <p>
+        閾値は仮説であり、精度を実証した値ではありません。
+        購入判断ではなく、確認順を決める補助情報です。
+      </p>
+    </div>
   );
 }

@@ -107,8 +107,12 @@ export type SellerDiscoveryState = {
    *
    * The only thing here that reaches Mercari, and only ever from a press.
    * Ignored while a run is going.
+   *
+   * Resolves when the run is over, however it ended, and never rejects: what
+   * ended it is on `run.endedBy`. A caller that only starts a run can ignore
+   * the promise; one that does something afterwards awaits it.
    */
-  evaluate: (sellerIds: readonly string[]) => void;
+  evaluate: (sellerIds: readonly string[]) => Promise<void>;
   /** Finish the seller in hand and ask about no more. */
   stopEvaluating: () => void;
 
@@ -226,7 +230,7 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const evaluate = useCallback(
-    (sellerIds: readonly string[]) => {
+    async (sellerIds: readonly string[]) => {
       if (running.current) {
         return;
       }
@@ -244,7 +248,7 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
       }
       setRun({ active: true, finished: 0, total: owed.length, endedBy: null });
 
-      void (async () => {
+      await (async () => {
         let finished = 0;
         let endedBy: ApiError | null = null;
 

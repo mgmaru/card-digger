@@ -1,6 +1,7 @@
 import { BrowserRouter, NavLink, Route, Routes } from "react-router";
 
 import styles from "./App.module.css";
+import { FindSellersPage } from "./pages/FindSellersPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SellerListsPage } from "./pages/SellerListsPage";
 import { SellerPage } from "./pages/SellerPage";
@@ -9,13 +10,15 @@ import {
   SellerDiscoveryProvider,
   useSellerDiscovery,
 } from "./sellerDiscoveryState";
+import { SellerHuntProvider } from "./sellerHuntState";
 
 /**
  * The application shell.
  *
- * Both providers sit **above** the router. That placement is the whole point:
- * the search result, its sort and filter, the reader's seller lists and the
- * sellers already looked at all outlive a navigation, so coming back from a
+ * The providers sit **above** the router. That placement is the whole point:
+ * the search result, its sort and filter, the reader's seller lists, the
+ * sellers already looked at and the last run of looking for them all outlive
+ * a navigation, so coming back from a
  * seller shows what was already collected instead of collecting again
  * (MVP specification section 5.2).
  */
@@ -23,19 +26,22 @@ export function App() {
   return (
     <SearchProvider>
       <SellerDiscoveryProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <SellerHuntProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </SellerHuntProvider>
       </SellerDiscoveryProvider>
     </SearchProvider>
   );
 }
 
 /**
- * The two places to start from.
+ * The three places to start from: listings, sellers, and the sellers already
+ * decided about.
  *
- * A seller is reached from one of these and is not a third: nobody arrives
- * wanting "a seller", they arrive from a listing or from a list.
+ * One seller is reached from one of these and is not a fourth: nobody arrives
+ * wanting "a seller", they arrive from a listing, a run or a list.
  */
 function Navigation() {
   const { entries } = useSellerDiscovery();
@@ -46,6 +52,9 @@ function Navigation() {
     <nav className={styles.nav} aria-label="画面">
       <NavLink to="/" end className={link}>
         検索
+      </NavLink>
+      <NavLink to="/find-sellers" className={link}>
+        出品者を探す
       </NavLink>
       <NavLink to="/seller-lists" className={link}>
         出品者リスト
@@ -77,6 +86,7 @@ export function AppRoutes() {
       <Routes>
         <Route path="/" element={<SearchPage />} />
         <Route path="/sellers/:sellerId" element={<SellerPage />} />
+        <Route path="/find-sellers" element={<FindSellersPage />} />
         <Route path="/seller-lists" element={<SellerListsPage />} />
       </Routes>
     </main>
