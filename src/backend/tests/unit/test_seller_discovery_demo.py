@@ -102,6 +102,29 @@ class TestTheSellers:
         assert shop["analyzedItemCount"] > 20
         assert single["analyzedItemCount"] == 1
 
+    def test_only_the_shop_has_a_sample_large_enough_to_call_it_a_specialist(self):
+        """What the screen that goes looking for sellers sorts by.
+
+        A shelf of nothing but cards reads the same over three listings and
+        over thirty. That screen files the first under 少数出品 and only the
+        second under 専門らしい, by this confidence, so the seed has to hold
+        one of each or the two tabs cannot be told apart.
+        """
+        client = app()
+
+        confidence = {
+            seller.name: evaluation(client, seller.id).json()["knowledge"][
+                "sampleConfidence"
+            ]
+            for seller in (demo.CARD_SHOP, demo.RETIRING, demo.ONE_LISTING)
+        }
+
+        assert confidence == {
+            "seller-card-shop": "medium",
+            "seller-retiring": "low",
+            "seller-one-listing": "low",
+        }
+
     def test_one_seller_has_no_ratings_to_show(self):
         body = evaluation(app(), demo.RETIRING.id).json()
 

@@ -83,7 +83,7 @@ docs/
 - [item-screen-spec.md](product/item-screen-spec.md):
   **商品画面**（商品1件について買うかを決める画面）の振る舞いと受入条件の正本。**2026-09-05設計**
 - [seller-discovery-spec.md](product/seller-discovery-spec.md):
-  **出品者探索**（検索結果の「出品者」Tab、出品者リスト画面、除外）の振る舞いと受入条件の正本。**2026-11-19決定**
+  **出品者探索**（検索結果の「出品者」Tab、「出品者を探す」画面、出品者リスト画面、除外）の振る舞いと受入条件の正本。**2026-11-19決定**
 - [design-tokens.md](product/design-tokens.md):
   色・書体・余白・Badgeの見え方を決めるときの制約と、決めた値。**2026-09-02決定**
 

@@ -144,3 +144,65 @@ test("the 出品者 tab works from the keyboard alone", async ({ page }) => {
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("並び順")).toBeFocused();
 });
+
+test("going looking for sellers from one press", async ({ page }) => {
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname === "/api/search" || pathname.endsWith("/evaluation")) {
+      sent.push(pathname);
+    }
+  });
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "出品者を探す" }).click();
+  // Wait for the screen itself. The search screen being left has a box
+  // labelled キーワード too, and a fill that arrives before the route has
+  // changed goes into that one.
+  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeVisible();
+
+  // --- Nothing is sent until the press, and the press says what it can cost -
+  await page.getByLabel(/^キーワード/).fill(`${KEYWORD}\nどこにも無い語`);
+  await expect(page.getByText(/Mercariへ最大80回問い合わせます/)).toBeVisible();
+  expect(sent).toEqual([]);
+
+  // --- One press: both searches, then both sellers -------------------------
+  await page.getByRole("button", { name: "探す" }).click();
+  await expect(page.getByText("12件の出品から 2人の出品者")).toBeVisible();
+  expect(sent).toEqual([
+    "/api/search",
+    "/api/search",
+    // Fewest matching listings first: seller two has two, seller one has ten.
+    `/api/sellers/${SELLER_TWO}/evaluation`,
+    `/api/sellers/${SELLER_ONE}/evaluation`,
+  ]);
+
+  const record = page.getByRole("region", { name: "探した範囲" });
+  await expect(record).toContainText(`${KEYWORD}12件 / 1ページ（終端まで取得）`);
+  await expect(record).toContainText("どこにも無い語0件");
+
+  // --- Both sell cards for the most part. Only one has a shelf to judge by --
+  await expect(page.getByRole("tab", { name: /候補/ })).toContainText("0");
+  await expect(page.getByRole("tab", { name: /少数出品/ })).toContainText("1");
+  await expect(page.getByRole("tab", { name: /専門らしい/ })).toContainText("1");
+
+  await page.getByRole("tab", { name: /少数出品/ }).click();
+  await expect(page.getByRole("tabpanel")).toContainText("seller-sample-2");
+
+  // --- The specialists go to the excluded list in one press ----------------
+  await page.getByRole("tab", { name: /専門らしい/ }).click();
+  await expect(page.getByRole("tabpanel")).toContainText("seller-sample-1");
+  await page.getByRole("button", { name: "この1人を除外リストへ入れる" }).click();
+  await expect(page.getByRole("tab", { name: /専門らしい/ })).toContainText("0");
+  await expect(record).toContainText("除外リストの出品者 1人・10件は対象から外しています");
+
+  // --- And the search screen then leaves their listings out too ------------
+  await page.getByRole("link", { name: "検索", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeHidden();
+  // Exact as well: the box on the screen just left is labelled キーワード…
+  await page.getByLabel("キーワード", { exact: true }).fill(KEYWORD);
+  await page.getByRole("button", { name: "検索", exact: true }).click();
+  await expect(
+    page.getByText("除外リストの出品者 1人・10件を表示していません"),
+  ).toBeVisible();
+});

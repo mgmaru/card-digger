@@ -1,0 +1,541 @@
+/**
+ * The screen that goes looking for sellers (出品者探索 §12).
+ *
+ * One press does what the search screen does in many: search each keyword,
+ * then look at the sellers found. So one press can send more requests than
+ * anything else in the application, and what is checked first is the same as
+ * everywhere else — **what is sent, in what order, and when it stops.**
+ */
+
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ApiError } from "../src/api/client";
+import { AppRoutes } from "../src/App";
+import { SearchProvider } from "../src/searchState";
+import { SellerDiscoveryProvider } from "../src/sellerDiscoveryState";
+import { SellerHuntProvider } from "../src/sellerHuntState";
+import type {
+  BreadthLevel,
+  CollectionMeta,
+  Item,
+  KnowledgeLevel,
+  SearchResponse,
+  SellerEvaluationResponse,
+  SellerListEntry,
+} from "../src/types/api";
+
+const mocks = vi.hoisted(() => ({
+  search: vi.fn(),
+  sellerAnalysis: vi.fn(),
+  sellerEvaluation: vi.fn(),
+  sellerLists: vi.fn(),
+  putSellerListEntry: vi.fn(),
+  removeSellerListEntry: vi.fn(),
+}));
+
+vi.mock("../src/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/api/client")>()),
+  ...mocks,
+}));
+
+const META: CollectionMeta = {
+  pageCount: 1,
+  uniqueItemCount: 0,
+  duplicateCount: 0,
+  discardedByLimitCount: 0,
+  oldestCreatedAt: "2026-01-01T00:00:00+09:00",
+  newestCreatedAt: "2026-11-01T00:00:00+09:00",
+  collectedAt: "2026-11-19T12:00:00+09:00",
+  stopReason: "end_of_results",
+  reachedEnd: true,
+  truncated: false,
+  partial: false,
+  retryCount: 0,
+  errors: [],
+  oldListingCount: 0,
+};
+
+function item(id: string, sellerId: string): Item {
+  return {
+    id,
+    title: `商品 ${id}`,
+    priceYen: 1000,
+    url: `https://jp.mercari.com/item/${id}`,
+    imageUrls: [],
+    createdAt: "2026-06-01T00:00:00+09:00",
+    updatedAt: "2026-06-02T00:00:00+09:00",
+    listingStatus: "on_sale",
+    saleFormat: "fixed_price",
+    sellerId,
+    itemCondition: { id: "3", name: "目立った傷や汚れなし" },
+  };
+}
+
+function result(items: Item[], meta: Partial<CollectionMeta> = {}): SearchResponse {
+  return { items, meta: { ...META, uniqueItemCount: items.length, ...meta } };
+}
+
+/**
+ * Two keywords. `shop` has three listings across them, one of which matches
+ * both; `home`, `attic` and `retiring` have one each.
+ */
+const BY_KEYWORD: Record<string, SearchResponse> = {
+  "ポケカ 押入れ": result(
+    [item("a", "shop"), item("b", "home"), item("c", "shop")],
+    { stopReason: "max_pages", reachedEnd: false, truncated: true, pageCount: 10 },
+  ),
+  "ポケカ 物置": result([item("c", "shop"), item("d", "attic"), item("e", "retiring"), item("f", "shop")]),
+};
+
+function look(
+  sellerId: string,
+  name: string,
+  level: BreadthLevel,
+  analyzed: number,
+  sampleConfidence: KnowledgeLevel,
+): SellerEvaluationResponse {
+  const other = level === "wide" ? Math.round(analyzed * 0.9) : 0;
+  return {
+    seller: {
+      id: sellerId,
+      name,
+      rating: null,
+      ratingCount: 12,
+      ratingBreakdown: { good: 10, normal: 2, bad: 0 },
+      listedItemCount: analyzed,
+      url: `https://jp.mercari.com/user/profile/${sellerId}`,
+    },
+    knowledge: {
+      analyzedItemCount: analyzed,
+      pokemonItemCount: analyzed - other,
+      tcgItemCount: analyzed - other,
+      specializedItemCount: 0,
+      distinctSpecializedTermCount: 0,
+      pokemonRatio: 1,
+      tcgRatio: 1,
+      specializedItemRatio: 0,
+      score: 0,
+      level: "low",
+      sampleConfidence,
+    },
+    breadth: {
+      analyzedItemCount: analyzed,
+      otherItemCount: other,
+      otherRatio: other / analyzed,
+      level,
+    },
+    onSaleMeta: META,
+    soldOutMeta: META,
+  };
+}
+
+const LOOKS: Record<string, SellerEvaluationResponse> = {
+  shop: look("shop", "カード専門店", "narrow", 60, "medium"),
+  home: look("home", "ゆうママ", "wide", 40, "medium"),
+  attic: look("attic", "屋根裏の人", "wide", 8, "low"),
+  retiring: look("retiring", "引退します", "narrow", 3, "low"),
+};
+
+let stored: SellerListEntry[];
+
+function mount(path = "/find-sellers") {
+  return render(
+    <SearchProvider>
+      <SellerDiscoveryProvider>
+        <SellerHuntProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </SellerHuntProvider>
+      </SellerDiscoveryProvider>
+    </SearchProvider>,
+  );
+}
+
+const keywordsBox = () => screen.getByLabelText(/^キーワード/);
+const go = () => screen.getByRole("button", { name: "探す" });
+const tab = (name: RegExp) => screen.getByRole("tab", { name });
+const rowNames = () =>
+  within(screen.getByRole("tabpanel"))
+    .queryAllByRole("heading", { level: 3 })
+    .map((heading) => heading.textContent);
+
+async function hunt(keywords = "ポケカ 押入れ\nポケカ 物置") {
+  const user = userEvent.setup();
+  mount();
+  await user.type(keywordsBox(), keywords);
+  await user.click(go());
+  return user;
+}
+
+const done = () => screen.findByText(/の出品者$/);
+
+beforeEach(() => {
+  for (const mock of Object.values(mocks)) {
+    mock.mockReset();
+  }
+  stored = [];
+  mocks.search.mockImplementation(async (keyword: string) => BY_KEYWORD[keyword] ?? result([]));
+  mocks.sellerLists.mockImplementation(async () => ({ entries: stored }));
+  mocks.sellerEvaluation.mockImplementation(async (id: string) => LOOKS[id]);
+  mocks.putSellerListEntry.mockImplementation(
+    async (sellerId: string, kind: SellerListEntry["kind"], note: string) => {
+      stored = [
+        ...stored.filter((kept) => kept.sellerId !== sellerId),
+        { sellerId, kind, addedAt: "2026-11-19T12:00:00+09:00", note },
+      ];
+      return { entries: stored };
+    },
+  );
+});
+
+describe("before the press", () => {
+  it("sends nothing by being opened or typed in", async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.type(keywordsBox(), "ポケカ 押入れ");
+
+    expect(mocks.search).not.toHaveBeenCalled();
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("says the most the press can cost, and follows what is typed", async () => {
+    const user = userEvent.setup();
+    mount();
+    // One keyword's worth before anything is typed: 10 + 20 × 3.
+    expect(screen.getByText(/Mercariへ最大70回問い合わせます/)).toBeInTheDocument();
+
+    await user.type(keywordsBox(), "ポケカ 押入れ\nポケカ 物置\nポケカ 実家");
+    expect(screen.getByText(/Mercariへ最大90回問い合わせます/)).toHaveTextContent(
+      "上限まで使うと約3分以上",
+    );
+
+    await user.selectOptions(screen.getByLabelText("調べる出品者"), "10");
+    expect(screen.getByText(/Mercariへ最大60回問い合わせます/)).toBeInTheDocument();
+  });
+
+  it("refuses an empty box without sending anything", async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(go());
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "検索するキーワードを1行に1つ入力してください",
+    );
+    expect(mocks.search).not.toHaveBeenCalled();
+  });
+
+  it("refuses more keywords than one press may search", async () => {
+    await hunt("a\nb\nc\nd\ne\nf");
+
+    expect(screen.getByRole("alert")).toHaveTextContent("キーワードは5つまでです（現在6つ）");
+    expect(mocks.search).not.toHaveBeenCalled();
+  });
+
+  it("refuses a price band the wrong way round", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(keywordsBox(), "ポケカ 押入れ");
+    await user.type(screen.getByLabelText("最低価格"), "5000");
+    await user.type(screen.getByLabelText("最高価格"), "3000");
+
+    await user.click(go());
+
+    expect(screen.getByRole("alert")).toHaveTextContent("最高価格は最低価格以上にしてください");
+    expect(mocks.search).not.toHaveBeenCalled();
+  });
+});
+
+describe("one press", () => {
+  it("searches each keyword in turn, under the same band", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(keywordsBox(), "ポケカ 押入れ\nポケカ 物置");
+    await user.type(screen.getByLabelText("最低価格"), "1000");
+    await user.type(screen.getByLabelText("最高価格"), "5000");
+
+    await user.click(go());
+    await done();
+
+    const band = { minPriceYen: 1000, maxPriceYen: 5000 };
+    expect(mocks.search.mock.calls).toEqual([
+      ["ポケカ 押入れ", band],
+      ["ポケカ 物置", band],
+    ]);
+  });
+
+  it("does not start the second search until the first has answered", async () => {
+    let release: (() => void) | undefined;
+    mocks.search.mockImplementation(
+      (keyword: string) =>
+        new Promise((resolve) => {
+          if (keyword === "ポケカ 押入れ") {
+            release = () => resolve(BY_KEYWORD[keyword]);
+          } else {
+            resolve(BY_KEYWORD[keyword]);
+          }
+        }),
+    );
+    await hunt();
+
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent("検索しています 0 / 2（ポケカ 押入れ）");
+    // A press while it runs starts nothing.
+    expect(go()).toBeDisabled();
+
+    release?.();
+    await done();
+    expect(mocks.search).toHaveBeenCalledTimes(2);
+  });
+
+  it("then looks at the sellers found, fewest matching listings first", async () => {
+    await hunt();
+    await done();
+
+    // `shop` matched three listings (one of them under both keywords, counted
+    // once) and goes last. The other three tie and keep the order found.
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([
+      ["home"],
+      ["attic"],
+      ["retiring"],
+      ["shop"],
+    ]);
+  });
+
+  it("says how far each search got, keyword by keyword", async () => {
+    await hunt();
+    await done();
+
+    const record = screen.getByRole("region", { name: "探した範囲" });
+    expect(record).toHaveTextContent(
+      "ポケカ 押入れ3件 / 10ページ（ページ数の上限に到達・続きが存在する可能性があります）",
+    );
+    expect(record).toHaveTextContent("ポケカ 物置4件 / 1ページ（終端まで取得）");
+    // Six listings, not seven: one matched both keywords.
+    expect(record).toHaveTextContent("6件の出品から 4人の出品者");
+  });
+
+  it("leaves the search screen as it was", async () => {
+    const user = await hunt();
+    await done();
+
+    await user.click(screen.getByRole("link", { name: "検索" }));
+
+    // Nothing collected there, although two searches have run.
+    expect(screen.queryByLabelText("取得範囲")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("キーワード")).toHaveValue("");
+  });
+});
+
+describe("what was found", () => {
+  it("is sorted into piles, with the one the reader came for in front", async () => {
+    await hunt();
+    await done();
+
+    expect(tab(/候補/)).toHaveAttribute("aria-selected", "true");
+    expect(tab(/候補/)).toHaveTextContent("2");
+    expect(tab(/少数出品/)).toHaveTextContent("1");
+    expect(tab(/専門らしい/)).toHaveTextContent("1");
+    expect(tab(/その他/)).toHaveTextContent("0");
+    expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
+  });
+
+  it("does not file somebody with three listings among the specialists", async () => {
+    const user = await hunt();
+    await done();
+
+    await user.click(tab(/少数出品/));
+    expect(rowNames()).toEqual(["引退します"]);
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("この件数では判断できません");
+
+    await user.click(tab(/専門らしい/));
+    expect(rowNames()).toEqual(["カード専門店"]);
+  });
+
+  it("excludes the specialists in one press, and only them", async () => {
+    const user = await hunt();
+    await done();
+    await user.click(tab(/専門らしい/));
+
+    await user.click(screen.getByRole("button", { name: "この1人を除外リストへ入れる" }));
+
+    await waitFor(() => expect(tab(/専門らしい/)).toHaveTextContent("0"));
+    expect(mocks.putSellerListEntry.mock.calls).toEqual([["shop", "excluded", ""]]);
+    // Gone from the piles, and the record says where.
+    expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
+      "除外リストの出品者 1人・3件は対象から外しています",
+    );
+    expect(tab(/少数出品/)).toHaveTextContent("1");
+  });
+
+  it("offers no such button on the other piles", async () => {
+    const user = await hunt();
+    await done();
+
+    for (const name of [/候補/, /少数出品/, /その他/]) {
+      await user.click(tab(name));
+      expect(
+        screen.queryByRole("button", { name: /を除外リストへ入れる$/ }),
+      ).not.toBeInTheDocument();
+    }
+  });
+
+  it("survives a trip to one of the sellers and back", async () => {
+    mocks.sellerAnalysis.mockRejectedValue(new ApiError("timeout"));
+    const user = await hunt();
+    await done();
+
+    await user.click(screen.getByRole("link", { name: "ゆうママ" }));
+    await screen.findByRole("link", { name: "検索へ戻る" });
+    await user.click(screen.getByRole("link", { name: "出品者を探す" }));
+
+    expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
+    expect(keywordsBox()).toHaveValue("ポケカ 押入れ\nポケカ 物置");
+    expect(mocks.search).toHaveBeenCalledTimes(2);
+    expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("what is not looked at", () => {
+  it("skips sellers on the excluded list, and says so", async () => {
+    stored = [{ sellerId: "shop", kind: "excluded", addedAt: "2026-11-01T00:00:00+09:00", note: "" }];
+    await hunt();
+    await done();
+
+    expect(mocks.sellerEvaluation.mock.calls.map(([id]) => id)).not.toContain("shop");
+    expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
+      "除外リストの出品者 1人・3件は対象から外しています",
+    );
+    expect(tab(/専門らしい/)).toHaveTextContent("0");
+  });
+
+  it("stops at the budget, says who is left, and carries on from there next time", async () => {
+    // Twelve sellers with one listing each, and a budget of ten.
+    const many = Array.from({ length: 12 }, (_, n) => item(`i${n}`, `s${n}`));
+    mocks.search.mockResolvedValue(result(many));
+    mocks.sellerEvaluation.mockImplementation(async (id: string) =>
+      look(id, `出品者${id}`, "wide", 40, "medium"),
+    );
+    const user = userEvent.setup();
+    mount();
+    await user.type(keywordsBox(), "ポケカ 押入れ");
+    await user.selectOptions(screen.getByLabelText("調べる出品者"), "10");
+
+    await user.click(go());
+    await done();
+
+    expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(10);
+    expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
+      "上限に達したため、2人はまだ調べていません",
+    );
+    expect(tab(/その他/)).toHaveTextContent("2");
+
+    // The same press again looks at the two that were left, and nobody twice.
+    await user.click(go());
+    await waitFor(() => expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(12));
+    await waitFor(() => expect(tab(/候補/)).toHaveTextContent("12"));
+    expect(mocks.sellerEvaluation.mock.calls.slice(10).map(([id]) => id)).toEqual([
+      "s10",
+      "s11",
+    ]);
+  });
+
+  it("does not look at sellers already looked at from a search result", async () => {
+    await hunt("ポケカ 押入れ");
+    await done();
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["shop"]]);
+
+    // The second keyword turns up `shop` again and two new sellers.
+    await userEvent.clear(keywordsBox());
+    await userEvent.type(keywordsBox(), "ポケカ 物置");
+    await userEvent.click(go());
+
+    await waitFor(() => expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4));
+    expect(mocks.sellerEvaluation.mock.calls.slice(2)).toEqual([["attic"], ["retiring"]]);
+  });
+});
+
+describe("when it cannot go on", () => {
+  it("carries on to the next keyword when one search fails", async () => {
+    mocks.search.mockImplementation(async (keyword: string) => {
+      if (keyword === "ポケカ 押入れ") throw new ApiError("timeout");
+      return BY_KEYWORD[keyword];
+    });
+    await hunt();
+    await done();
+
+    expect(mocks.search).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
+      "ポケカ 押入れ取得できませんでした",
+    );
+    expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops everything when a search is turned away, and looks at nobody", async () => {
+    mocks.search.mockImplementation(async (keyword: string) => {
+      if (keyword === "ポケカ 押入れ") {
+        throw new ApiError("safety_stop", { status: 503, retryAfterSeconds: 60 });
+      }
+      return BY_KEYWORD[keyword];
+    });
+    await hunt();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "続けて拒否されたため取得を止めました",
+    );
+    // The second keyword was never searched for.
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "もう一度探す" })).not.toBeInTheDocument();
+  });
+
+  it("stops when a look is turned away, keeping what was found so far", async () => {
+    mocks.sellerEvaluation.mockImplementation(async (id: string) => {
+      if (id === "attic") {
+        throw new ApiError("rate_limited", { status: 503 });
+      }
+      return LOOKS[id];
+    });
+    await hunt();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Mercariが一時的に応答を制限しています",
+    );
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["attic"]]);
+    expect(rowNames()).toEqual(["ゆうママ"]);
+    expect(tab(/その他/)).toHaveTextContent("3");
+  });
+
+  it("stops between two searches when told to", async () => {
+    let release: (() => void) | undefined;
+    mocks.search.mockImplementation(
+      (keyword: string) =>
+        new Promise((resolve) => {
+          release = () => resolve(BY_KEYWORD[keyword]);
+        }),
+    );
+    const user = await hunt();
+
+    await user.click(screen.getByRole("button", { name: "止める" }));
+    release?.();
+
+    expect(await screen.findByText("途中で止めました。")).toBeInTheDocument();
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("says so when no keyword matched anything", async () => {
+    await hunt("どこにも無い語");
+
+    expect(
+      await screen.findByText(/一致する出品がありませんでした/),
+    ).toBeInTheDocument();
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("tablist", { name: "見つかった出品者" })).not.toBeInTheDocument();
+  });
+});

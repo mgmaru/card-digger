@@ -13,7 +13,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 |---|---|
 | 今やること・進捗 | [docs/planning/todo.md](docs/planning/todo.md) |
 | 機能・画面・API・完了条件 | [docs/product/mvp-spec.md](docs/product/mvp-spec.md) |
-| 出品者探索（「出品者」Tab・出品者リスト・除外） | [docs/product/seller-discovery-spec.md](docs/product/seller-discovery-spec.md) |
+| 出品者探索（「出品者」Tab・「出品者を探す」・出品者リスト・除外） | [docs/product/seller-discovery-spec.md](docs/product/seller-discovery-spec.md) |
 | 色・書体・余白 | [docs/product/design-tokens.md](docs/product/design-tokens.md) |
 | 層・依存の向き・固有語 | [docs/development/architecture.md](docs/development/architecture.md) |
 | CI・PR・Merge・Branch | [docs/development/ci-policy.md](docs/development/ci-policy.md) |
@@ -44,7 +44,8 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
   読み手のメモだけ。名前や評価を足すなら、先にADRを書き直す
   （[ADR 0004 論点1](docs/adr/0004-store-seller-lists-in-a-local-file.md#論点1--何を保存するか)）
 - **出品者を調べるのは、押されたときだけ。** 検索やTabを開いた拍子に`/evaluation`を呼ばない。
-  1人あたりMercariへ3回かかる（[出品者探索 §4](docs/product/seller-discovery-spec.md#4-出品者を調べる)）
+  1人あたりMercariへ3回かかる（[出品者探索 §4](docs/product/seller-discovery-spec.md#4-出品者を調べる)）。
+  「出品者を探す」も同じで、**押す前に上限の回数を出す**（[§12.2](docs/product/seller-discovery-spec.md#122-1回の押下で起きること)）
 - **相場データをCard Diggerで作らない。** カードの相場も、Mercariの成約価格の分布も
   [card-pulse](https://github.com/mgmaru/card-pulse)の担当。Card Diggerは受け取って表示する側
   （[§19](docs/product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)）

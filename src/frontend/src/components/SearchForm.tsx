@@ -42,7 +42,7 @@ import styles from "./SearchForm.module.css";
  * page limit having reached 7 days back; "ポケモンカード 押入れ" ran out of
  * results having reached 5 years.
  */
-const EXAMPLES = [
+export const EXAMPLES = [
   "ポケモンカード 押入れ",
   "ポケモンカード 物置",
   "ポケモンカード 実家",

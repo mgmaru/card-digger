@@ -12,6 +12,14 @@ import type { CollectionMeta } from "./types/api";
 export const SELLER_ITEM_LIMIT = 100;
 
 /**
+ * The most pages one search collects (MVP specification section 5.3).
+ *
+ * Mirrors `SEARCH_LIMITS.max_pages` in the backend. Used only to say, before
+ * a button is pressed, the most requests the press can cost.
+ */
+export const SEARCH_PAGE_LIMIT = 10;
+
+/**
  * Why this collection stopped, phrased as what it means for the reader.
  *
  * Only `end_of_results` promises there is nothing more. Everything else says
