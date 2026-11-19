@@ -97,9 +97,9 @@ export function hasActiveFilter(filters: Filters): boolean {
  * missing, unnumbered, or a number nobody has a name for — is 状態不明, and
  * placing it would mean inventing the grade the screen refuses to guess.
  */
-type Grade = { rank: number; id: string; name: string };
+export type Grade = { rank: number; id: string; name: string };
 
-function grade(condition: ItemCondition | null): Grade | null {
+export function grade(condition: ItemCondition | null): Grade | null {
   if (condition === null || condition.id === null || condition.name === null) {
     return null;
   }

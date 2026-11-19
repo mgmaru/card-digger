@@ -1,0 +1,35 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 墨で塗るButtonは1行に1つまで。2つ目からは枠だけにして、
+   「まず押すもの」がどれかを残す。 */
+.quiet {
+  background: none;
+  color: var(--ink);
+  border-color: var(--ink-quiet);
+}
+
+.quiet:hover {
+  background: var(--sheet);
+}
+
+.buttons button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* どちらのリストにあるかは事実であって操作ではない。角を丸めず、塗らない
+   （視覚方針 §3.7: 丸めるのは操作できるものだけ）。 */
+.listed {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  border: 1px solid var(--ink-quiet);
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}

@@ -14,6 +14,7 @@ import { Link, useParams } from "react-router";
 
 import { FailureNotice } from "../components/FailureNotice";
 import { SellerItems } from "../components/SellerItems";
+import { SellerListPanel } from "../components/SellerListPanel";
 import { SellerKnowledgePanel } from "../components/SellerKnowledge";
 import { SellerProfile } from "../components/SellerProfile";
 import { latestMoment } from "../elapsed";
@@ -118,6 +119,10 @@ export function SellerPage() {
             lastUpdatedAt={lastUpdate(analysis)}
             collectedAt={collectedAt(analysis)}
             isInactive={analysis.sellerIsInactive}
+          />
+          <SellerListPanel
+            sellerId={analysis.seller.id}
+            sellerName={analysis.seller.name}
           />
           <SellerKnowledgePanel
             knowledge={analysis.knowledge}

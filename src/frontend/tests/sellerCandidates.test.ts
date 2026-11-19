@@ -1,0 +1,219 @@
+/**
+ * Grouping a result by seller, and the orders the sellers are read in.
+ *
+ * Everything here is worked out from a search already in hand, so nothing in
+ * this file can send a request. What it can get wrong is quieter: treating a
+ * grade nobody could place as a bad one, or shuffling the list when asked to
+ * sort by something not known yet.
+ */
+
+import { describe, expect, it } from "vitest";
+
+import {
+  evaluationSeconds,
+  excludedSellerIds,
+  isOwedALook,
+  sellerCandidates,
+  sortCandidates,
+  withoutExcluded,
+  type EvaluationRecord,
+} from "../src/sellerCandidates";
+import type {
+  BreadthLevel,
+  Item,
+  SellerEvaluationResponse,
+  SellerListEntry,
+} from "../src/types/api";
+
+const GRADES: Record<string, string> = {
+  "1": "新品、未使用",
+  "2": "未使用に近い",
+  "3": "目立った傷や汚れなし",
+  "5": "傷や汚れあり",
+};
+
+function item(id: string, sellerId: string, condition: string | null = "3"): Item {
+  return {
+    id,
+    title: `商品 ${id}`,
+    priceYen: 1000,
+    url: `https://jp.mercari.com/item/${id}`,
+    imageUrls: [],
+    createdAt: "2026-01-01T00:00:00+09:00",
+    updatedAt: "2026-01-02T00:00:00+09:00",
+    listingStatus: "on_sale",
+    saleFormat: "fixed_price",
+    sellerId,
+    itemCondition:
+      condition === null ? null : { id: condition, name: GRADES[condition] ?? null },
+  };
+}
+
+function looked(level: BreadthLevel): EvaluationRecord {
+  return {
+    status: "done",
+    evaluation: { breadth: { level } } as SellerEvaluationResponse,
+  };
+}
+
+const ids = (candidates: { sellerId: string }[]) =>
+  candidates.map((candidate) => candidate.sellerId);
+
+describe("grouping by seller", () => {
+  it("lists each seller once, in the order they first appear", () => {
+    const candidates = sellerCandidates([
+      item("a", "s2"),
+      item("b", "s1"),
+      item("c", "s2"),
+    ]);
+
+    expect(ids(candidates)).toEqual(["s2", "s1"]);
+    expect(candidates[0]?.hits.map((hit) => hit.id)).toEqual(["a", "c"]);
+    expect(candidates[1]?.firstIndex).toBe(1);
+  });
+
+  it("counts the grades on a seller's hits, best first", () => {
+    const [candidate] = sellerCandidates([
+      item("a", "s1", "5"),
+      item("b", "s1", "1"),
+      item("c", "s1", "5"),
+    ]);
+
+    expect(candidate?.conditions).toEqual([
+      { id: "1", name: "新品、未使用", count: 1 },
+      { id: "5", name: "傷や汚れあり", count: 2 },
+    ]);
+    expect(candidate?.worstRank).toBe(5);
+  });
+
+  it("keeps a grade nobody could place apart, and never as a bad one", () => {
+    // No condition at all, and a number Mercari's table has no name for.
+    const [candidate] = sellerCandidates([
+      item("a", "s1", null),
+      item("b", "s1", "9"),
+      item("c", "s1", "2"),
+    ]);
+
+    expect(candidate?.unknownConditionCount).toBe(2);
+    expect(candidate?.conditions).toEqual([
+      { id: "2", name: "未使用に近い", count: 1 },
+    ]);
+    expect(candidate?.worstRank).toBe(2);
+  });
+
+  it("has no worst grade when none could be placed", () => {
+    const [candidate] = sellerCandidates([item("a", "s1", null)]);
+
+    expect(candidate?.worstRank).toBeNull();
+  });
+});
+
+describe("ordering", () => {
+  const candidates = sellerCandidates([
+    item("a", "narrow"),
+    item("b", "never-looked-at", "1"),
+    item("c", "wide", "5"),
+    item("d", "nothing-listed", null),
+    item("e", "mixed", "2"),
+    item("f", "wide", "3"),
+  ]);
+  const evaluations = new Map<string, EvaluationRecord>([
+    ["narrow", looked("narrow")],
+    ["wide", looked("wide")],
+    ["mixed", looked("mixed")],
+    ["nothing-listed", looked("unknown")],
+  ]);
+
+  it("by breadth puts the widest shelf first and the unasked last", () => {
+    expect(ids(sortCandidates(candidates, "breadth", evaluations))).toEqual([
+      "wide",
+      "mixed",
+      "narrow",
+      // An answer, even if the answer is that nothing could be analysed.
+      "nothing-listed",
+      "never-looked-at",
+    ]);
+  });
+
+  it("by breadth changes nothing before anyone has been looked at", () => {
+    // Shuffling the list on a sort that has nothing to sort by would read as
+    // the sort having found something.
+    expect(ids(sortCandidates(candidates, "breadth", new Map()))).toEqual(
+      ids(candidates),
+    );
+  });
+
+  it("by condition goes by each seller's most worn hit", () => {
+    // `wide` has a 目立った傷や汚れなし and a 傷や汚れあり. One good card does
+    // not make a seller of good cards, so the worn one decides.
+    expect(ids(sortCandidates(candidates, "condition", evaluations))).toEqual([
+      "never-looked-at",
+      "mixed",
+      "narrow",
+      "wide",
+      "nothing-listed",
+    ]);
+  });
+
+  it("by hits puts the seller with the most matching listings first", () => {
+    expect(ids(sortCandidates(candidates, "hits", evaluations))[0]).toBe("wide");
+  });
+
+  it("does not reorder the list it was given", () => {
+    const before = ids(candidates);
+    sortCandidates(candidates, "hits", evaluations);
+
+    expect(ids(candidates)).toEqual(before);
+  });
+});
+
+describe("who is still owed a look", () => {
+  it.each([
+    [undefined, true],
+    [{ status: "queued" }, true],
+    [{ status: "failed" }, true],
+    [looked("wide"), false],
+    // Mercari said there is no such seller. Asking again buys nothing.
+    [{ status: "gone" }, false],
+  ] as [EvaluationRecord | undefined, boolean][])("%j → %s", (record, owed) => {
+    expect(isOwedALook(record)).toBe(owed);
+  });
+});
+
+describe("the excluded list", () => {
+  const entries: SellerListEntry[] = [
+    { sellerId: "s1", kind: "excluded", addedAt: "2026-11-19T12:00:00+09:00", note: "" },
+    { sellerId: "s2", kind: "saved", addedAt: "2026-11-19T12:00:00+09:00", note: "" },
+    { sellerId: "s9", kind: "excluded", addedAt: "2026-11-19T12:00:00+09:00", note: "" },
+  ];
+  const items = [item("a", "s1"), item("b", "s2"), item("c", "s1"), item("d", "s3")];
+
+  it("is the excluded sellers only, not the saved ones", () => {
+    expect([...excludedSellerIds(entries)].sort()).toEqual(["s1", "s9"]);
+  });
+
+  it("hands back what was held, so the screen can count it", () => {
+    const split = withoutExcluded(items, excludedSellerIds(entries));
+
+    expect(split.kept.map((kept) => kept.id)).toEqual(["b", "d"]);
+    expect(split.heldBack.map((held) => held.id)).toEqual(["a", "c"]);
+    // One seller, two listings. `s9` is excluded but is not in this result,
+    // and is not counted as held back from it.
+    expect(split.heldBackSellerCount).toBe(1);
+  });
+
+  it("holds nothing back when nobody is excluded", () => {
+    const split = withoutExcluded(items, new Set());
+
+    expect(split.kept).toEqual(items);
+    expect(split.heldBack).toEqual([]);
+    expect(split.heldBackSellerCount).toBe(0);
+  });
+});
+
+describe("what a look costs", () => {
+  it("is three requests a seller, two seconds apart", () => {
+    expect(evaluationSeconds(1)).toBe(6);
+    expect(evaluationSeconds(30)).toBe(180);
+  });
+});

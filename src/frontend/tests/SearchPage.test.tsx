@@ -14,13 +14,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppRoutes } from "../src/App";
 import { SearchProvider } from "../src/searchState";
+import { SellerDiscoveryProvider } from "../src/sellerDiscoveryState";
 import type { CollectionMeta, Item, SearchResponse } from "../src/types/api";
 
 const searchMock = vi.hoisted(() => vi.fn());
+/**
+ * The reader's seller lists, which the application reads once when it opens.
+ *
+ * Mocked in every test that mounts a screen. Left real it would call `fetch`
+ * from jsdom, fail, and leave each screen saying the lists could not be read.
+ */
+const sellerListsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/api/client")>()),
   search: searchMock,
+  sellerLists: sellerListsMock,
 }));
 
 function item(
@@ -74,9 +83,11 @@ const RESULT: SearchResponse = {
 function mount() {
   return render(
     <SearchProvider>
-      <MemoryRouter initialEntries={["/"]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <SellerDiscoveryProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </SellerDiscoveryProvider>
     </SearchProvider>,
   );
 }
@@ -96,6 +107,8 @@ const titles = () =>
 beforeEach(() => {
   searchMock.mockReset();
   searchMock.mockResolvedValue(RESULT);
+  sellerListsMock.mockReset();
+  sellerListsMock.mockResolvedValue({ entries: [] });
 });
 
 afterEach(() => {

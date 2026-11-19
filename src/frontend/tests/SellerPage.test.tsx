@@ -13,6 +13,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SellerPage } from "../src/pages/SellerPage";
+import { SellerDiscoveryProvider } from "../src/sellerDiscoveryState";
 import type {
   CollectionMeta,
   Item,
@@ -20,10 +21,18 @@ import type {
 } from "../src/types/api";
 
 const sellerMock = vi.hoisted(() => vi.fn());
+/**
+ * The reader's seller lists, which the application reads once when it opens.
+ *
+ * Mocked in every test that mounts a screen. Left real it would call `fetch`
+ * from jsdom, fail, and leave each screen saying the lists could not be read.
+ */
+const sellerListsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/api/client")>()),
   sellerAnalysis: sellerMock,
+  sellerLists: sellerListsMock,
 }));
 
 const COLLECTED_AT = "2026-09-02T14:03:00+09:00";
@@ -114,11 +123,13 @@ function analysis(patch: Partial<SellerAnalysisResponse> = {}): SellerAnalysisRe
 
 function mount() {
   return render(
-    <MemoryRouter initialEntries={["/sellers/s1"]}>
-      <Routes>
-        <Route path="/sellers/:sellerId" element={<SellerPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <SellerDiscoveryProvider>
+      <MemoryRouter initialEntries={["/sellers/s1"]}>
+        <Routes>
+          <Route path="/sellers/:sellerId" element={<SellerPage />} />
+        </Routes>
+      </MemoryRouter>
+    </SellerDiscoveryProvider>,
   );
 }
 
@@ -130,6 +141,8 @@ const cardTitles = () =>
 beforeEach(() => {
   sellerMock.mockReset();
   sellerMock.mockResolvedValue(analysis());
+  sellerListsMock.mockReset();
+  sellerListsMock.mockResolvedValue({ entries: [] });
 });
 
 afterEach(() => {
@@ -152,11 +165,13 @@ describe("collecting", () => {
     // in development only, with every test passing.
     render(
       <StrictMode>
-        <MemoryRouter initialEntries={["/sellers/s1"]}>
-          <Routes>
-            <Route path="/sellers/:sellerId" element={<SellerPage />} />
-          </Routes>
-        </MemoryRouter>
+        <SellerDiscoveryProvider>
+          <MemoryRouter initialEntries={["/sellers/s1"]}>
+            <Routes>
+              <Route path="/sellers/:sellerId" element={<SellerPage />} />
+            </Routes>
+          </MemoryRouter>
+        </SellerDiscoveryProvider>
       </StrictMode>,
     );
     await screen.findByText("ポケカ引退おじさん");

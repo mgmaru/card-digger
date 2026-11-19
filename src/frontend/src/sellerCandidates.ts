@@ -1,0 +1,242 @@
+/**
+ * The sellers behind a search result, and the order they are looked at in.
+ *
+ * **Nothing here sends a request.** A search already says who listed each
+ * item and how worn they said it was, so the people behind a result can be
+ * laid out from what is in hand. What a search does not say — what else each
+ * of them sells — costs three Mercari requests a seller and is asked for
+ * separately, by an explicit press
+ * ([出品者探索 §4](../../../docs/product/seller-discovery-spec.md)).
+ *
+ * Two different things are known about a candidate, and they are kept apart:
+ *
+ * - **What the search showed.** How many of their listings matched, and the
+ *   grades on those. Known for everyone, at once.
+ * - **What a brief look found.** Their name, their ratings, how much of their
+ *   shelf is something other than trading cards. Known only once asked.
+ */
+
+import { grade } from "./searchQuery";
+import type {
+  BreadthLevel,
+  Item,
+  SellerEvaluationResponse,
+  SellerListEntry,
+} from "./types/api";
+
+export type ConditionCount = { id: string; name: string; count: number };
+
+export type SellerCandidate = {
+  sellerId: string;
+  /** This seller's listings in the result, in the order the result holds them. */
+  hits: Item[];
+  /** Where their first listing sits in the result. The order they were found in. */
+  firstIndex: number;
+  /** The grades on those listings, best first. Only grades Mercari named. */
+  conditions: ConditionCount[];
+  /** Listings whose grade could not be placed. Never counted as a bad one. */
+  unknownConditionCount: number;
+  /**
+   * The most worn grade among their hits, as Mercari's number, or `null` when
+   * none could be placed. Larger is more worn: `1` is 新品、未使用.
+   */
+  worstRank: number | null;
+};
+
+/**
+ * Group a result by seller, in the order each seller first appears.
+ *
+ * That order is the result's own. Nothing is promoted here: sorting is a
+ * separate step the reader chooses, so the unsorted list reads the same as
+ * the grid beside it.
+ */
+export function sellerCandidates(items: readonly Item[]): SellerCandidate[] {
+  const found = new Map<string, { hits: Item[]; firstIndex: number }>();
+  items.forEach((item, index) => {
+    const seen = found.get(item.sellerId);
+    if (seen) {
+      seen.hits.push(item);
+    } else {
+      found.set(item.sellerId, { hits: [item], firstIndex: index });
+    }
+  });
+
+  return [...found.entries()].map(([sellerId, { hits, firstIndex }]) => {
+    const counted = new Map<number, ConditionCount>();
+    let unknown = 0;
+    for (const hit of hits) {
+      const seen = grade(hit.itemCondition);
+      if (seen === null) {
+        unknown += 1;
+        continue;
+      }
+      const tally = counted.get(seen.rank);
+      if (tally) {
+        tally.count += 1;
+      } else {
+        counted.set(seen.rank, { id: seen.id, name: seen.name, count: 1 });
+      }
+    }
+    const ranks = [...counted.keys()].sort((a, b) => a - b);
+    return {
+      sellerId,
+      hits,
+      firstIndex,
+      conditions: ranks.map((rank) => counted.get(rank) as ConditionCount),
+      unknownConditionCount: unknown,
+      worstRank: ranks.at(-1) ?? null,
+    };
+  });
+}
+
+/**
+ * How far a brief look at one seller has got.
+ *
+ * `failed` is not final: a seller whose look timed out is asked about again
+ * by the next press, which is the only retry there is. `gone` is final. Mercari
+ * answered that there is no such seller, and asking again would spend a
+ * request to hear the same thing.
+ */
+export type EvaluationRecord =
+  | { status: "queued" }
+  | { status: "running" }
+  | { status: "done"; evaluation: SellerEvaluationResponse }
+  | { status: "failed" }
+  | { status: "gone" };
+
+/** Whether the next press should ask about this seller. */
+export function isOwedALook(record: EvaluationRecord | undefined): boolean {
+  return record?.status !== "done" && record?.status !== "gone";
+}
+
+export type CandidateSort = "found" | "breadth" | "condition" | "hits";
+
+export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
+  found: "検索結果に出た順",
+  breadth: "出品の幅が広い順",
+  condition: "商品の状態が良い順",
+  hits: "一致した出品が多い順",
+};
+
+export const CANDIDATE_SORT_ORDER: CandidateSort[] = [
+  "found",
+  "breadth",
+  "condition",
+  "hits",
+];
+
+/**
+ * Where a band sits when ordering by breadth. Smaller comes first.
+ *
+ * `unknown` — a seller looked at who had nothing listed to analyse — comes
+ * after every real band. It is an answer, so it still comes before a seller
+ * nobody has looked at yet.
+ */
+const BREADTH_ORDER: Record<BreadthLevel, number> = {
+  wide: 0,
+  mixed: 1,
+  narrow: 2,
+  unknown: 3,
+};
+const NOT_LOOKED_AT = 4;
+
+function breadthOrder(record: EvaluationRecord | undefined): number {
+  return record?.status === "done"
+    ? BREADTH_ORDER[record.evaluation.breadth.level]
+    : NOT_LOOKED_AT;
+}
+
+/**
+ * Order a copy of the candidates.
+ *
+ * Every order falls back to the order found, so two sellers that tie do not
+ * swap places between renders — and so that sorting by breadth before anyone
+ * has been looked at changes nothing, rather than shuffling the list.
+ *
+ * By condition, the seller whose *most worn* hit is least worn comes first: a
+ * seller with one mint card and one damaged one is not a seller of mint cards.
+ * A seller with no grade that could be placed comes last, and is not treated
+ * as worn.
+ */
+export function sortCandidates(
+  candidates: readonly SellerCandidate[],
+  sort: CandidateSort,
+  evaluations: ReadonlyMap<string, EvaluationRecord>,
+): SellerCandidate[] {
+  const sorted = [...candidates];
+  const found = (a: SellerCandidate, b: SellerCandidate) =>
+    a.firstIndex - b.firstIndex;
+
+  sorted.sort((a, b) => {
+    switch (sort) {
+      case "found":
+        return found(a, b);
+      case "breadth":
+        return (
+          breadthOrder(evaluations.get(a.sellerId)) -
+            breadthOrder(evaluations.get(b.sellerId)) || found(a, b)
+        );
+      case "condition":
+        return (
+          (a.worstRank ?? Number.POSITIVE_INFINITY) -
+            (b.worstRank ?? Number.POSITIVE_INFINITY) || found(a, b)
+        );
+      case "hits":
+        return b.hits.length - a.hits.length || found(a, b);
+    }
+  });
+  return sorted;
+}
+
+/** The sellers on the excluded list, as a set to test membership against. */
+export function excludedSellerIds(
+  entries: readonly SellerListEntry[],
+): Set<string> {
+  return new Set(
+    entries
+      .filter((entry) => entry.kind === "excluded")
+      .map((entry) => entry.sellerId),
+  );
+}
+
+/**
+ * Split a result into what is shown and what the excluded list keeps back.
+ *
+ * Both halves are returned, because the screen has to say how many sellers
+ * and listings were kept back. A filter that only handed over the survivors
+ * would leave the reader unable to tell an empty result from a hidden one,
+ * which is the reason excluding by keyword was put off
+ * ([O-7](../../../docs/planning/todo.md)).
+ */
+export function withoutExcluded(
+  items: readonly Item[],
+  excluded: ReadonlySet<string>,
+): { kept: Item[]; heldBack: Item[]; heldBackSellerCount: number } {
+  if (excluded.size === 0) {
+    return { kept: [...items], heldBack: [], heldBackSellerCount: 0 };
+  }
+  const kept: Item[] = [];
+  const heldBack: Item[] = [];
+  for (const item of items) {
+    (excluded.has(item.sellerId) ? heldBack : kept).push(item);
+  }
+  return {
+    kept,
+    heldBack,
+    heldBackSellerCount: new Set(heldBack.map((item) => item.sellerId)).size,
+  };
+}
+
+/**
+ * Seconds a brief look at this many sellers takes, at the least.
+ *
+ * Three Mercari requests a seller, two seconds apart. A floor rather than an
+ * estimate: the requests themselves take time on top, and the screen says
+ * 目安 for that reason.
+ */
+export const REQUESTS_PER_EVALUATION = 3;
+export const SECONDS_BETWEEN_REQUESTS = 2;
+
+export function evaluationSeconds(sellerCount: number): number {
+  return sellerCount * REQUESTS_PER_EVALUATION * SECONDS_BETWEEN_REQUESTS;
+}
