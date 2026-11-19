@@ -19,6 +19,8 @@ import styles from "./Stage.module.css";
 
 export const FETCH_STAGE_TITLE = "取得する条件";
 export const DISPLAY_STAGE_TITLE = "表示の絞り込み";
+/** The step between the two, on the seller search: whom to look at. */
+export const SELECT_STAGE_TITLE = "調べる出品者";
 
 export function Stage({
   title,

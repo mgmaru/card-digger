@@ -145,7 +145,7 @@ test("the 出品者 tab works from the keyboard alone", async ({ page }) => {
   await expect(page.getByLabel("並び順")).toBeFocused();
 });
 
-test("going looking for sellers from one press", async ({ page }) => {
+test("going looking for sellers: a search, then a look", async ({ page }) => {
   const sent: string[] = [];
   page.on("request", (request) => {
     const { pathname } = new URL(request.url());
@@ -161,18 +161,27 @@ test("going looking for sellers from one press", async ({ page }) => {
   // changed goes into that one.
   await expect(page.getByRole("heading", { name: "出品者検索" })).toBeVisible();
 
-  // --- Nothing is sent until the press, and the press says what it can cost -
+  // --- Nothing is sent until a press, and the press says what it can cost ---
   // By role: each field's 外す button is named after the field as well.
   await page.getByRole("textbox", { name: "キーワード 1" }).fill(KEYWORD);
   await page.getByRole("button", { name: "別のキーワードでも探す" }).click();
   await page.getByRole("textbox", { name: "キーワード 2" }).fill("どこにも無い語");
-  await expect(page.getByText(/Mercariへ最大80回問い合わせます/)).toBeVisible();
+  await expect(page.getByText(/Mercariへ最大20回問い合わせます/)).toBeVisible();
   expect(sent).toEqual([]);
 
-  // --- One press: both searches, then both sellers -------------------------
-  // Exact: the button that adds a field ends in the same word.
-  await page.getByRole("button", { name: "探す", exact: true }).click();
+  // --- The first press searches, and looks at nobody -----------------------
+  const fetching = page.getByRole("region", { name: "取得する条件" });
+  await fetching.getByRole("button", { name: "検索", exact: true }).click();
   await expect(page.getByText("12件の出品から 2人の出品者")).toBeVisible();
+  expect(sent).toEqual(["/api/search", "/api/search"]);
+
+  // --- The second says exactly what it will send, then looks ---------------
+  const selecting = page.getByRole("region", { name: "調べる出品者" });
+  await expect(selecting).toContainText("対象の出品者 2人（まだ調べていない人 2人）");
+  await expect(selecting).toContainText("Mercariへ6回問い合わせます（2人 × 3回");
+  await selecting.getByRole("button", { name: "調べる", exact: true }).click();
+  await expect(page.getByRole("tablist", { name: "見つかった出品者" })).toBeVisible();
+  await expect(selecting).toContainText("対象の出品者は全員調べました。");
   expect(sent).toEqual([
     "/api/search",
     "/api/search",
@@ -198,7 +207,7 @@ test("going looking for sellers from one press", async ({ page }) => {
   await expect(page.getByRole("tabpanel")).toContainText("seller-sample-1");
   await page.getByRole("button", { name: "この1人を除外リストへ入れる" }).click();
   await expect(page.getByRole("tab", { name: /カード専門/ })).toContainText("0");
-  await expect(record).toContainText("除外リストの出品者 1人・10件は対象から外しています");
+  await expect(selecting).toContainText("除外リストの出品者 1人・10件は対象から外しています");
 
   // --- And the search screen then leaves their listings out too ------------
   await page.getByRole("link", { name: "商品検索" }).click();
@@ -241,5 +250,14 @@ test("narrowing a result by the words in its titles", async ({ page }) => {
   await page.getByLabel("タイトルに含む語").fill("ポケ");
   await page.getByRole("link", { name: "出品者検索" }).click();
   await expect(page.getByRole("heading", { name: "出品者検索" })).toBeVisible();
-  await expect(page.getByLabel("タイトルに含む語")).toHaveValue("ポケ");
+  // There the words choose whom to look at, so they are offered once a
+  // search has found somebody to choose from.
+  await page.getByRole("textbox", { name: "キーワード 1" }).fill(KEYWORD);
+  await page
+    .getByRole("region", { name: "取得する条件" })
+    .getByRole("button", { name: "検索", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "調べる出品者" }).getByLabel("タイトルに含む語"),
+  ).toHaveValue("ポケ");
 });

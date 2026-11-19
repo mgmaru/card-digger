@@ -123,23 +123,36 @@ export function chooseTargets(
 }
 
 /**
- * The most a press can cost, said before it is pressed.
+ * The most a search can cost, said before it is pressed.
  *
  * A ceiling, not an estimate. A search stops when it runs out of listings or
- * time, and usually well short of ten pages; a result may hold fewer sellers
- * than the budget. The screen says 最大 for that reason.
+ * time, and usually well short of ten pages. The screen says 最大 for that
+ * reason.
  *
- * The count is of pages and looks. The backend tries a request once more
- * when it fails in passing, and those second attempts are not in it — the
- * same way 3 a seller is counted on the 出品者 tab (出品者探索 §4.2). The
- * seconds are the interval alone, so they are a floor for that many requests.
+ * The count is of pages. The backend tries a request once more when it fails
+ * in passing, and those second attempts are not in it — the same way 3 a
+ * seller is counted on the 出品者 tab (出品者探索 §4.2). The seconds are the
+ * interval alone, so they are a floor for that many requests.
  */
-export function huntCeiling(
-  keywordCount: number,
-  sellerBudget: number,
-): { requests: number; seconds: number } {
-  const requests =
-    keywordCount * SEARCH_PAGE_LIMIT + sellerBudget * REQUESTS_PER_EVALUATION;
+export function searchCeiling(keywordCount: number): {
+  requests: number;
+  seconds: number;
+} {
+  const requests = keywordCount * SEARCH_PAGE_LIMIT;
+  return { requests, seconds: requests * SECONDS_BETWEEN_REQUESTS };
+}
+
+/**
+ * What looking at this many sellers costs.
+ *
+ * **Not a ceiling.** By the time this is shown the searches are done and the
+ * sellers are known, so it is the number of requests the press will send —
+ * which a single press that searched and looked could never say, and is one
+ * of the reasons the two were parted (出品者探索 §15). The seconds are still
+ * the interval alone.
+ */
+export function lookCost(sellerCount: number): { requests: number; seconds: number } {
+  const requests = sellerCount * REQUESTS_PER_EVALUATION;
   return { requests, seconds: requests * SECONDS_BETWEEN_REQUESTS };
 }
 

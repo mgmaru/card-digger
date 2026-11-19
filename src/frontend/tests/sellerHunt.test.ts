@@ -12,11 +12,12 @@ import { describe, expect, it } from "vitest";
 import { sellerCandidates, type EvaluationRecord } from "../src/sellerCandidates";
 import {
   chooseTargets,
-  huntCeiling,
   keywordsFrom,
+  lookCost,
   MAX_KEYWORDS,
   mergeItems,
   pileOf,
+  searchCeiling,
   SPECIALIST_FROM_CARD_PERCENT,
 } from "../src/sellerHunt";
 import type {
@@ -162,16 +163,26 @@ describe("choosing who to look at", () => {
   });
 });
 
-describe("what a press can cost", () => {
-  it("is ten requests a keyword and three a seller, two seconds each", () => {
-    expect(huntCeiling(3, 20)).toEqual({ requests: 90, seconds: 180 });
+describe("what each press can cost", () => {
+  it("is at most ten requests a keyword for a search, two seconds each", () => {
+    expect(searchCeiling(3)).toEqual({ requests: 30, seconds: 60 });
   });
 
-  it("is 140 requests at the largest press the screen allows", () => {
-    // Past the 110 to 123 a live acceptance run has sent without a refusal.
-    // The specification says so (出品者探索 §12.3); a change to either limit
-    // moves this number and should be made knowing that.
-    expect(huntCeiling(MAX_KEYWORDS, 30).requests).toBe(140);
+  it("is fifty requests at the most keywords a search may have", () => {
+    // Sellers are not in it any more. Looking at them is the other press.
+    expect(searchCeiling(MAX_KEYWORDS).requests).toBe(50);
+  });
+
+  it("is exactly three requests a seller for a look", () => {
+    // Not a ceiling: by then the sellers are known.
+    expect(lookCost(4)).toEqual({ requests: 12, seconds: 24 });
+    expect(lookCost(0)).toEqual({ requests: 0, seconds: 0 });
+  });
+
+  it("is ninety requests at the most sellers one look may take", () => {
+    // Each press is inside the 110 to 123 a live acceptance run has sent
+    // without a refusal. Both, one after the other, are not (出品者探索 §15).
+    expect(lookCost(30).requests).toBe(90);
   });
 });
 
