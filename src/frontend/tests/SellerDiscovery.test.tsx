@@ -568,3 +568,99 @@ describe("the list a seller is on, from the seller screen", () => {
     expect(within(panel).getByLabelText("ゆうママのメモ")).toHaveValue("旧裏のまとめ売りあり");
   });
 });
+
+describe("the words a title has to contain", () => {
+  const titled = (id: string, sellerId: string, title: string): Item => ({
+    ...item(id, sellerId, "3"),
+    title,
+  });
+  const termsField = () => screen.getByLabelText("タイトルに含む語");
+  const tab = (name: RegExp) => screen.getByRole("tab", { name });
+
+  beforeEach(() => {
+    // What Mercari does with a keyword: two listings that say the game, one
+    // that matched loosely and says another game, and one whose title names
+    // no game at all.
+    mocks.search.mockResolvedValue({
+      items: [
+        titled("a", "home", "ポケモンカード まとめ 押入れ"),
+        titled("b", "attic", "NARUTO カードゲーム まとめ売り"),
+        titled("c", "home", "カード まとめ売り"),
+        titled("d", "shop", "ポケカ 引退品"),
+      ],
+      meta: META,
+    });
+  });
+
+  it("narrow nothing until one is typed", async () => {
+    await searchAndOpenSellers();
+
+    expect(termsField()).toHaveValue("");
+    expect(tab(/商品/)).toHaveTextContent("4");
+    expect(tab(/出品者/)).toHaveTextContent("3");
+    expect(screen.queryByText(/含まない出品/)).not.toBeInTheDocument();
+  });
+
+  it("keep back the same listings in both tabs, and say how many", async () => {
+    const user = await searchAndOpenSellers();
+
+    await user.type(termsField(), "ポケモン ポケカ");
+
+    expect(tab(/商品/)).toHaveTextContent("2");
+    expect(tab(/出品者/)).toHaveTextContent("2");
+    expect(rowNames()).toEqual(["Seller home", "Seller shop"]);
+    // `home` keeps one listing of two and stays; `attic` had only the one.
+    expect(
+      screen.getByText(
+        "タイトルに「ポケモン」「ポケカ」のどれも含まない出品 2件を表示していません（出品者 1人は、ほかに残る出品がありません）",
+      ),
+    ).toBeInTheDocument();
+    expect(rows()[0]).toHaveTextContent("一致した出品1件");
+  });
+
+  it("bring everything back when the field is emptied, without searching again", async () => {
+    const user = await searchAndOpenSellers();
+    await user.type(termsField(), "ポケモン");
+    expect(tab(/出品者/)).toHaveTextContent("1");
+
+    await user.clear(termsField());
+
+    expect(tab(/商品/)).toHaveTextContent("4");
+    expect(tab(/出品者/)).toHaveTextContent("3");
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+  });
+
+  it("send nothing by being typed", async () => {
+    const user = await searchAndOpenSellers();
+
+    await user.type(termsField(), "ポケモン ポケカ");
+
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("keep a seller whose only listing is kept back from being looked at", async () => {
+    mocks.sellerEvaluation.mockImplementation(async (id: string) =>
+      evaluation(id, `出品者${id}`, "wide", 18, 20),
+    );
+    const user = await searchAndOpenSellers();
+    await user.type(termsField(), "ポケモン ポケカ");
+
+    await user.click(lookButton());
+
+    await waitFor(() => expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(2));
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["shop"]]);
+  });
+
+  it("say so in the record of what was collected", async () => {
+    const user = await searchAndOpenSellers();
+
+    await user.type(termsField(), "ポケモン ポケカ");
+
+    // The record must not read as if four listings were on screen.
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した条件に一致: 2件",
+    );
+  });
+});
+

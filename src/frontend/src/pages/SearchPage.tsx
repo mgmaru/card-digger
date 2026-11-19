@@ -18,10 +18,12 @@ import { SearchForm } from "../components/SearchForm";
 import { SellerCandidates } from "../components/SellerCandidates";
 import { SellerListError } from "../components/SellerListNote";
 import { Tabs } from "../components/Tabs";
+import { TitleTermsField } from "../components/TitleTermsField";
 import { conditionChoices, hasActiveFilter, visibleItems } from "../searchQuery";
 import { useSearchState } from "../searchState";
 import { excludedSellerIds, withoutExcluded } from "../sellerCandidates";
 import { useSellerDiscovery, type SearchTab } from "../sellerDiscoveryState";
+import { parseTitleTerms, quoteTerms, withTitleTerms } from "../titleTerms";
 import type { ApiFailureKind } from "../api/client";
 import {
   EMPTY_SEARCH_FORM,
@@ -114,8 +116,14 @@ export function SearchPage() {
     void runSearch(checked.keyword, checked.band);
   };
 
-  const { entries, searchTab, setSearchTab, showExcluded, setShowExcluded } =
-    useSellerDiscovery();
+  const {
+    entries,
+    searchTab,
+    setSearchTab,
+    showExcluded,
+    setShowExcluded,
+    titleTermsText,
+  } = useSellerDiscovery();
 
   // The excluded list is applied before anything else narrows the result, and
   // it is applied here rather than in the backend: the response stays the
@@ -126,10 +134,21 @@ export function SearchPage() {
       result ? withoutExcluded(result.items, excludedSellerIds(entries)) : null,
     [result, entries],
   );
-  const inView = useMemo(
+  const afterExclusion = useMemo(
     () => (result && held ? (showExcluded ? result.items : held.kept) : []),
     [result, held, showExcluded],
   );
+
+  // Then the title. Mercari returns listings that match a keyword only
+  // loosely, and in 新しい順 they stand level with the ones that match well;
+  // the reader's words are applied to what came back, and what they keep back
+  // is counted below (出品者探索 §13). Both tabs read `inView`, so both agree.
+  const titleTerms = useMemo(() => parseTitleTerms(titleTermsText), [titleTermsText]);
+  const titled = useMemo(
+    () => withTitleTerms(afterExclusion, titleTerms),
+    [afterExclusion, titleTerms],
+  );
+  const inView = titled.kept;
 
   const shown = useMemo(
     () =>
@@ -189,7 +208,7 @@ export function SearchPage() {
             items={result.items}
             sort={sort}
             visibleCount={shown.length}
-            filtered={narrowed}
+            filtered={narrowed || titled.heldBack.length > 0}
             band={band}
             // Collects the same question again — the band the result came
             // from, not whatever is currently typed above.
@@ -213,6 +232,23 @@ export function SearchPage() {
                 {showExcluded ? "隠す" : "表示する"}
               </button>
             </p>
+          )}
+
+          {result.items.length > 0 && (
+            // Above the tabs, like the line about the excluded list: it
+            // decides what both of them hold.
+            <>
+              <TitleTermsField />
+              {titled.heldBack.length > 0 && (
+                <p className={styles.heldBack}>
+                  タイトルに{quoteTerms(titleTerms)}
+                  {titleTerms.length > 1 ? "のどれも" : "を"}含まない出品{" "}
+                  {titled.heldBack.length.toLocaleString("ja-JP")}件を表示していません
+                  {titled.goneSellerCount > 0 &&
+                    `（出品者 ${titled.goneSellerCount.toLocaleString("ja-JP")}人は、ほかに残る出品がありません）`}
+                </p>
+              )}
+            </>
           )}
 
           {result.items.length === 0 ? (

@@ -121,6 +121,17 @@ export type SellerDiscoveryState = {
   /** Whether listings by excluded sellers are shown anyway. Off by default. */
   showExcluded: boolean;
   setShowExcluded: (show: boolean) => void;
+
+  /**
+   * The words a title has to contain one of, as typed (出品者探索 §13).
+   *
+   * Held here, beside the other things that decide what of a result is
+   * shown, so the search screen and 出品者を探す narrow by the same words.
+   * Empty narrows nothing. Not stored: it is gone on a reload, like the
+   * result it narrows.
+   */
+  titleTermsText: string;
+  setTitleTermsText: (text: string) => void;
 };
 
 const SellerDiscoveryContext = createContext<SellerDiscoveryState | null>(null);
@@ -139,6 +150,7 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
 
   const [searchTab, setSearchTab] = useState<SearchTab>("items");
   const [showExcluded, setShowExcluded] = useState(false);
+  const [titleTermsText, setTitleTermsText] = useState("");
 
   // Read once when the application opens, and again only when asked. The
   // lists are a local file: this sends nothing to Mercari, which is what
@@ -316,6 +328,8 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
       setSearchTab,
       showExcluded,
       setShowExcluded,
+      titleTermsText,
+      setTitleTermsText,
     }),
     [
       listsStatus,
@@ -332,6 +346,7 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
       stopEvaluating,
       searchTab,
       showExcluded,
+      titleTermsText,
     ],
   );
 
