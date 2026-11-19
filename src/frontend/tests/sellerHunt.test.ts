@@ -175,10 +175,10 @@ describe("what a press can cost", () => {
 
 describe("which pile a seller lands in", () => {
   it.each([
-    [looked("wide"), "candidates"],
+    [looked("wide"), "varied"],
     // Shown, not hidden. Showing someone costs a glance; hiding them costs
     // the find.
-    [looked("mixed"), "candidates"],
+    [looked("mixed"), "varied"],
     [looked("narrow", "medium"), "specialists"],
     [looked("narrow", "high"), "specialists"],
     [looked("unknown"), "others"],
@@ -198,6 +198,6 @@ describe("which pile a seller lands in", () => {
   });
 
   it("keeps a wide shelf a candidate however few listings it was read from", () => {
-    expect(pileOf(looked("wide", "low"))).toBe("candidates");
+    expect(pileOf(looked("wide", "low"))).toBe("varied");
   });
 });

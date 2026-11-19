@@ -183,7 +183,7 @@ test("the ten step acceptance flow", async ({ page }) => {
   );
 
   // --- 9. 戻り、再検索されず、件数・Sort・Filterが手順5のまま -------------
-  await page.getByRole("link", { name: "検索へ戻る" }).click();
+  await page.getByRole("link", { name: "商品検索へ戻る" }).click();
   await expect(page.getByLabel("取得範囲")).toBeVisible();
 
   expect(searches).toHaveLength(1);

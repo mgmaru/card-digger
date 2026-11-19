@@ -20,12 +20,12 @@ Search for `ポケカ まとめ`, open the 出品者 tab and press the button.
 
 | Seller | What their shelf is | 出品の幅 | 「出品者を探す」での分類 |
 |---|---|---|---|
-| `seller-household` | Clothes and kitchenware, two card lots | 広い | 候補 |
-| `seller-clearing-out` | About a third trading cards | 中 | 候補 |
-| `seller-card-shop` | Trading cards, in the words of the trade | 狭い | 専門らしい |
-| `seller-retiring` | Three listings, all cards | 狭い（標本は少ない） | 少数出品 |
-| `seller-one-listing` | Only the listing the search found | 狭い（1件） | 少数出品 |
-| `300000006` | No profile. The look fails for this one alone | 取得できませんでした | その他 |
+| `seller-household` | Clothes and kitchenware, two card lots | 広い | 混ざっている |
+| `seller-clearing-out` | About a third trading cards | 中 | 混ざっている |
+| `seller-card-shop` | Trading cards, in the words of the trade | 狭い | カード専門 |
+| `seller-retiring` | Three listings, all cards | 狭い（標本は少ない） | 出品が少ない |
+| `seller-one-listing` | Only the listing the search found | 狭い（1件） | 出品が少ない |
+| `300000006` | No profile. The look fails for this one alone | 取得できませんでした | 未調査・不明 |
 
 The same sellers serve both screens: the 出品者 tab under a search, and
 出品者を探す, where `ポケカ まとめ` and `ポケモンカード` in two fields show two

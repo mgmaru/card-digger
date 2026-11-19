@@ -186,22 +186,22 @@ test("going looking for sellers from one press", async ({ page }) => {
   await expect(record).toContainText("どこにも無い語0件");
 
   // --- Both sell cards for the most part. Only one has a shelf to judge by --
-  await expect(page.getByRole("tab", { name: /候補/ })).toContainText("0");
-  await expect(page.getByRole("tab", { name: /少数出品/ })).toContainText("1");
-  await expect(page.getByRole("tab", { name: /専門らしい/ })).toContainText("1");
+  await expect(page.getByRole("tab", { name: /混ざっている/ })).toContainText("0");
+  await expect(page.getByRole("tab", { name: /出品が少ない/ })).toContainText("1");
+  await expect(page.getByRole("tab", { name: /カード専門/ })).toContainText("1");
 
-  await page.getByRole("tab", { name: /少数出品/ }).click();
+  await page.getByRole("tab", { name: /出品が少ない/ }).click();
   await expect(page.getByRole("tabpanel")).toContainText("seller-sample-2");
 
   // --- The specialists go to the excluded list in one press ----------------
-  await page.getByRole("tab", { name: /専門らしい/ }).click();
+  await page.getByRole("tab", { name: /カード専門/ }).click();
   await expect(page.getByRole("tabpanel")).toContainText("seller-sample-1");
   await page.getByRole("button", { name: "この1人を除外リストへ入れる" }).click();
-  await expect(page.getByRole("tab", { name: /専門らしい/ })).toContainText("0");
+  await expect(page.getByRole("tab", { name: /カード専門/ })).toContainText("0");
   await expect(record).toContainText("除外リストの出品者 1人・10件は対象から外しています");
 
   // --- And the search screen then leaves their listings out too ------------
-  await page.getByRole("link", { name: "検索", exact: true }).click();
+  await page.getByRole("link", { name: "商品検索" }).click();
   await expect(page.getByRole("heading", { name: "出品者を探す" })).toBeHidden();
   // Exact as well: the box on the screen just left is labelled キーワード…
   await page.getByLabel("キーワード", { exact: true }).fill(KEYWORD);

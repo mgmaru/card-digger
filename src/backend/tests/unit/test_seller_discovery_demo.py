@@ -106,8 +106,8 @@ class TestTheSellers:
         """What the screen that goes looking for sellers sorts by.
 
         A shelf of nothing but cards reads the same over three listings and
-        over thirty. That screen files the first under 少数出品 and only the
-        second under 専門らしい, by this confidence, so the seed has to hold
+        over thirty. That screen files the first under 出品が少ない and only the
+        second under カード専門, by this confidence, so the seed has to hold
         one of each or the two tabs cannot be told apart.
         """
         client = app()

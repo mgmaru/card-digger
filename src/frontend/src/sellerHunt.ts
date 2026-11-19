@@ -145,36 +145,43 @@ export function huntCeiling(
 /**
  * Which pile a seller falls in once the looking is done.
  *
- * - `candidates`: part of their shelf, or most of it, is something other than
- *   trading cards. Who the reader came for.
- * - `few`: trading cards for the most part, but over fewer than thirty
- *   listings. Somebody retiring from the hobby with three lots lands here,
- *   and so does a shop that opened last week. The count cannot tell them
- *   apart, so the pile does not pretend to.
- * - `specialists`: at least half trading cards, over thirty listings or more.
- *   Worth excluding, so the next press does not spend three requests finding
- *   that out again.
- * - `others`: everything that is not an answer either way — not reached, not
- *   found, failed, or looked at and found to have nothing listed to judge by.
+ * **The piles say what a seller's shelf is, not what to do about it.** They
+ * were first named 候補 / 少数出品 / 専門らしい — a verdict, and one made for a
+ * single use, finding people who do not know what their cards are worth. The
+ * reader pointed out that a card specialist is where to look for cards in
+ * good condition, and somebody whose shelf is mixed is where to look for a
+ * bargain: the same piles, read for two purposes. So each is named after the
+ * fact it sorts by, and the purpose is left to the reader (出品者探索 §12.5).
  *
- * **`few` exists because of the button on `specialists`.** That pile can be
- * excluded in one press, and a seller with a single listing — the card that
- * turned up in a cupboard — reads as "all trading cards" exactly as a shop
- * does. Excluding them in bulk would throw away the people most worth
- * finding.
+ * - `varied` (混ざっている): less than half of the shelf is trading cards.
+ * - `few` (出品が少ない): trading cards for the most part, but over fewer
+ *   than thirty listings. Somebody retiring from the hobby with three lots
+ *   lands here, and so does a shop that opened last week. The count cannot
+ *   tell them apart, so the pile does not pretend to.
+ * - `specialists` (カード専門): at least half trading cards, over thirty
+ *   listings or more.
+ * - `others` (未調査・不明): everything that is not an answer either way — not
+ *   reached, not found, failed, or looked at and found to have nothing listed
+ *   to judge by.
+ *
+ * **`few` is kept apart from `specialists` because of what one listing can
+ * say.** A seller with a single listing — the card that turned up in a
+ * cupboard — reads as "all trading cards" exactly as a shop does. Filed
+ * together, the pile a reader goes to for shops would hold the people least
+ * like one, and the button that excludes that pile would take them with it.
  *
  * The line between the two is Seller Knowledge's own: fewer than thirty
  * listings analysed is `sampleConfidence: "low"` (MVP specification section
  * 7.6). It is read from there, not written again, and it is a full page of
  * one status, which is what a seller with a real shelf fills.
  *
- * `mixed` is a candidate on purpose. Erring towards showing somebody costs a
- * glance; erring towards hiding them costs the find.
+ * Breadth 中 goes with 広い on purpose: both have a shelf that is not mostly
+ * cards, and splitting them would be a second line drawn on the same guess.
  */
-export type HuntPile = "candidates" | "few" | "specialists" | "others";
+export type HuntPile = "varied" | "few" | "specialists" | "others";
 
 export const HUNT_PILES: readonly HuntPile[] = [
-  "candidates",
+  "varied",
   "few",
   "specialists",
   "others",
@@ -188,7 +195,7 @@ export function pileOf(record: EvaluationRecord | undefined): HuntPile {
   switch (breadth.level) {
     case "wide":
     case "mixed":
-      return "candidates";
+      return "varied";
     case "narrow":
       return knowledge.sampleConfidence === "low" ? "few" : "specialists";
     case "unknown":

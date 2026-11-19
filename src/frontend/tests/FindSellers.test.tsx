@@ -399,11 +399,49 @@ describe("one press", () => {
     const user = await hunt();
     await done();
 
-    await user.click(screen.getByRole("link", { name: "検索" }));
+    await user.click(screen.getByRole("link", { name: "商品検索" }));
 
     // Nothing collected there, although two searches have run.
     expect(screen.queryByLabelText("取得範囲")).not.toBeInTheDocument();
     expect(screen.getByLabelText("キーワード")).toHaveValue("");
+  });
+});
+
+describe("what the screens and the piles are called", () => {
+  it("names the piles after what a seller's shelf is, in this order", async () => {
+    await hunt();
+    await done();
+
+    // Not 候補 / 少数出品 / 専門らしい: those were a verdict, and left the
+    // reader asking a candidate for what, few of what, a specialist in what.
+    const names = within(screen.getByRole("tablist", { name: "見つかった出品者" }))
+      .getAllByRole("tab")
+      .map((found) => found.textContent?.replace(/\d+$/, ""));
+    expect(names).toEqual(["混ざっている", "出品が少ない", "カード専門", "未調査・不明"]);
+  });
+
+  it("says what excluding the card specialists does, and not that they should be", async () => {
+    const user = await hunt();
+    await done();
+
+    await user.click(tab(/カード専門/));
+
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveTextContent(
+      "除外リストへ入れた出品者は、次から調べる対象に入らず、検索結果にも出なくなります。",
+    );
+    expect(panel).toHaveTextContent("ポケモンカードに限らず、カード全般で数えています。");
+  });
+
+  it("calls the search screen 商品検索, beside the screen that looks for sellers", () => {
+    mount();
+
+    const menu = within(screen.getByRole("navigation", { name: "画面" }));
+    expect(menu.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "商品検索",
+      "出品者を探す",
+      "出品者リスト",
+    ]);
   });
 });
 
@@ -412,11 +450,11 @@ describe("what was found", () => {
     await hunt();
     await done();
 
-    expect(tab(/候補/)).toHaveAttribute("aria-selected", "true");
-    expect(tab(/候補/)).toHaveTextContent("2");
-    expect(tab(/少数出品/)).toHaveTextContent("1");
-    expect(tab(/専門らしい/)).toHaveTextContent("1");
-    expect(tab(/その他/)).toHaveTextContent("0");
+    expect(tab(/混ざっている/)).toHaveAttribute("aria-selected", "true");
+    expect(tab(/混ざっている/)).toHaveTextContent("2");
+    expect(tab(/出品が少ない/)).toHaveTextContent("1");
+    expect(tab(/カード専門/)).toHaveTextContent("1");
+    expect(tab(/未調査・不明/)).toHaveTextContent("0");
     expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
   });
 
@@ -424,35 +462,35 @@ describe("what was found", () => {
     const user = await hunt();
     await done();
 
-    await user.click(tab(/少数出品/));
+    await user.click(tab(/出品が少ない/));
     expect(rowNames()).toEqual(["引退します"]);
     expect(screen.getByRole("tabpanel")).toHaveTextContent("この件数では判断できません");
 
-    await user.click(tab(/専門らしい/));
+    await user.click(tab(/カード専門/));
     expect(rowNames()).toEqual(["カード専門店"]);
   });
 
   it("excludes the specialists in one press, and only them", async () => {
     const user = await hunt();
     await done();
-    await user.click(tab(/専門らしい/));
+    await user.click(tab(/カード専門/));
 
     await user.click(screen.getByRole("button", { name: "この1人を除外リストへ入れる" }));
 
-    await waitFor(() => expect(tab(/専門らしい/)).toHaveTextContent("0"));
+    await waitFor(() => expect(tab(/カード専門/)).toHaveTextContent("0"));
     expect(mocks.putSellerListEntry.mock.calls).toEqual([["shop", "excluded", ""]]);
     // Gone from the piles, and the record says where.
     expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
       "除外リストの出品者 1人・3件は対象から外しています",
     );
-    expect(tab(/少数出品/)).toHaveTextContent("1");
+    expect(tab(/出品が少ない/)).toHaveTextContent("1");
   });
 
   it("offers no such button on the other piles", async () => {
     const user = await hunt();
     await done();
 
-    for (const name of [/候補/, /少数出品/, /その他/]) {
+    for (const name of [/混ざっている/, /出品が少ない/, /未調査・不明/]) {
       await user.click(tab(name));
       expect(
         screen.queryByRole("button", { name: /を除外リストへ入れる$/ }),
@@ -466,7 +504,7 @@ describe("what was found", () => {
     await done();
 
     await user.click(screen.getByRole("link", { name: "ゆうママ" }));
-    await screen.findByRole("link", { name: "検索へ戻る" });
+    await screen.findByRole("link", { name: "商品検索へ戻る" });
     await user.click(screen.getByRole("link", { name: "出品者を探す" }));
 
     expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
@@ -487,7 +525,7 @@ describe("what is not looked at", () => {
     expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
       "除外リストの出品者 1人・3件は対象から外しています",
     );
-    expect(tab(/専門らしい/)).toHaveTextContent("0");
+    expect(tab(/カード専門/)).toHaveTextContent("0");
   });
 
   it("stops at the budget, says who is left, and carries on from there next time", async () => {
@@ -509,12 +547,12 @@ describe("what is not looked at", () => {
     expect(screen.getByRole("region", { name: "探した範囲" })).toHaveTextContent(
       "上限に達したため、2人はまだ調べていません",
     );
-    expect(tab(/その他/)).toHaveTextContent("2");
+    expect(tab(/未調査・不明/)).toHaveTextContent("2");
 
     // The same press again looks at the two that were left, and nobody twice.
     await user.click(go());
     await waitFor(() => expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(12));
-    await waitFor(() => expect(tab(/候補/)).toHaveTextContent("12"));
+    await waitFor(() => expect(tab(/混ざっている/)).toHaveTextContent("12"));
     expect(mocks.sellerEvaluation.mock.calls.slice(10).map(([id]) => id)).toEqual([
       "s10",
       "s11",
@@ -584,7 +622,7 @@ describe("when it cannot go on", () => {
     );
     expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["attic"]]);
     expect(rowNames()).toEqual(["ゆうママ"]);
-    expect(tab(/その他/)).toHaveTextContent("3");
+    expect(tab(/未調査・不明/)).toHaveTextContent("3");
   });
 
   it("stops between two searches when told to", async () => {
@@ -673,7 +711,7 @@ describe("the words a title has to contain", () => {
     await user.clear(termsField());
 
     expect(record()).toHaveTextContent("3件の出品から 3人の出品者");
-    await user.click(tab(/その他/));
+    await user.click(tab(/未調査・不明/));
     expect(rowNames()).toEqual(["Seller attic"]);
     expect(screen.getByRole("tabpanel")).toHaveTextContent("未調査");
     // Emptying the field showed them. It did not go and ask about them.
@@ -694,7 +732,7 @@ describe("the words a title has to contain", () => {
   it("are the same words on the search screen", async () => {
     const user = await huntWith("ポケモン ポケカ");
 
-    await user.click(screen.getByRole("link", { name: "検索" }));
+    await user.click(screen.getByRole("link", { name: "商品検索" }));
     await user.type(screen.getByLabelText("キーワード"), "ポケモンカード 押入れ");
     await user.click(screen.getByRole("button", { name: "検索" }));
 
