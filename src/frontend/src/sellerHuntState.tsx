@@ -43,7 +43,13 @@ import {
 import { ApiError, search, type ApiFailureKind } from "./api/client";
 import { excludedSellerIds, sellerCandidates, withoutExcluded } from "./sellerCandidates";
 import { useSellerDiscovery } from "./sellerDiscoveryState";
-import { chooseTargets, mergeItems } from "./sellerHunt";
+import type { CandidateSort } from "./sellerCandidates";
+import {
+  chooseTargets,
+  DEFAULT_HUNT_SORT,
+  mergeItems,
+  type LookOrder,
+} from "./sellerHunt";
 import { withTitleTerms } from "./titleTerms";
 import type { CollectionMeta, Item } from "./types/api";
 import type { PriceBand } from "./validation";
@@ -83,6 +89,26 @@ export type HuntLookRequest = {
   titleTerms: readonly string[];
   /** The most sellers this press looks at. */
   sellerBudget: number;
+  /** Which end of the result the looks start from. */
+  order: LookOrder;
+};
+
+/**
+ * How the finished list is read (出品者探索 §16.2).
+ *
+ * **Sends nothing, whatever it is set to.** It is kept here and not in the
+ * screen so that it is still set after a trip to one of the sellers and back,
+ * like the list it reads.
+ */
+export type HuntView = {
+  /** Keep sellers with at least this many good ratings. Null narrows nothing. */
+  minGoodRatings: number | null;
+  sort: CandidateSort;
+};
+
+export const INITIAL_HUNT_VIEW: HuntView = {
+  minGoodRatings: null,
+  sort: DEFAULT_HUNT_SORT,
 };
 
 export type SellerHuntState = {
@@ -109,6 +135,9 @@ export type SellerHuntState = {
   applied: HuntLookRequest | null;
   /** Whether the reader stopped the looks. */
   lookStopped: boolean;
+
+  view: HuntView;
+  setView: (view: HuntView) => void;
 
   /** Step one. Ignored while either step is running, here or elsewhere. */
   search: (request: HuntSearchRequest) => void;
@@ -147,6 +176,7 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
   const [looking, setLooking] = useState(false);
   const [applied, setApplied] = useState<HuntLookRequest | null>(null);
   const [lookStopped, setLookStopped] = useState(false);
+  const [view, setView] = useState<HuntView>(INITIAL_HUNT_VIEW);
 
   const busy = useRef(false);
   const stopRequested = useRef(false);
@@ -253,6 +283,7 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
         sellerCandidates(kept),
         latest.current.evaluations,
         next.sellerBudget,
+        next.order,
       );
 
       setApplied(next);
@@ -294,6 +325,8 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
       looking,
       applied,
       lookStopped,
+      view,
+      setView,
       search: startSearch,
       look: startLook,
       stop,
@@ -308,6 +341,7 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
       looking,
       applied,
       lookStopped,
+      view,
       startSearch,
       startLook,
       stop,

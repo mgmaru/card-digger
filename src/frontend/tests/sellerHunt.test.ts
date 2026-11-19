@@ -156,6 +156,32 @@ describe("choosing who to look at", () => {
     expect(chooseTargets(candidates, evaluations, 1).sellerIds).toEqual(["home"]);
   });
 
+  it("starts from the sellers a result shows most of, when asked to", () => {
+    expect(chooseTargets(candidates, new Map(), 10, "most")).toEqual({
+      // Ties still keep the order found.
+      sellerIds: ["shop", "club", "home", "garage"],
+      beyondBudget: 0,
+    });
+  });
+
+  it("puts different sellers inside the budget, from the other end", () => {
+    expect(chooseTargets(candidates, new Map(), 2, "most").sellerIds).toEqual([
+      "shop",
+      "club",
+    ]);
+    expect(chooseTargets(candidates, new Map(), 2, "fewest").sellerIds).toEqual([
+      "home",
+      "garage",
+    ]);
+  });
+
+  it("looks at the same people from either end when the budget covers them all", () => {
+    const fewest = chooseTargets(candidates, new Map(), 10, "fewest").sellerIds;
+    const most = chooseTargets(candidates, new Map(), 10, "most").sellerIds;
+
+    expect([...most].sort()).toEqual([...fewest].sort());
+  });
+
   it("makes the same choice every time over the same result", () => {
     expect(chooseTargets(candidates, new Map(), 3)).toEqual(
       chooseTargets(candidates, new Map(), 3),

@@ -136,11 +136,19 @@ export function cardShare(evaluation: SellerEvaluationResponse): CardShare | nul
   };
 }
 
-export type CandidateSort = "found" | "cardShare" | "condition" | "hits";
+export type CandidateSort =
+  | "found"
+  | "cardShare"
+  | "cardShareHigh"
+  | "goodRatings"
+  | "condition"
+  | "hits";
 
 export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
   found: "検索結果に出た順",
   cardShare: "カードの割合が低い順",
+  cardShareHigh: "カードの割合が高い順",
+  goodRatings: "良い評価が多い順",
   condition: "一致した出品の状態が良い順",
   hits: "一致した出品が多い順",
 };
@@ -148,6 +156,8 @@ export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
 export const CANDIDATE_SORT_ORDER: CandidateSort[] = [
   "found",
   "cardShare",
+  "cardShareHigh",
+  "goodRatings",
   "condition",
   "hits",
 ];
@@ -167,6 +177,55 @@ function cardShareOrder(record: EvaluationRecord | undefined): number {
     return NOT_LOOKED_AT;
   }
   return cardShare(record.evaluation)?.ratio ?? NOTHING_TO_ANALYSE;
+}
+
+/** The same, highest share first. What is not known still comes last. */
+function cardShareHighOrder(record: EvaluationRecord | undefined): number {
+  if (record?.status !== "done") {
+    return NOT_LOOKED_AT;
+  }
+  const share = cardShare(record.evaluation);
+  return share === null ? NOTHING_TO_ANALYSE : 1 - share.ratio;
+}
+
+/**
+ * How many good ratings a seller has, or null when that is not known.
+ *
+ * Not known for a seller nobody has looked at, and for one whose profile
+ * came back without a breakdown. Neither is a seller with none.
+ */
+export function goodRatings(record: EvaluationRecord | undefined): number | null {
+  return record?.status === "done"
+    ? (record.evaluation.seller.ratingBreakdown?.good ?? null)
+    : null;
+}
+
+/**
+ * Keep the sellers with at least this many good ratings.
+ *
+ * **A way of reading what has been looked at, and nothing more.** The count
+ * comes back with a look, so nobody is left out of being looked at by it and
+ * no request is saved or spent: it narrows the list, and widening it again
+ * brings everybody back (出品者探索 §16.2).
+ *
+ * A seller whose count is not known stays. Dropping them would say they had
+ * too few, and nobody has said that.
+ */
+export function withGoodRatings(
+  candidates: readonly SellerCandidate[],
+  evaluations: ReadonlyMap<string, EvaluationRecord>,
+  atLeast: number | null,
+): { kept: SellerCandidate[]; heldBack: SellerCandidate[] } {
+  if (atLeast === null) {
+    return { kept: [...candidates], heldBack: [] };
+  }
+  const kept: SellerCandidate[] = [];
+  const heldBack: SellerCandidate[] = [];
+  for (const candidate of candidates) {
+    const good = goodRatings(evaluations.get(candidate.sellerId));
+    (good !== null && good < atLeast ? heldBack : kept).push(candidate);
+  }
+  return { kept, heldBack };
 }
 
 /**
@@ -198,6 +257,18 @@ export function sortCandidates(
         return (
           cardShareOrder(evaluations.get(a.sellerId)) -
             cardShareOrder(evaluations.get(b.sellerId)) || found(a, b)
+        );
+      case "cardShareHigh":
+        return (
+          cardShareHighOrder(evaluations.get(a.sellerId)) -
+            cardShareHighOrder(evaluations.get(b.sellerId)) || found(a, b)
+        );
+      case "goodRatings":
+        // Most first. A count that is not known goes after every count that
+        // is, and is not treated as none.
+        return (
+          (goodRatings(evaluations.get(b.sellerId)) ?? -1) -
+            (goodRatings(evaluations.get(a.sellerId)) ?? -1) || found(a, b)
         );
       case "condition":
         return (

@@ -36,25 +36,38 @@ import {
 } from "../components/SellerCandidates";
 import { SellerListError } from "../components/SellerListNote";
 import { Tabs } from "../components/Tabs";
-import { FETCH_STAGE_TITLE, SELECT_STAGE_TITLE, Stage } from "../components/Stage";
+import {
+  DISPLAY_AND_SORT_STAGE_TITLE,
+  FETCH_STAGE_TITLE,
+  SELECT_STAGE_TITLE,
+  Stage,
+} from "../components/Stage";
 import { TitleTermsField } from "../components/TitleTermsField";
 import {
-  REQUESTS_PER_EVALUATION,
+  CANDIDATE_SORT_LABELS,
+  type CandidateSort,
   excludedSellerIds,
   isOwedALook,
+  REQUESTS_PER_EVALUATION,
+  type SellerCandidate,
   sellerCandidates,
   sortCandidates,
+  withGoodRatings,
   withoutExcluded,
-  type SellerCandidate,
 } from "../sellerCandidates";
 import { useSellerDiscovery } from "../sellerDiscoveryState";
 import {
   chooseTargets,
+  DEFAULT_LOOK_ORDER,
   DEFAULT_SELLER_BUDGET,
   HUNT_PILES,
+  HUNT_SORT_ORDER,
   type HuntPile,
   keywordsFrom,
+  LOOK_ORDER_LABELS,
+  LOOK_ORDERS,
   lookCost,
+  type LookOrder,
   MAX_KEYWORDS,
   pileOf,
   searchCeiling,
@@ -176,8 +189,16 @@ export function FindSellersPage() {
   const [budget, setBudget] = useState<number>(
     () => hunt.applied?.sellerBudget ?? DEFAULT_SELLER_BUDGET,
   );
+  const [order, setOrder] = useState<LookOrder>(
+    () => hunt.applied?.order ?? DEFAULT_LOOK_ORDER,
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   const [pile, setPile] = useState<HuntPile>("varied");
+  // What is typed in the ratings field. The number it stands for lives with
+  // the list; this is only so that a half-typed value is not thrown away.
+  const [minGoodText, setMinGoodText] = useState(
+    () => hunt.view.minGoodRatings?.toString() ?? "",
+  );
   const id = useId();
 
   const typed = keywordsFrom(fields);
@@ -252,8 +273,8 @@ export function FindSellersPage() {
   );
   const draftCandidates = useMemo(() => sellerCandidates(draft.kept), [draft.kept]);
   const draftTargets = useMemo(
-    () => chooseTargets(draftCandidates, evaluations, budget),
-    [draftCandidates, evaluations, budget],
+    () => chooseTargets(draftCandidates, evaluations, budget, order),
+    [draftCandidates, evaluations, budget, order],
   );
   const toLook = draftTargets.sellerIds.length;
   const cost = lookCost(toLook);
@@ -266,7 +287,7 @@ export function FindSellersPage() {
 
   const submitLook = () => {
     setPile("varied");
-    hunt.look({ titleTerms: draftTerms, sellerBudget: budget });
+    hunt.look({ titleTerms: draftTerms, sellerBudget: budget, order });
   };
 
   // What is on screen: the collection as the last 調べる narrowed it. Not the
@@ -276,13 +297,33 @@ export function FindSellersPage() {
     () => (appliedTerms === null ? null : withTitleTerms(held.kept, appliedTerms)),
     [held.kept, appliedTerms],
   );
-  const candidates = useMemo(
+  const lookedOver = useMemo(
     () => (shown === null ? [] : sellerCandidates(shown.kept)),
     [shown],
   );
-  const notLookedAt = candidates.filter((candidate) =>
+  const notLookedAt = lookedOver.filter((candidate) =>
     isOwedALook(evaluations.get(candidate.sellerId)),
   ).length;
+
+  // How the list is read. Applied last, over what the looks brought back, and
+  // sends nothing: undoing it brings back whoever it kept off (出品者探索 §16.2).
+  const rated = useMemo(
+    () => withGoodRatings(lookedOver, evaluations, hunt.view.minGoodRatings),
+    [lookedOver, evaluations, hunt.view.minGoodRatings],
+  );
+  const candidates = rated.kept;
+  const minGoodInvalid = minGoodText.trim() !== "" && !/^\d+$/.test(minGoodText.trim());
+  const changeMinGood = (text: string) => {
+    setMinGoodText(text);
+    const typedNumber = text.trim();
+    if (typedNumber === "") {
+      hunt.setView({ ...hunt.view, minGoodRatings: null });
+    } else if (/^\d+$/.test(typedNumber)) {
+      hunt.setView({ ...hunt.view, minGoodRatings: Number(typedNumber) });
+    }
+    // Anything else is left as it was: a letter typed by mistake does not
+    // change what is on the list.
+  };
   const piles = useMemo(() => {
     const sorted: Record<HuntPile, SellerCandidate[]> = {
       varied: [],
@@ -290,12 +331,12 @@ export function FindSellersPage() {
       specialists: [],
       others: [],
     };
-    // Fewest cards first within a pile.
-    for (const candidate of sortCandidates(candidates, "cardShare", evaluations)) {
+    // In the order the reader chose, within each pile.
+    for (const candidate of sortCandidates(candidates, hunt.view.sort, evaluations)) {
       sorted[pileOf(evaluations.get(candidate.sellerId))].push(candidate);
     }
     return sorted;
-  }, [candidates, evaluations]);
+  }, [candidates, evaluations, hunt.view.sort]);
 
   const searchFailure = hunt.searchEndedBy ? RUN_ENDED[hunt.searchEndedBy.kind] : null;
   // The looks report what ended them through the shared run, which may also
@@ -527,7 +568,32 @@ export function FindSellersPage() {
                   ))}
                 </select>
               </div>
+              <div className={styles.inline}>
+                <label htmlFor={`${id}-order`} className={styles.label}>
+                  調べる順番
+                </label>
+                <select
+                  id={`${id}-order`}
+                  value={order}
+                  disabled={blocked}
+                  aria-describedby={`${id}-order-how`}
+                  onChange={(event) => setOrder(event.target.value as LookOrder)}
+                >
+                  {LOOK_ORDERS.map((key) => (
+                    <option key={key} value={key}>
+                      {LOOK_ORDER_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+            {/* What the order is and is not. It is read off a count the
+                search already gave; what a shelf holds is only known once
+                somebody has been looked at. */}
+            <p id={`${id}-order-how`} className={styles.how}>
+              少ない人からは出品が混ざっている人に、多い人からはカード専門の人に当たりやすい、という見立てです。
+              どちらも確かめた値ではなく、調べるまで分かりません。対象が人数の上限に収まるときは、順番に関わらず全員を調べます。
+            </p>
 
             {/* Who that leaves, said before the press and from what is
                 already in hand. */}
@@ -552,7 +618,6 @@ export function FindSellersPage() {
                   。
                 </p>
               )}
-              <p>一致した出品が少ない出品者から調べます。</p>
             </div>
 
             <div className={styles.go}>
@@ -608,7 +673,7 @@ export function FindSellersPage() {
         />
       )}
 
-      {hunt.applied !== null && candidates.length > 0 && (
+      {hunt.applied !== null && lookedOver.length > 0 && (
         <>
           {/* What the list is a list of. It was made by the last press, and
               the fields above may have moved on since. */}
@@ -627,6 +692,68 @@ export function FindSellersPage() {
               </p>
             )}
           </div>
+
+          {/* The third kind of thing on this screen, and the only one that
+              sends nothing: how to read what the looks brought back. */}
+          <Stage
+            title={DISPLAY_AND_SORT_STAGE_TITLE}
+            note="調べ終えた結果の見え方だけを変えます。Mercariへは何も送らず、戻せば元に戻ります。"
+          >
+            <div className={styles.view}>
+              <div className={styles.row}>
+                <div className={styles.inline}>
+                  <label htmlFor={`${id}-good`} className={styles.label}>
+                    良い評価
+                  </label>
+                  <input
+                    id={`${id}-good`}
+                    className={styles.number}
+                    inputMode="numeric"
+                    value={minGoodText}
+                    disabled={blocked}
+                    aria-invalid={minGoodInvalid ? true : undefined}
+                    onChange={(event) => changeMinGood(event.target.value)}
+                  />
+                  <span className={styles.unit}>件以上</span>
+                </div>
+                <div className={styles.inline}>
+                  <label htmlFor={`${id}-sort`} className={styles.label}>
+                    並び順
+                  </label>
+                  <select
+                    id={`${id}-sort`}
+                    value={hunt.view.sort}
+                    disabled={blocked}
+                    onChange={(event) =>
+                      hunt.setView({
+                        ...hunt.view,
+                        sort: event.target.value as CandidateSort,
+                      })
+                    }
+                  >
+                    {HUNT_SORT_ORDER.map((key) => (
+                      <option key={key} value={key}>
+                        {CANDIDATE_SORT_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {minGoodInvalid && (
+                <p className={styles.error} role="alert">
+                  良い評価の件数は、0以上の整数で入力してください
+                </p>
+              )}
+              {blocked && <p className={styles.how}>処理中は変えられません。</p>}
+              {rated.heldBack.length > 0 && hunt.view.minGoodRatings !== null && (
+                <p className={styles.how}>
+                  良い評価が{hunt.view.minGoodRatings.toLocaleString("ja-JP")}
+                  件に満たない出品者 {people(rated.heldBack.length)}
+                  を表示していません。評価の件数が分からない出品者は外していません。
+                </p>
+              )}
+            </div>
+          </Stage>
 
           <Tabs<HuntPile>
             label="見つかった出品者"

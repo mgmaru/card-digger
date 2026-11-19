@@ -184,6 +184,10 @@ const rowNames = () =>
 const fetching = () => screen.getByRole("region", { name: "取得する条件" });
 const selecting = () => screen.getByRole("region", { name: "調べる出品者" });
 const record = () => screen.getByRole("region", { name: "探した範囲" });
+const viewing = () => screen.getByRole("region", { name: "表示の絞り込み・並べ替え" });
+const orderField = () => screen.getByLabelText("調べる順番");
+const minGoodField = () => screen.getByLabelText("良い評価");
+const sortField = () => screen.getByLabelText("並び順");
 
 /** The first step is over when the record says how much it found. */
 const searched = () => screen.findByText(/の出品者$/);
@@ -792,6 +796,7 @@ describe("the words a title has to contain", () => {
 
     expect(termsField()).toBeDisabled();
     expect(budgetField()).toBeDisabled();
+    expect(orderField()).toBeDisabled();
     expect(selecting()).toHaveTextContent("処理中は変えられません。");
     await user.type(termsField(), " 遊戯王");
     expect(termsField()).toHaveValue("ポケモン ポケカ");
@@ -884,10 +889,14 @@ describe("the three things, each in its own block", () => {
   });
 
   it("does not call the words a way of narrowing the view", async () => {
-    // They decide who is asked about. That is not a way of reading a result.
+    // They decide who is asked about. That is not a way of reading a result,
+    // and the block for reading the result does not hold them.
     await hunt();
 
-    expect(screen.queryByRole("region", { name: "表示の絞り込み" })).not.toBeInTheDocument();
+    expect(
+      within(viewing()).queryByLabelText("タイトルに含む語"),
+    ).not.toBeInTheDocument();
+    expect(viewing()).toHaveTextContent("Mercariへは何も送らず、戻せば元に戻ります。");
   });
 
   it("puts them in the order they happen", async () => {
@@ -897,6 +906,7 @@ describe("the three things, each in its own block", () => {
       fetching(),
       record(),
       selecting(),
+      viewing(),
       screen.getByRole("tablist", { name: "見つかった出品者" }),
     ];
     for (const [index, block] of order.entries()) {
@@ -1054,3 +1064,223 @@ describe("what was found", () => {
     expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4);
   });
 });
+
+describe("which end the looks start from", () => {
+  it("is the sellers with fewest matching listings, unless asked otherwise", async () => {
+    await searchFor();
+    await searched();
+
+    expect(orderField()).toHaveValue("fewest");
+    expect(
+      within(orderField())
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["一致した出品が少ない人から", "一致した出品が多い人から"]);
+  });
+
+  it("can be the sellers with most", async () => {
+    const user = await searchFor();
+    await searched();
+    await user.selectOptions(orderField(), "most");
+
+    await lookAt(user);
+
+    // `shop` has three matching listings and goes first now. The rest tie
+    // and keep the order found.
+    expect(mocks.sellerEvaluation.mock.calls).toEqual([
+      ["shop"],
+      ["home"],
+      ["attic"],
+      ["retiring"],
+    ]);
+  });
+
+  it("decides who is inside the number, when there are more sellers than that", async () => {
+    // Eleven sellers with one listing and one with five, ten at a time.
+    const many = [
+      ...Array.from({ length: 11 }, (_, n) => item(`i${n}`, `s${n}`)),
+      ...Array.from({ length: 5 }, (_, n) => item(`b${n}`, "big")),
+    ];
+    mocks.search.mockResolvedValue(result(many));
+    mocks.sellerEvaluation.mockImplementation(async (id: string) =>
+      look(id, `出品者${id}`, "wide", 40, "medium"),
+    );
+    const user = await searchFor(["ポケカ 押入れ"]);
+    await searched();
+    await user.selectOptions(budgetField(), "10");
+    await user.selectOptions(orderField(), "most");
+
+    await lookAt(user);
+
+    const asked = mocks.sellerEvaluation.mock.calls.map(([id]) => id);
+    expect(asked).toHaveLength(10);
+    expect(asked[0]).toBe("big");
+  });
+
+  it("says it is a guess, and when it makes no difference", async () => {
+    await searchFor();
+    await searched();
+
+    // Asked from use: starting from the many does not by itself make
+    // somebody a specialist. It does not, and the screen says so.
+    expect(orderField()).toHaveAccessibleDescription(
+      /見立てです。.*どちらも確かめた値ではなく、調べるまで分かりません。.*対象が人数の上限に収まるときは、順番に関わらず全員を調べます。/,
+    );
+  });
+});
+
+describe("reading the finished list", () => {
+  const GOOD: Record<string, number | null> = {
+    home: 310,
+    attic: 2,
+    shop: 5180,
+    // The profile came back without a breakdown.
+    retiring: null,
+  };
+
+  beforeEach(() => {
+    mocks.sellerEvaluation.mockImplementation(async (id: string) => {
+      const base = LOOKS[id] as SellerEvaluationResponse;
+      const good = GOOD[id];
+      return {
+        ...base,
+        seller: {
+          ...base.seller,
+          ratingBreakdown: good == null ? null : { good, normal: 0, bad: 0 },
+        },
+      };
+    });
+  });
+
+  it("is offered once somebody has been looked at, and not before", async () => {
+    const user = await searchFor();
+    await searched();
+    expect(
+      screen.queryByRole("region", { name: "表示の絞り込み・並べ替え" }),
+    ).not.toBeInTheDocument();
+
+    await lookAt(user);
+
+    expect(viewing()).toBeInTheDocument();
+  });
+
+  it("keeps off sellers with fewer good ratings than asked, and says how many", async () => {
+    const user = await hunt();
+    expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
+
+    await user.type(minGoodField(), "100");
+
+    expect(rowNames()).toEqual(["ゆうママ"]);
+    expect(tab(/混ざっている/)).toHaveTextContent("1");
+    expect(tab(/カード専門/)).toHaveTextContent("1");
+    expect(viewing()).toHaveTextContent(
+      "良い評価が100件に満たない出品者 1人を表示していません。評価の件数が分からない出品者は外していません。",
+    );
+  });
+
+  it("does not keep off a seller whose count is not known", async () => {
+    const user = await hunt();
+
+    await user.type(minGoodField(), "100");
+
+    // `retiring` has no breakdown. Nobody said they have too few.
+    expect(tab(/出品が少ない/)).toHaveTextContent("1");
+  });
+
+  it("sends nothing, and brings everybody back when it is undone", async () => {
+    const user = await hunt();
+    await user.type(minGoodField(), "100");
+
+    await user.clear(minGoodField());
+
+    expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
+    expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4);
+    expect(mocks.search).toHaveBeenCalledTimes(2);
+    // Nor has the block that chooses whom to look at anything new to do.
+    expect(lookButton()).toBeDisabled();
+  });
+
+  it("leaves the list alone for a number that is not one", async () => {
+    const user = await hunt();
+
+    await user.type(minGoodField(), "abc");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "良い評価の件数は、0以上の整数で入力してください",
+    );
+    expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
+  });
+
+  it("can be put in order of good ratings, most first", async () => {
+    GOOD.attic = 900;
+    const user = await hunt();
+    expect(sortField()).toHaveValue("cardShare");
+
+    await user.selectOptions(sortField(), "goodRatings");
+
+    expect(rowNames()).toEqual(["屋根裏の人", "ゆうママ"]);
+    expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4);
+    GOOD.attic = 2;
+  });
+
+  it("offers the orders a merged result can honestly be put in", async () => {
+    await hunt();
+
+    expect(
+      within(sortField())
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "カードの割合が低い順",
+      "カードの割合が高い順",
+      "良い評価が多い順",
+      "一致した出品の状態が良い順",
+      "一致した出品が多い順",
+    ]);
+  });
+
+  it("is still set after a trip to another screen and back", async () => {
+    const user = await hunt();
+    await user.type(minGoodField(), "100");
+    await user.selectOptions(sortField(), "goodRatings");
+
+    await user.click(screen.getByRole("link", { name: /出品者リスト/ }));
+    await user.click(screen.getByRole("link", { name: "出品者検索" }));
+
+    expect(minGoodField()).toHaveValue("100");
+    expect(sortField()).toHaveValue("goodRatings");
+    expect(rowNames()).toEqual(["ゆうママ"]);
+  });
+
+  it("cannot be changed while sellers are being looked at", async () => {
+    // Twelve sellers, ten at a time: the first press leaves a list on screen
+    // and two sellers for the second.
+    const many = Array.from({ length: 12 }, (_, n) => item(`i${n}`, `s${n}`));
+    mocks.search.mockResolvedValue(result(many));
+    let hold = false;
+    const waiting: (() => void)[] = [];
+    mocks.sellerEvaluation.mockImplementation((id: string) => {
+      const answer = look(id, `出品者${id}`, "wide", 40, "medium");
+      return hold
+        ? new Promise((resolve) => waiting.push(() => resolve(answer)))
+        : Promise.resolve(answer);
+    });
+    const user = await searchFor(["ポケカ 押入れ"]);
+    await searched();
+    await user.selectOptions(budgetField(), "10");
+    await lookAt(user);
+
+    hold = true;
+    await user.click(lookButton());
+    await screen.findByText(/^出品者を調べています/);
+
+    expect(minGoodField()).toBeDisabled();
+    expect(sortField()).toBeDisabled();
+
+    waiting[0]?.();
+    await waitFor(() => expect(waiting).toHaveLength(2));
+    waiting[1]?.();
+    await waitFor(() => expect(sortField()).toBeEnabled());
+  });
+});
+

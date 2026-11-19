@@ -54,6 +54,7 @@
 }
 
 .how {
+  max-width: var(--measure);
   margin: var(--space-2) 0 0;
   font-size: var(--text-note);
   line-height: var(--leading-dense);
@@ -254,3 +255,9 @@
   margin: var(--space-5) 0;
   color: var(--ink-quiet);
 }
+
+/* 「表示の絞り込み」の塊。押すButtonが無いので、欄だけを並べる。 */
+.view {
+  padding: var(--space-2) 0 var(--space-2);
+}
+

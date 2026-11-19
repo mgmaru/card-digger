@@ -17,6 +17,7 @@ import {
   SECONDS_BETWEEN_REQUESTS,
   cardShare,
   isOwedALook,
+  type CandidateSort,
   type EvaluationRecord,
   type SellerCandidate,
 } from "./sellerCandidates";
@@ -90,17 +91,35 @@ export type Targets = {
 };
 
 /**
+ * Which end of a result the looks start from.
+ *
+ * **A place to start, read off how many listings matched. Not a finding.**
+ * Somebody clearing out a cupboard tends to have one or two listings that
+ * match a search for cards, and somebody who sells cards tends to have many;
+ * so starting from the few reaches more people whose shelf is mixed, and
+ * starting from the many reaches more specialists. Neither has been measured,
+ * and what a seller's shelf is like is known only once they have been looked
+ * at — which is the thing the order is deciding. The options are named for
+ * what they do, and the screen says they promise nothing (出品者探索 §16.1).
+ *
+ * The order matters only when there are more sellers than the press will
+ * look at. Otherwise everybody is looked at whichever end it starts from.
+ */
+export type LookOrder = "fewest" | "most";
+
+export const LOOK_ORDERS: readonly LookOrder[] = ["fewest", "most"];
+export const DEFAULT_LOOK_ORDER: LookOrder = "fewest";
+
+export const LOOK_ORDER_LABELS: Record<LookOrder, string> = {
+  fewest: "一致した出品が少ない人から",
+  most: "一致した出品が多い人から",
+};
+
+/**
  * Choose who to look at with the budget there is.
  *
- * **Fewest matching listings first.** Somebody clearing out a cupboard has
- * one or two listings that match a search for cards; somebody who sells cards
- * has many. So the sellers the reader is looking for are, more often than
- * not, the ones a result shows least of, and a budget spent from that end
- * reaches more of them. It is a guess about where to look first and decides
- * nothing: a seller with many listings is looked at too, if the budget lasts.
- *
- * Ties keep the order found, so the choice is the same every time it is made
- * over the same result.
+ * In the order asked for. Ties keep the order found, so the choice is the
+ * same every time it is made over the same result.
  *
  * Excluded sellers are never among the candidates handed in — the caller
  * holds them back first — and a seller already looked at costs nothing, so
@@ -110,11 +129,14 @@ export function chooseTargets(
   candidates: readonly SellerCandidate[],
   evaluations: ReadonlyMap<string, EvaluationRecord>,
   budget: number,
+  order: LookOrder = DEFAULT_LOOK_ORDER,
 ): Targets {
+  const direction = order === "fewest" ? 1 : -1;
   const owed = candidates
     .filter((candidate) => isOwedALook(evaluations.get(candidate.sellerId)))
     .sort(
-      (a, b) => a.hits.length - b.hits.length || a.firstIndex - b.firstIndex,
+      (a, b) =>
+        direction * (a.hits.length - b.hits.length) || a.firstIndex - b.firstIndex,
     );
   return {
     sellerIds: owed.slice(0, budget).map((candidate) => candidate.sellerId),
@@ -232,3 +254,19 @@ export function pileOf(record: EvaluationRecord | undefined): HuntPile {
     ? "few"
     : "specialists";
 }
+
+/**
+ * The orders the finished list can be read in, on the seller search.
+ *
+ * 検索結果に出た順 is not among them: several searches were merged, and the
+ * order that leaves is nobody's.
+ */
+export const HUNT_SORT_ORDER: readonly CandidateSort[] = [
+  "cardShare",
+  "cardShareHigh",
+  "goodRatings",
+  "condition",
+  "hits",
+];
+export const DEFAULT_HUNT_SORT: CandidateSort = "cardShare";
+
