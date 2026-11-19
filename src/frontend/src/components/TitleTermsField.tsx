@@ -15,7 +15,7 @@ import { useSellerDiscovery } from "../sellerDiscoveryState";
 
 import styles from "./TitleTermsField.module.css";
 
-export function TitleTermsField() {
+export function TitleTermsField({ disabled = false }: { disabled?: boolean }) {
   const { titleTermsText, setTitleTermsText } = useSellerDiscovery();
   const id = useId();
 
@@ -31,9 +31,14 @@ export function TitleTermsField() {
           value={titleTermsText}
           placeholder="例: ポケモン ポケカ"
           aria-describedby={`${id}-how`}
+          disabled={disabled}
           onChange={(event) => setTitleTermsText(event.target.value)}
         />
       </div>
+      {/* Locked while anything is being asked of Mercari. Whoever is being
+          looked at was chosen by these words; changing them part-way would
+          leave a list that matches neither the old words nor the new. */}
+      {disabled && <p className={styles.how}>処理中は変えられません。</p>}
       <p id={`${id}-how`} className={styles.how}>
         空白で区切った語の、どれか1つをタイトルに含む出品だけを残します。空欄なら絞りません。
         説明文は見ていません。

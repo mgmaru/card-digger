@@ -111,3 +111,18 @@ export function withTitleTerms(
 export function quoteTerms(terms: readonly string[]): string {
   return terms.map((term) => `「${term}」`).join("");
 }
+
+/**
+ * Whether two sets of words would keep the same listings.
+ *
+ * Order and spelling do not matter, since neither changes what is kept:
+ * ポケカ ポケモン and ポケモン ぽけか are the same question.
+ */
+export function sameTerms(a: readonly string[], b: readonly string[]): boolean {
+  const fold = (terms: readonly string[]) =>
+    [...new Set(terms.map(foldForTitle).filter((term) => term !== ""))].sort();
+  const left = fold(a);
+  const right = fold(b);
+  return left.length === right.length && left.every((term, at) => term === right[at]);
+}
+

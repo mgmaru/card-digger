@@ -750,6 +750,27 @@ describe("the words a title has to contain", () => {
     expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["shop"]]);
   });
 
+  it("cannot be changed while sellers are being looked at", async () => {
+    // The looks were chosen from the sellers these words left on the list.
+    let release: (() => void) | undefined;
+    mocks.sellerEvaluation.mockImplementation(
+      (id: string) =>
+        new Promise((resolve) => {
+          release = () => resolve(evaluation(id, `出品者${id}`, "wide", 18, 20));
+        }),
+    );
+    const user = await searchAndOpenSellers();
+    await user.type(termsField(), "ポケモン");
+    await user.click(lookButton());
+    await waitFor(() => expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(1));
+
+    expect(termsField()).toBeDisabled();
+    expect(screen.getByText("処理中は変えられません。")).toBeInTheDocument();
+
+    release?.();
+    await waitFor(() => expect(termsField()).toBeEnabled());
+  });
+
   it("say so in the record of what was collected", async () => {
     const user = await searchAndOpenSellers();
 

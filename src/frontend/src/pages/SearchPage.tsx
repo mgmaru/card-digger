@@ -124,6 +124,7 @@ export function SearchPage() {
     showExcluded,
     setShowExcluded,
     titleTermsText,
+    run,
   } = useSellerDiscovery();
 
   // The excluded list is applied before anything else narrows the result, and
@@ -250,7 +251,9 @@ export function SearchPage() {
             {/* Above the tabs, like the line about the excluded list: it
                 decides what both of them hold. */}
             <>
-              <TitleTermsField />
+              {/* Not while sellers are being looked at: the looks were chosen
+                  from the sellers these words left on the list. */}
+              <TitleTermsField disabled={run.active} />
               {titled.heldBack.length > 0 && (
                 <p className={styles.heldBack}>
                   タイトルに{quoteTerms(titleTerms)}

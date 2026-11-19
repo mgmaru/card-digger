@@ -13,6 +13,7 @@ import {
   foldForTitle,
   parseTitleTerms,
   quoteTerms,
+  sameTerms,
   withTitleTerms,
 } from "../src/titleTerms";
 import type { Item } from "../src/types/api";
@@ -132,3 +133,16 @@ describe("narrowing by title", () => {
     expect(found).toEqual(before);
   });
 });
+
+describe("whether two sets of words ask the same thing", () => {
+  it("does not depend on their order or spelling", () => {
+    expect(sameTerms(["ポケモン", "ポケカ"], ["ぽけか", "ポケモン"])).toBe(true);
+    expect(sameTerms([], [])).toBe(true);
+  });
+
+  it("is false when a word is added or taken away", () => {
+    expect(sameTerms(["ポケモン"], ["ポケモン", "ポケカ"])).toBe(false);
+    expect(sameTerms(["ポケモン"], [])).toBe(false);
+  });
+});
+

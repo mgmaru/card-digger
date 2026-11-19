@@ -127,14 +127,31 @@
   border-bottom: 1px solid var(--rule);
 }
 
-/* 表示の絞り込みで外れた件数。読み手が自分で決めたことの確認なので、朱は使わない
+/* 「調べる出品者」の塊。語、人数、対象の人数、Buttonを縦に並べる。 */
+.select {
+  padding: var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* 次に押したとき誰が対象になるか。読み手が自分で決めたことの確認なので、朱は使わない
    （出品者探索 §7 の除外の行と同じ扱い）。 */
-.narrowed {
+.selected {
   max-width: var(--measure);
-  margin: var(--space-2) 0 0;
+  margin-top: var(--space-3);
+}
+
+.selected p,
+.shown p {
+  margin: 0 0 var(--space-1);
   font-size: var(--text-note);
   line-height: var(--leading-dense);
   color: var(--ink-quiet);
+}
+
+/* 一覧が何の一覧かを言う行。Tabのすぐ上。 */
+.shown {
+  max-width: var(--measure);
+  margin-top: var(--space-4);
 }
 
 .progress {

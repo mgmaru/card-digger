@@ -1,19 +1,27 @@
 /**
- * One run of going looking for sellers, and what it found
+ * Going looking for sellers: what was collected, and who was looked at
  * ([出品者探索 §12](../../../docs/product/seller-discovery-spec.md)).
  *
- * A run is two things done in turn from one press: search for each keyword,
- * then look at the sellers those searches turned up. Both are things the
- * reader could do by hand on the search screen. This does them in order so
- * the reader does not have to sit and press.
+ * **Two steps, each started by its own press** (出品者探索 §15).
+ *
+ * 1. `search` — put each keyword to Mercari and keep what comes back.
+ * 2. `look` — out of what was collected, choose whom to look at, and look.
+ *
+ * They were one press once. The words that narrow whom to look at were then
+ * read part-way through, after the searches and before the looks, and a
+ * reader who changed them in between got a list that matched neither what
+ * they had typed nor what had been asked. Apart, each step takes what it is
+ * given at the press and nothing later: the second can be run again with
+ * other words over the same collection, without asking Mercari to search
+ * again, and can say before it is pressed exactly how many requests it is.
  *
  * Above the router, like the search result and for the same reason
- * ([アーキテクチャ §2.2](../../../docs/development/architecture.md)): what a
- * run found is a fact about that run, and opening one of the sellers it found
+ * ([アーキテクチャ §2.2](../../../docs/development/architecture.md)): what was
+ * found is a fact about that search, and opening one of the sellers it found
  * must not throw the rest away.
  *
- * **It keeps its own result and leaves the search screen's alone.** A run
- * calls the backend's search directly instead of going through the search
+ * **It keeps its own result and leaves the search screen's alone.** A search
+ * here calls the backend directly instead of going through the search
  * screen's state, so whatever the reader had on that screen is still there
  * when they go back to it.
  *
@@ -36,11 +44,12 @@ import { ApiError, search, type ApiFailureKind } from "./api/client";
 import { excludedSellerIds, sellerCandidates, withoutExcluded } from "./sellerCandidates";
 import { useSellerDiscovery } from "./sellerDiscoveryState";
 import { chooseTargets, mergeItems } from "./sellerHunt";
-import { parseTitleTerms, withTitleTerms } from "./titleTerms";
+import { withTitleTerms } from "./titleTerms";
 import type { CollectionMeta, Item } from "./types/api";
 import type { PriceBand } from "./validation";
 
-export type HuntPhase = "idle" | "searching" | "looking" | "done";
+/** Where the first step stands. The second is `looking`. */
+export type SearchPhase = "idle" | "searching" | "done";
 
 /**
  * How one keyword's search went.
@@ -56,39 +65,67 @@ export type KeywordOutcome = {
   meta: CollectionMeta | null;
 };
 
-export type HuntRequest = {
+/** What the first step is asked: the question put to Mercari. */
+export type HuntSearchRequest = {
   keywords: readonly string[];
   band: PriceBand;
+};
+
+/**
+ * What the second step is asked: whom to look at, out of what was collected.
+ *
+ * **Taken whole at the press.** The words are a value here and not something
+ * read from the field later, so nothing typed while the looks are running
+ * can change who is looked at.
+ */
+export type HuntLookRequest = {
+  /** A listing's title has to contain one of these. Empty narrows nothing. */
+  titleTerms: readonly string[];
+  /** The most sellers this press looks at. */
   sellerBudget: number;
 };
 
 export type SellerHuntState = {
-  phase: HuntPhase;
-  /** What the current result was asked for. Null before the first run. */
-  request: HuntRequest | null;
+  searchPhase: SearchPhase;
+  /** What the collection on screen was asked for. Null before the first. */
+  request: HuntSearchRequest | null;
   keywords: readonly KeywordOutcome[];
   /** Every listing the searches found, each once. */
   items: readonly Item[];
-  /** Sellers owed a look that the budget did not reach. */
-  beyondBudget: number;
-  /** What ended the run early, or null. */
-  endedBy: ApiError | null;
-  /** Whether the reader stopped it. */
-  stoppedByReader: boolean;
-  /** Start a run. Ignored while one is going, here or on the search screen. */
-  start: (request: HuntRequest) => void;
+  /** What ended the searches early, or null. */
+  searchEndedBy: ApiError | null;
+  /** Whether the reader stopped the searches. */
+  searchStopped: boolean;
+
+  /** Whether the second step is running, started from here. */
+  looking: boolean;
+  /**
+   * What the second step was last asked. Null until it has been pressed over
+   * this collection: a new search has been narrowed by nobody yet.
+   *
+   * The list on screen is this request applied to the collection, so it
+   * stays what it was while the reader edits the fields for the next press.
+   */
+  applied: HuntLookRequest | null;
+  /** Whether the reader stopped the looks. */
+  lookStopped: boolean;
+
+  /** Step one. Ignored while either step is running, here or elsewhere. */
+  search: (request: HuntSearchRequest) => void;
+  /** Step two. Ignored while either step is running, or with nothing found. */
+  look: (request: HuntLookRequest) => void;
   /** Finish the request in hand and send no more. */
   stop: () => void;
 };
 
 /**
- * Failures that end the whole run.
+ * Failures that end the searches.
  *
  * The same three, for the same reason, as when sellers are looked at from a
  * search result: each says something about every request that would follow.
- * Any other failure is about one keyword, and the run moves to the next.
+ * Any other failure is about one keyword, and the next one is still searched.
  */
-const ENDS_THE_RUN: ReadonlySet<ApiFailureKind> = new Set([
+const ENDS_THE_SEARCHES: ReadonlySet<ApiFailureKind> = new Set([
   "safety_stop",
   "rate_limited",
   "network",
@@ -97,43 +134,48 @@ const ENDS_THE_RUN: ReadonlySet<ApiFailureKind> = new Set([
 const SellerHuntContext = createContext<SellerHuntState | null>(null);
 
 export function SellerHuntProvider({ children }: { children: ReactNode }) {
-  const { entries, evaluations, evaluate, stopEvaluating, run, titleTermsText } =
+  const { entries, evaluations, evaluate, stopEvaluating, run } =
     useSellerDiscovery();
 
-  const [phase, setPhase] = useState<HuntPhase>("idle");
-  const [request, setRequest] = useState<HuntRequest | null>(null);
+  const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
+  const [request, setRequest] = useState<HuntSearchRequest | null>(null);
   const [keywords, setKeywords] = useState<readonly KeywordOutcome[]>([]);
   const [items, setItems] = useState<readonly Item[]>([]);
-  const [beyondBudget, setBeyondBudget] = useState(0);
-  const [endedBy, setEndedBy] = useState<ApiError | null>(null);
-  const [stoppedByReader, setStoppedByReader] = useState(false);
+  const [searchEndedBy, setSearchEndedBy] = useState<ApiError | null>(null);
+  const [searchStopped, setSearchStopped] = useState(false);
 
-  const running = useRef(false);
+  const [looking, setLooking] = useState(false);
+  const [applied, setApplied] = useState<HuntLookRequest | null>(null);
+  const [lookStopped, setLookStopped] = useState(false);
+
+  const busy = useRef(false);
   const stopRequested = useRef(false);
-  // What the run reads when it gets as far as choosing sellers. It was
-  // started several searches ago, and the lists and the looks may both have
-  // changed since: somebody excluded while the searches ran must not be
-  // looked at just because they were not excluded when the button was pressed.
-  const latest = useRef({ entries, evaluations, titleTermsText });
-  latest.current = { entries, evaluations, titleTermsText };
-  const looking = run.active;
+  // The lists and the looks as they stand at a press. Read through a ref so
+  // the two callbacks are not rebuilt every time a seller is looked at.
+  const latest = useRef({ entries, evaluations, items });
+  latest.current = { entries, evaluations, items };
+  const lookingElsewhere = run.active;
 
-  const start = useCallback(
-    (next: HuntRequest) => {
-      // One run at a time, and not while sellers are being looked at from a
-      // search result: both would be drawing on the same queue.
-      if (running.current || looking || next.keywords.length === 0) {
+  const startSearch = useCallback(
+    (next: HuntSearchRequest) => {
+      // One thing at a time, and not while sellers are being looked at from a
+      // search result either: a search started then would be queued behind
+      // those looks with nothing on screen saying so.
+      if (busy.current || lookingElsewhere || next.keywords.length === 0) {
         return;
       }
-      running.current = true;
+      busy.current = true;
       stopRequested.current = false;
 
       setRequest(next);
-      setPhase("searching");
+      setSearchPhase("searching");
       setItems([]);
-      setBeyondBudget(0);
-      setEndedBy(null);
-      setStoppedByReader(false);
+      setSearchEndedBy(null);
+      setSearchStopped(false);
+      // A new collection has been narrowed by nobody. Whoever was looked at
+      // over the last one is still known, and shows up again if found again.
+      setApplied(null);
+      setLookStopped(false);
       let outcomes: KeywordOutcome[] = next.keywords.map((keyword) => ({
         keyword,
         status: "waiting",
@@ -173,47 +215,67 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
             const error =
               cause instanceof ApiError ? cause : new ApiError("unexpected");
             note(index, { status: "failed" });
-            if (ENDS_THE_RUN.has(error.kind)) {
+            if (ENDS_THE_SEARCHES.has(error.kind)) {
               fatal = error;
               break;
             }
           }
         }
 
-        if (fatal === null && !stopRequested.current && found.length > 0) {
-          const { kept: notExcluded } = withoutExcluded(
-            found,
-            excludedSellerIds(latest.current.entries),
-          );
-          // Nobody is looked at for a listing the reader's words keep back.
-          // A seller found only by a loose match would otherwise be first in
-          // line — one listing is the fewest there is — and cost three
-          // requests to be told about (出品者探索 §13).
-          const { kept } = withTitleTerms(
-            notExcluded,
-            parseTitleTerms(latest.current.titleTermsText),
-          );
-          const targets = chooseTargets(
-            sellerCandidates(kept),
-            latest.current.evaluations,
-            next.sellerBudget,
-          );
-          setBeyondBudget(targets.beyondBudget);
-          if (targets.sellerIds.length > 0) {
-            setPhase("looking");
-            // What ends this half early is reported by the discovery state,
-            // which is the one that ran it.
-            await evaluate(targets.sellerIds);
-          }
-        }
-
-        setEndedBy(fatal);
-        setStoppedByReader(stopRequested.current);
-        setPhase("done");
-        running.current = false;
+        setSearchEndedBy(fatal);
+        setSearchStopped(stopRequested.current);
+        setSearchPhase("done");
+        busy.current = false;
       })();
     },
-    [evaluate, looking],
+    [lookingElsewhere],
+  );
+
+  const startLook = useCallback(
+    (next: HuntLookRequest) => {
+      if (busy.current || lookingElsewhere || latest.current.items.length === 0) {
+        return;
+      }
+      busy.current = true;
+      stopRequested.current = false;
+
+      // Somebody on the excluded list is not looked at, and nobody is looked
+      // at for a listing the reader's words keep back: a seller found only by
+      // a loose match would otherwise be first in line — one listing is the
+      // fewest there is — and cost three requests to be told about
+      // (出品者探索 §13).
+      const { kept: notExcluded } = withoutExcluded(
+        latest.current.items,
+        excludedSellerIds(latest.current.entries),
+      );
+      const { kept } = withTitleTerms(notExcluded, next.titleTerms);
+      const targets = chooseTargets(
+        sellerCandidates(kept),
+        latest.current.evaluations,
+        next.sellerBudget,
+      );
+
+      setApplied(next);
+      setLookStopped(false);
+
+      if (targets.sellerIds.length === 0) {
+        // Everybody these words leave has been looked at already. The list
+        // changes to match the words, and nothing is sent.
+        busy.current = false;
+        return;
+      }
+
+      setLooking(true);
+      void (async () => {
+        // What ends this early is reported by the discovery state, which is
+        // the one that runs it.
+        await evaluate(targets.sellerIds);
+        setLookStopped(stopRequested.current);
+        setLooking(false);
+        busy.current = false;
+      })();
+    },
+    [evaluate, lookingElsewhere],
   );
 
   const stop = useCallback(() => {
@@ -223,25 +285,31 @@ export function SellerHuntProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SellerHuntState>(
     () => ({
-      phase,
+      searchPhase,
       request,
       keywords,
       items,
-      beyondBudget,
-      endedBy,
-      stoppedByReader,
-      start,
+      searchEndedBy,
+      searchStopped,
+      looking,
+      applied,
+      lookStopped,
+      search: startSearch,
+      look: startLook,
       stop,
     }),
     [
-      phase,
+      searchPhase,
       request,
       keywords,
       items,
-      beyondBudget,
-      endedBy,
-      stoppedByReader,
-      start,
+      searchEndedBy,
+      searchStopped,
+      looking,
+      applied,
+      lookStopped,
+      startSearch,
+      startLook,
       stop,
     ],
   );

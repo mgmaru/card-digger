@@ -45,7 +45,9 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
   （[ADR 0004 論点1](docs/adr/0004-store-seller-lists-in-a-local-file.md#論点1--何を保存するか)）
 - **出品者を調べるのは、押されたときだけ。** 検索やTabを開いた拍子に`/evaluation`を呼ばない。
   1人あたりMercariへ3回かかる（[出品者探索 §4](docs/product/seller-discovery-spec.md#4-出品者を調べる)）。
-  「出品者検索」も同じで、**押す前に上限の回数を出す**（[§12.2](docs/product/seller-discovery-spec.md#122-1回の押下で起きること)）
+  「出品者検索」も同じで、**「検索」も「調べる」も、押す前に回数を出す**（[§12.2](docs/product/seller-discovery-spec.md#122-押したときに起きること)）
+- **表示の絞り込みは、Mercariへの問い合わせを変えない。** 問い合わせを変える入力は、取得する条件か「調べる出品者」の塊に置き、
+  処理中は変えられないようにする（[出品者探索 §15](docs/product/seller-discovery-spec.md#15-検索と調べるを別の押下にする2026-11-19追加)）
 - **相場データをCard Diggerで作らない。** カードの相場も、Mercariの成約価格の分布も
   [card-pulse](https://github.com/mgmaru/card-pulse)の担当。Card Diggerは受け取って表示する側
   （[§19](docs/product/concept.md#19-相場データはcard-diggerが持たない2026-09-05決定)）
