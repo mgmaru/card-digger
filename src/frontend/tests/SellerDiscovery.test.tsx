@@ -201,19 +201,21 @@ describe("the 出品者 tab", () => {
     expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
   });
 
-  it("writes the condition under the listings it describes, not as a fact about the seller", async () => {
+  it("names the condition after the listings it describes, not as a fact about the seller", async () => {
     await searchAndOpenSellers();
 
-    // Three terms, not four: the condition belongs to the matching listings,
-    // and 出品の幅 and 評価 belong to the seller.
+    // 商品の状態 alone read as something about the seller. The first two
+    // lines are about the listings this search found; the last two are about
+    // the seller.
     const shop = within(rows()[0] as HTMLElement);
     expect(shop.getAllByRole("term").map((term) => term.textContent)).toEqual([
       "一致した出品",
+      "一致した出品の状態",
       "出品の幅",
       "評価",
     ]);
-    expect(shop.getAllByRole("definition")[0]).toHaveTextContent(
-      "2件その商品の状態目立った傷や汚れなし 1件、傷や汚れあり 1件",
+    expect(shop.getAllByRole("definition")[1]).toHaveTextContent(
+      "目立った傷や汚れなし 1件、傷や汚れあり 1件",
     );
   });
 
