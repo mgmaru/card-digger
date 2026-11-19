@@ -44,7 +44,7 @@ import {
   MAX_KEYWORDS,
   SELLER_BUDGETS,
   huntCeiling,
-  parseKeywords,
+  keywordsFrom,
   pileOf,
   type HuntPile,
 } from "../sellerHunt";
@@ -138,8 +138,12 @@ export function FindSellersPage() {
   const { entries, evaluations, run, listSeller, listBusy, listsStatus } =
     useSellerDiscovery();
 
-  const [keywordsText, setKeywordsText] = useState(
-    () => hunt.request?.keywords.join("\n") ?? "",
+  // One field to begin with, which is the search screen's own form. A second
+  // search is a field the reader adds, never something a keystroke starts.
+  const [fields, setFields] = useState<string[]>(() =>
+    hunt.request && hunt.request.keywords.length > 0
+      ? [...hunt.request.keywords]
+      : [""],
   );
   const [minPriceYen, setMinPriceYen] = useState(
     () => hunt.request?.band.minPriceYen?.toString() ?? "",
@@ -154,7 +158,7 @@ export function FindSellersPage() {
   const [pile, setPile] = useState<HuntPile>("candidates");
   const id = useId();
 
-  const typed = parseKeywords(keywordsText);
+  const typed = keywordsFrom(fields);
   // The ceiling follows what is typed, so the cost is on screen before the
   // press and changes as a keyword is added or the budget is raised.
   const ceiling = huntCeiling(Math.max(typed.length, 1), budget);
@@ -165,9 +169,7 @@ export function FindSellersPage() {
     event.preventDefault();
     const found: FormErrors = {};
     if (typed.length === 0) {
-      found.keywords = "検索するキーワードを1行に1つ入力してください";
-    } else if (typed.length > MAX_KEYWORDS) {
-      found.keywords = `キーワードは${MAX_KEYWORDS}つまでです（現在${typed.length}つ）`;
+      found.keywords = "検索するキーワードを入力してください";
     }
 
     // The band is the same for every keyword, so it is judged once, by the
@@ -256,26 +258,60 @@ export function FindSellersPage() {
       </p>
 
       <form className={styles.form} onSubmit={submit} noValidate>
-        <div className={styles.field}>
-          <label htmlFor={`${id}-keywords`} className={styles.label}>
-            キーワード（1行に1つ、{MAX_KEYWORDS}つまで）
-          </label>
-          <textarea
-            id={`${id}-keywords`}
-            className={styles.keywords}
-            rows={4}
-            value={keywordsText}
-            placeholder={EXAMPLES.slice(0, 3).join("\n")}
-            aria-invalid={errors.keywords ? true : undefined}
-            aria-describedby={errors.keywords ? `${id}-keywords-error` : undefined}
-            onChange={(event) => setKeywordsText(event.target.value)}
-          />
+        <fieldset className={styles.keywords}>
+          <legend className={styles.label}>キーワード</legend>
+          {fields.map((value, index) => (
+            // Keyed by position: the fields have no identity but their order.
+            <div key={index} className={styles.keywordRow}>
+              <input
+                className={styles.keyword}
+                aria-label={`キーワード ${index + 1}`}
+                value={value}
+                placeholder={EXAMPLES[index]}
+                aria-invalid={errors.keywords ? true : undefined}
+                aria-describedby={`${id}-keywords-how`}
+                onChange={(event) =>
+                  setFields(
+                    fields.map((kept, at) => (at === index ? event.target.value : kept)),
+                  )
+                }
+              />
+              {fields.length > 1 && (
+                <button
+                  type="button"
+                  className={styles.quiet}
+                  aria-label={`キーワード ${index + 1}を外す`}
+                  onClick={() => setFields(fields.filter((_, at) => at !== index))}
+                >
+                  外す
+                </button>
+              )}
+            </div>
+          ))}
+          {/* What the fields mean, where they are typed. One field is one
+              search; a second field is a second search, added to the first. */}
+          <p id={`${id}-keywords-how`} className={styles.how}>
+            {typed.length > 1
+              ? `${typed.length}つのキーワードを別々に検索し、見つかった出品を合わせます。`
+              : "1つの欄が1回の検索です。空白で区切った語は、検索画面と同じく、まとめて1回で検索します。"}
+          </p>
           {errors.keywords && (
-            <p id={`${id}-keywords-error`} className={styles.error} role="alert">
+            <p className={styles.error} role="alert">
               {errors.keywords}
             </p>
           )}
-        </div>
+          {fields.length < MAX_KEYWORDS && (
+            <p className={styles.more}>
+              <button
+                type="button"
+                className={styles.quiet}
+                onClick={() => setFields([...fields, ""])}
+              >
+                別のキーワードでも探す
+              </button>
+            </p>
+          )}
+        </fieldset>
 
         <div className={styles.row}>
           {/* The unit sits outside the label, as on the search form, so the

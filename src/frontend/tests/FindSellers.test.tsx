@@ -155,7 +155,18 @@ function mount(path = "/find-sellers") {
   );
 }
 
-const keywordsBox = () => screen.getByLabelText(/^キーワード/);
+const field = (n = 1) => screen.getByLabelText(`キーワード ${n}`);
+const another = () => screen.getByRole("button", { name: "別のキーワードでも探す" });
+
+/** Type one keyword to a field, adding a field for each one after the first. */
+async function typeKeywords(user: ReturnType<typeof userEvent.setup>, keywords: string[]) {
+  for (const [index, keyword] of keywords.entries()) {
+    if (index > 0) {
+      await user.click(another());
+    }
+    await user.type(field(index + 1), keyword);
+  }
+}
 const go = () => screen.getByRole("button", { name: "探す" });
 const tab = (name: RegExp) => screen.getByRole("tab", { name });
 const rowNames = () =>
@@ -163,10 +174,10 @@ const rowNames = () =>
     .queryAllByRole("heading", { level: 3 })
     .map((heading) => heading.textContent);
 
-async function hunt(keywords = "ポケカ 押入れ\nポケカ 物置") {
+async function hunt(keywords = ["ポケカ 押入れ", "ポケカ 物置"]) {
   const user = userEvent.setup();
   mount();
-  await user.type(keywordsBox(), keywords);
+  await typeKeywords(user, keywords);
   await user.click(go());
   return user;
 }
@@ -197,7 +208,8 @@ describe("before the press", () => {
     const user = userEvent.setup();
     mount();
 
-    await user.type(keywordsBox(), "ポケカ 押入れ");
+    await user.type(field(), "ポケカ 押入れ");
+    await user.click(another());
 
     expect(mocks.search).not.toHaveBeenCalled();
     expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
@@ -209,7 +221,7 @@ describe("before the press", () => {
     // One keyword's worth before anything is typed: 10 + 20 × 3.
     expect(screen.getByText(/Mercariへ最大70回問い合わせます/)).toBeInTheDocument();
 
-    await user.type(keywordsBox(), "ポケカ 押入れ\nポケカ 物置\nポケカ 実家");
+    await typeKeywords(user, ["ポケカ 押入れ", "ポケカ 物置", "ポケカ 実家"]);
     expect(screen.getByText(/Mercariへ最大90回問い合わせます/)).toHaveTextContent(
       "上限まで使うと約3分以上",
     );
@@ -225,22 +237,27 @@ describe("before the press", () => {
     await user.click(go());
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "検索するキーワードを1行に1つ入力してください",
+      "検索するキーワードを入力してください",
     );
     expect(mocks.search).not.toHaveBeenCalled();
   });
 
-  it("refuses more keywords than one press may search", async () => {
-    await hunt("a\nb\nc\nd\ne\nf");
+  it("offers no sixth field, so one press cannot search more than five keywords", async () => {
+    const user = userEvent.setup();
+    mount();
 
-    expect(screen.getByRole("alert")).toHaveTextContent("キーワードは5つまでです（現在6つ）");
-    expect(mocks.search).not.toHaveBeenCalled();
+    await typeKeywords(user, ["a", "b", "c", "d", "e"]);
+
+    expect(
+      screen.queryByRole("button", { name: "別のキーワードでも探す" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Mercariへ最大110回問い合わせます/)).toBeInTheDocument();
   });
 
   it("refuses a price band the wrong way round", async () => {
     const user = userEvent.setup();
     mount();
-    await user.type(keywordsBox(), "ポケカ 押入れ");
+    await user.type(field(), "ポケカ 押入れ");
     await user.type(screen.getByLabelText("最低価格"), "5000");
     await user.type(screen.getByLabelText("最高価格"), "3000");
 
@@ -251,11 +268,59 @@ describe("before the press", () => {
   });
 });
 
+describe("one field, one search", () => {
+  it("searches two words in one field once, as the search screen would", async () => {
+    // Reported from use: ポケモンカード and 押入れ became two searches, and a
+    // listing that matched 押入れ alone was found. One field is one search.
+    await hunt(["ポケモンカード 押入れ"]);
+    await done();
+
+    expect(mocks.search.mock.calls.map(([keyword]) => keyword)).toEqual([
+      "ポケモンカード 押入れ",
+    ]);
+  });
+
+  it("starts the search on Enter, and does not start a second keyword with it", async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.type(field(), "ポケモンカード 押入れ{Enter}");
+    await done();
+
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText("キーワード 2")).not.toBeInTheDocument();
+  });
+
+  it("says in words how many searches the fields will make", async () => {
+    const user = userEvent.setup();
+    mount();
+    expect(screen.getByText(/1つの欄が1回の検索です/)).toBeInTheDocument();
+
+    await typeKeywords(user, ["ポケカ 押入れ", "ポケカ 物置"]);
+
+    expect(
+      screen.getByText("2つのキーワードを別々に検索し、見つかった出品を合わせます。"),
+    ).toBeInTheDocument();
+  });
+
+  it("takes a field away again, and its search with it", async () => {
+    const user = userEvent.setup();
+    mount();
+    await typeKeywords(user, ["ポケカ 押入れ", "ポケカ 物置"]);
+
+    await user.click(screen.getByRole("button", { name: "キーワード 1を外す" }));
+    await user.click(go());
+    await done();
+
+    expect(mocks.search.mock.calls.map(([keyword]) => keyword)).toEqual(["ポケカ 物置"]);
+  });
+});
+
 describe("one press", () => {
   it("searches each keyword in turn, under the same band", async () => {
     const user = userEvent.setup();
     mount();
-    await user.type(keywordsBox(), "ポケカ 押入れ\nポケカ 物置");
+    await typeKeywords(user, ["ポケカ 押入れ", "ポケカ 物置"]);
     await user.type(screen.getByLabelText("最低価格"), "1000");
     await user.type(screen.getByLabelText("最高価格"), "5000");
 
@@ -395,7 +460,8 @@ describe("what was found", () => {
     await user.click(screen.getByRole("link", { name: "出品者を探す" }));
 
     expect(rowNames()).toEqual(["ゆうママ", "屋根裏の人"]);
-    expect(keywordsBox()).toHaveValue("ポケカ 押入れ\nポケカ 物置");
+    expect(field(1)).toHaveValue("ポケカ 押入れ");
+    expect(field(2)).toHaveValue("ポケカ 物置");
     expect(mocks.search).toHaveBeenCalledTimes(2);
     expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4);
   });
@@ -423,7 +489,7 @@ describe("what is not looked at", () => {
     );
     const user = userEvent.setup();
     mount();
-    await user.type(keywordsBox(), "ポケカ 押入れ");
+    await user.type(field(), "ポケカ 押入れ");
     await user.selectOptions(screen.getByLabelText("調べる出品者"), "10");
 
     await user.click(go());
@@ -446,13 +512,13 @@ describe("what is not looked at", () => {
   });
 
   it("does not look at sellers already looked at from a search result", async () => {
-    await hunt("ポケカ 押入れ");
+    await hunt(["ポケカ 押入れ"]);
     await done();
     expect(mocks.sellerEvaluation.mock.calls).toEqual([["home"], ["shop"]]);
 
     // The second keyword turns up `shop` again and two new sellers.
-    await userEvent.clear(keywordsBox());
-    await userEvent.type(keywordsBox(), "ポケカ 物置");
+    await userEvent.clear(field());
+    await userEvent.type(field(), "ポケカ 物置");
     await userEvent.click(go());
 
     await waitFor(() => expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(4));
@@ -530,7 +596,7 @@ describe("when it cannot go on", () => {
   });
 
   it("says so when no keyword matched anything", async () => {
-    await hunt("どこにも無い語");
+    await hunt(["どこにも無い語"]);
 
     expect(
       await screen.findByText(/一致する出品がありませんでした/),

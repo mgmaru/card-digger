@@ -36,15 +36,22 @@ export const SELLER_BUDGETS = [10, 20, 30] as const;
 export const DEFAULT_SELLER_BUDGET = 20;
 
 /**
- * The keywords in a box, one to a line.
+ * The searches to run, from the keyword fields: one field, one search.
  *
- * Blank lines are dropped and a keyword written twice is searched for once:
+ * **A field is never split.** `ポケモンカード 押入れ` in one field is the one
+ * search the search screen would make with it. The fields used to be the
+ * lines of a single box, and the two words on two lines became two searches
+ * whose results were added together — so a listing that matched 押入れ alone
+ * came back under a question that had asked for both. Separate fields make a
+ * second search something that is added on purpose.
+ *
+ * Empty fields are dropped and a keyword written twice is searched for once:
  * the second search would cost ten pages to bring back the same listings.
  */
-export function parseKeywords(text: string): string[] {
+export function keywordsFrom(fields: readonly string[]): string[] {
   const seen = new Set<string>();
-  for (const line of text.split("\n")) {
-    const keyword = line.trim();
+  for (const field of fields) {
+    const keyword = field.trim();
     if (keyword !== "") {
       seen.add(keyword);
     }
