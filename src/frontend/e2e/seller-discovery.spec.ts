@@ -121,8 +121,14 @@ test("looking at the sellers behind a result, then saving one and excluding one"
     "引退品をまとめて出している",
   );
 
+  // --- The name leads to Mercari, and is not followed here -----------------
+  await expect(page.getByRole("link", { name: `Seller ${SELLER_TWO}` })).toHaveAttribute(
+    "href",
+    `https://jp.mercari.com/user/profile/${SELLER_TWO}`,
+  );
+
   // --- The seller screen shows the same decision ---------------------------
-  await page.getByRole("link", { name: `Seller ${SELLER_TWO}` }).click();
+  await page.getByRole("link", { name: "Sellerを分析" }).click();
   const panel = page.getByRole("region", { name: "出品者リスト" });
   await expect(panel).toContainText("保存リストに入れています");
   await panel.getByRole("button", { name: "seller-sample-2をリストから外す" }).click();

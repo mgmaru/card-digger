@@ -555,7 +555,13 @@ describe("the 出品者リスト screen", () => {
 
     expect(await screen.findByRole("tab", { name: /保存/ })).toHaveTextContent("1");
     expect(screen.getByRole("tab", { name: /除外/ })).toHaveTextContent("1");
-    expect(screen.getByRole("link", { name: "Seller 111" })).toHaveAttribute(
+    // The name opens the seller's page on Mercari, built from the one thing
+    // about them that is stored. The seller screen is the link under it.
+    const name = screen.getByRole("link", { name: "Seller 111" });
+    expect(name).toHaveAttribute("href", "https://jp.mercari.com/user/profile/111");
+    expect(name).toHaveAttribute("target", "_blank");
+    expect(name).toHaveAttribute("rel", "noreferrer");
+    expect(screen.getByRole("link", { name: "Sellerを分析" })).toHaveAttribute(
       "href",
       "/sellers/111",
     );
