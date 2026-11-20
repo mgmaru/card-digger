@@ -8,8 +8,13 @@
  *
  * **Opening this screen sends nothing to Mercari.** The lists are a local
  * file. A seller's name and listings are read from Mercari only when the
- * reader opens that seller, which is why a row here shows an identifier and
- * the reader's own note rather than a name.
+ * reader asks for them, which is why a row here shows an identifier and the
+ * reader's own note rather than a name.
+ *
+ * **A seller's name opens their page on Mercari**, as it does in a search
+ * result (出品者探索 §5.4, §6.2). It used to open this application's own
+ * seller screen, which starts collecting as soon as it is opened. That
+ * screen is one press away, under the words that say what it does.
  */
 
 import { useState } from "react";
@@ -20,6 +25,7 @@ import { SellerListButtons } from "../components/SellerListButtons";
 import { SellerListError, SellerListNote } from "../components/SellerListNote";
 import { Tabs } from "../components/Tabs";
 import { toDateString } from "../jst";
+import { mercariSellerUrl } from "../sellerCandidates";
 import { useSellerDiscovery } from "../sellerDiscoveryState";
 import type { SellerListEntry, SellerListKind } from "../types/api";
 
@@ -27,7 +33,7 @@ import styles from "./SellerListsPage.module.css";
 
 const ABOUT: Record<SellerListKind, string> = {
   saved:
-    "また見に来たい出品者です。開くと、その出品者の販売中と売却済みの商品をMercariから取得します。",
+    "また見に来たい出品者です。名前を押すと、Mercariの出品者ページが開きます。「Sellerを分析」を押すと、その出品者の販売中と売却済みの商品をMercariから取得します。",
   excluded:
     "検索結果に出さない出品者です。何人・何件を出していないかは、検索画面に表示します。",
 };
@@ -43,16 +49,29 @@ function Row({ entry }: { entry: SellerListEntry }) {
   // looked at since the page was opened. Otherwise the row says what it has:
   // the identifier, labelled as one.
   const looked = evaluations.get(entry.sellerId);
-  const name = looked?.status === "done" ? looked.evaluation.seller.name : "";
-  const label = name || `Seller ${entry.sellerId}`;
+  const seller = looked?.status === "done" ? looked.evaluation.seller : null;
+  const label = seller?.name || `Seller ${entry.sellerId}`;
   return (
     <li className={styles.row}>
       <div className={styles.who}>
+        {/* The address needs nothing but the identifier, which is the one
+            thing about a seller that is stored. So the link works after a
+            reload, when the name is no longer known. */}
         <h3 className={styles.name}>
-          <Link to={`/sellers/${entry.sellerId}`}>{label}</Link>
+          <a
+            href={seller?.url ?? mercariSellerUrl(entry.sellerId)}
+            target="_blank"
+            rel="noreferrer"
+            title="Mercariの出品者ページを開きます"
+          >
+            {label}
+          </a>
         </h3>
         <p className={styles.added}>
           {toDateString(new Date(entry.addedAt))} に追加
+        </p>
+        <p className={styles.analyze}>
+          <Link to={`/sellers/${entry.sellerId}`}>Sellerを分析</Link>
         </p>
       </div>
       <SellerListNote entry={entry} sellerLabel={label} />

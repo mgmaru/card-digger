@@ -80,6 +80,14 @@
   line-height: var(--leading-dense);
 }
 
+/* この画面の中のSeller画面へ行くLink。名前（Mercariへ出る）とは行き先が違うので、
+   名前の下に、何をするLinkかを書いて置く。 */
+.analyze {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-note);
+  line-height: var(--leading-dense);
+}
+
 @media (max-width: 900px) {
   .row {
     grid-template-columns: 1fr;
