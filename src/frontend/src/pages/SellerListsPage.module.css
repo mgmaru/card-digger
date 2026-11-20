@@ -39,7 +39,8 @@
   display: grid;
   grid-template-columns: minmax(11em, 1fr) minmax(16em, 2.4fr) auto;
   gap: var(--space-3) var(--space-5);
-  align-items: center;
+  /* 真ん中の塊が2段（メモと自分の評価）になったので、上端で揃える。 */
+  align-items: start;
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--rule);
 }
@@ -78,6 +79,33 @@
   margin: 0;
   font-size: var(--text-note);
   line-height: var(--leading-dense);
+}
+
+/* 読み手が書いたもの（メモ）と、読み手が付けたもの（自分の評価）を1つの塊にする。 */
+.own {
+  min-width: 0;
+}
+
+/* 一覧の読み方。押すButtonは無く、選ぶとすぐ変わる。 */
+.view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-3);
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label,
+.heldBack {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
 }
 
 /* この画面の中のSeller画面へ行くLink。名前（Mercariへ出る）とは行き先が違うので、

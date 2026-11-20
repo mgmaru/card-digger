@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   health,
+  putSellerAssessment,
   putSellerListEntry,
   removeSellerListEntry,
   search,
@@ -326,6 +327,15 @@ describe("the seller analysis request", () => {
     ["sellerEvaluation", () => sellerEvaluation("100000001")],
     ["sellerLists", () => sellerLists()],
     ["putSellerListEntry", () => putSellerListEntry("100000001", "saved", "")],
+    [
+      "putSellerAssessment",
+      () =>
+        putSellerAssessment("100000001", {
+          condition: "high",
+          frequency: null,
+          price: null,
+        }),
+    ],
     ["removeSellerListEntry", () => removeSellerListEntry("100000001")],
     ["health", () => health()],
   ])("%s asks by a root path, without an origin", async (_name, call) => {
@@ -384,6 +394,22 @@ describe("the requests behind finding sellers", () => {
     expect(JSON.parse(String(sent[0]?.init?.body))).toEqual({
       kind: "excluded",
       note: "専門の出品者",
+    });
+  });
+
+  it("stores the reader's own ratings by their own path, all three axes in the body", async () => {
+    const sent = recordRequests();
+
+    await putSellerAssessment("100 1", { condition: "high", frequency: null, price: "low" });
+
+    expect(sent[0]?.url).toBe("/api/seller-lists/100%201/assessment");
+    expect(sent[0]?.init?.method).toBe("PUT");
+    // `null` is sent, not left out: an axis left out would be an axis the
+    // backend is free to keep, and the reader chose to clear it.
+    expect(JSON.parse(String(sent[0]?.init?.body))).toEqual({
+      condition: "high",
+      frequency: null,
+      price: "low",
     });
   });
 

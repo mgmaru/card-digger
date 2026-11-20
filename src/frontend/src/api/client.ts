@@ -20,6 +20,7 @@ import type {
   SellerAnalysisResponse,
   SellerEvaluationResponse,
   SellerListKind,
+  SellerAssessment,
   SellerListsResponse,
 } from "../types/api";
 
@@ -398,6 +399,32 @@ export function putSellerListEntry(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, note }),
+    },
+    SELLER_LISTS_TIMEOUT_MS,
+  );
+}
+
+/**
+ * Record what the reader makes of a seller on one of the lists.
+ *
+ * All three axes, every time, so what is stored is what the screen showed.
+ * These are the reader's own ratings: nothing is asked of Mercari to store
+ * them. 404 for a seller on neither list.
+ */
+export function putSellerAssessment(
+  sellerId: string,
+  levels: Pick<SellerAssessment, "condition" | "frequency" | "price">,
+): Promise<SellerListsResponse> {
+  return request<SellerListsResponse>(
+    `/api/seller-lists/${encodeURIComponent(sellerId)}/assessment`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        condition: levels.condition,
+        frequency: levels.frequency,
+        price: levels.price,
+      }),
     },
     SELLER_LISTS_TIMEOUT_MS,
   );

@@ -240,12 +240,32 @@ export type SellerEvaluationResponse = {
 /** Which of the reader's two lists a seller is on. */
 export type SellerListKind = "saved" | "excluded";
 
+/** How the reader rates a seller on one axis. `high` is the end a buyer is glad of. */
+export type AssessmentLevel = "high" | "middle" | "low";
+
+/**
+ * What the reader themselves makes of a seller, axis by axis.
+ *
+ * **Not Mercari's ratings**, which are never stored. `null` on an axis is
+ * "not rated", which is not the middle step (ADR 0004).
+ */
+export type SellerAssessment = {
+  /** Whether their cards tend to be in good condition. */
+  condition: AssessmentLevel | null;
+  /** Whether they list often. */
+  frequency: AssessmentLevel | null;
+  /** Whether they price below the going rate. `high` is cheap. */
+  price: AssessmentLevel | null;
+  /** When any of the three was last changed. `null` while none is rated. */
+  assessedAt: IsoDateTime | null;
+};
+
 /**
  * One seller the reader chose to remember.
  *
- * The identifier and the reader's own decision. **Nothing the marketplace said
- * about the seller is stored**, so there is no name here: it is read from
- * Mercari when the seller is opened (ADR 0004).
+ * The identifier and the reader's own decisions and judgements. **Nothing the
+ * marketplace said about the seller is stored**, so there is no name here: it
+ * is read from Mercari when the seller is looked at (ADR 0004).
  */
 export type SellerListEntry = {
   sellerId: string;
@@ -253,6 +273,8 @@ export type SellerListEntry = {
   addedAt: IsoDateTime;
   /** The reader's own words. Empty when they wrote nothing. */
   note: string;
+  /** The reader's own ratings. Every axis `null` until they rate one. */
+  assessment: SellerAssessment;
 };
 
 /** Both lists as one sequence, oldest entry first. Every change returns this. */

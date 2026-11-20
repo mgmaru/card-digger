@@ -36,6 +36,7 @@ import {
 
 import {
   ApiError,
+  putSellerAssessment,
   putSellerListEntry,
   removeSellerListEntry,
   sellerEvaluation,
@@ -43,7 +44,11 @@ import {
   type ApiFailureKind,
 } from "./api/client";
 import { isOwedALook, type EvaluationRecord } from "./sellerCandidates";
-import type { SellerListEntry, SellerListKind } from "./types/api";
+import type {
+  SellerAssessment,
+  SellerListEntry,
+  SellerListKind,
+} from "./types/api";
 
 export type SearchTab = "items" | "sellers";
 
@@ -98,6 +103,15 @@ export type SellerDiscoveryState = {
     note: string,
   ) => Promise<boolean>;
   unlistSeller: (sellerId: string) => Promise<boolean>;
+  /**
+   * Store the reader's own ratings of a seller on a list. All three axes.
+   * Resolves to whether it was stored. Never throws, and never reaches
+   * Mercari.
+   */
+  assessSeller: (
+    sellerId: string,
+    levels: Pick<SellerAssessment, "condition" | "frequency" | "price">,
+  ) => Promise<boolean>;
   reloadLists: () => void;
 
   evaluations: ReadonlyMap<string, EvaluationRecord>;
@@ -222,6 +236,13 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
     (sellerId: string) => change(() => removeSellerListEntry(sellerId)),
     [change],
   );
+  const assessSeller = useCallback(
+    (
+      sellerId: string,
+      levels: Pick<SellerAssessment, "condition" | "frequency" | "price">,
+    ) => change(() => putSellerAssessment(sellerId, levels)),
+    [change],
+  );
   const reloadLists = useCallback(() => setLoadAttempt((n) => n + 1), []);
 
   const running = useRef(false);
@@ -319,6 +340,7 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
       listBusy,
       listSeller,
       unlistSeller,
+      assessSeller,
       reloadLists,
       evaluations,
       run,
@@ -339,6 +361,7 @@ export function SellerDiscoveryProvider({ children }: { children: ReactNode }) {
       listBusy,
       listSeller,
       unlistSeller,
+      assessSeller,
       reloadLists,
       evaluations,
       run,

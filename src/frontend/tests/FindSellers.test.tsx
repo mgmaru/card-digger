@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../src/api/client";
 import { AppRoutes } from "../src/App";
 import { SearchProvider } from "../src/searchState";
+import { UNRATED } from "../src/sellerAssessment";
 import { SellerDiscoveryProvider } from "../src/sellerDiscoveryState";
 import { SellerHuntProvider } from "../src/sellerHuntState";
 import type {
@@ -229,7 +230,7 @@ beforeEach(() => {
     async (sellerId: string, kind: SellerListEntry["kind"], note: string) => {
       stored = [
         ...stored.filter((kept) => kept.sellerId !== sellerId),
-        { sellerId, kind, addedAt: "2026-11-19T12:00:00+09:00", note },
+        { sellerId, kind, addedAt: "2026-11-19T12:00:00+09:00", note, assessment: UNRATED },
       ];
       return { entries: stored };
     },
@@ -575,7 +576,15 @@ describe("the second press, 調べる", () => {
   });
 
   it("skips sellers on the excluded list, and says so before it is pressed", async () => {
-    stored = [{ sellerId: "shop", kind: "excluded", addedAt: "2026-11-01T00:00:00+09:00", note: "" }];
+    stored = [
+      {
+        sellerId: "shop",
+        kind: "excluded",
+        addedAt: "2026-11-01T00:00:00+09:00",
+        note: "",
+        assessment: UNRATED,
+      },
+    ];
     const user = await searchFor();
     await searched();
 

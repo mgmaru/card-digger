@@ -303,7 +303,7 @@ DOM向けのexportを持つ。
 
 | 上の項目 | 再評価の結果 |
 |---|---|
-| お気に入り、確認済みFlag、商品・Seller Memo | **出品者についてだけ**追加した。保存リスト・除外リストとメモ（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)）。商品には無い |
+| お気に入り、確認済みFlag、商品・Seller Memo | **出品者についてだけ**追加した。保存リスト・除外リストとメモ、自分の評価（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)）。商品には無い |
 | Seller Knowledgeによる検索結果全体のFilter / Ranking | 検索結果の出品者を**並べ替える**画面を追加した。自動では調べず、絞り込みもしない（[出品者探索 §4](seller-discovery-spec.md#4-出品者を調べる)） |
 | 検索条件保存、除外Keyword | **出品者の除外だけ**追加した。Keywordによる除外は[O-7](../planning/todo.md#オプション--判断済みで保留しているもの)のまま保留。**取得した後にタイトルで絞る欄は足した**（[出品者探索 §13](seller-discovery-spec.md#13-タイトルに含む語2026-11-19追加)。Mercariへは送らない） |
 
@@ -1278,7 +1278,7 @@ Buttonが消えて理由が分からないことより良い。
 - 他の端末からは`tailscale serve`を経由してTailnet内だけで使う（[ADR 0001](../adr/0001-run-on-home-windows-via-tailscale.md)）
 - CORSは実際に使用するLocal Frontend Originだけを許可する
 - 商品・Seller情報をDatabaseへ保存しない。**保存するのは出品者リスト（Seller ID、種別、追加日時、
-  読み手のメモ）だけで、ファイル1つに置く**（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)、2026-11-19）
+  読み手のメモ、読み手自身の評価）だけで、ファイル1つに置く**（[ADR 0004](../adr/0004-store-seller-lists-in-a-local-file.md)、2026-11-19。評価は2026-11-20に足した）
 - 画像はMercariのHTTPS URLをBrowserで表示し、Backendに保存しない
 - 検索・分析結果は画面を閉じた後の復元を保証しない
 - 検索・分析結果をBrowserの永続Storage（localStorage / sessionStorage / IndexedDB）へ保存しない

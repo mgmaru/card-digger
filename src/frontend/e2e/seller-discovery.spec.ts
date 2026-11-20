@@ -112,8 +112,25 @@ test("looking at the sellers behind a result, then saving one and excluding one"
     page.getByRole("button", { name: "seller-sample-2のメモを保存" }),
   ).toBeDisabled();
 
+  // --- The reader's own ratings: chosen, and stored by choosing -------------
+  const own = page.getByRole("group", { name: "seller-sample-2への自分の評価" });
+  await expect(own.getByLabel("状態")).toHaveValue("");
+  await own.getByLabel("状態").selectOption({ label: "◎ 美品が多い" });
+  await own.getByLabel("価格").selectOption({ label: "△ 高い" });
+  await expect(own).toContainText("に評価");
+
   // --- A reload forgets the looks and keeps the lists ----------------------
   await page.reload();
+  await expect(page.getByRole("link", { name: `Seller ${SELLER_TWO}` })).toBeVisible();
+  // Rated on two axes and left alone on the third, as it was chosen.
+  const kept = page.getByRole("group", { name: `Seller ${SELLER_TWO}への自分の評価` });
+  await expect(kept.getByLabel("状態")).toHaveValue("high");
+  await expect(kept.getByLabel("出品頻度")).toHaveValue("");
+  await expect(kept.getByLabel("価格")).toHaveValue("low");
+  // Reading the list by them sends nothing and hides nobody for good.
+  await page.getByLabel("絞り込み").selectOption({ label: "価格が◎の人だけ" });
+  await expect(page.getByText("この絞り込みに当てはまる出品者はいません")).toBeVisible();
+  await page.getByLabel("絞り込み").selectOption({ label: "すべて" });
   await expect(page.getByRole("link", { name: `Seller ${SELLER_TWO}` })).toBeVisible();
   await expect(
     page.getByRole("textbox", { name: `Seller ${SELLER_TWO}のメモ` }),
