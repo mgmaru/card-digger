@@ -9,6 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { UNRATED } from "../src/sellerAssessment";
+
 import {
   type EvaluationRecord,
   evaluationSeconds,
@@ -240,9 +242,9 @@ describe("who is still owed a look", () => {
 
 describe("the excluded list", () => {
   const entries: SellerListEntry[] = [
-    { sellerId: "s1", kind: "excluded", addedAt: "2026-11-19T12:00:00+09:00", note: "" },
-    { sellerId: "s2", kind: "saved", addedAt: "2026-11-19T12:00:00+09:00", note: "" },
-    { sellerId: "s9", kind: "excluded", addedAt: "2026-11-19T12:00:00+09:00", note: "" },
+    { sellerId: "s1", kind: "excluded", addedAt: "2026-11-19T12:00:00+09:00", note: "", assessment: UNRATED },
+    { sellerId: "s2", kind: "saved", addedAt: "2026-11-19T12:00:00+09:00", note: "", assessment: UNRATED },
+    { sellerId: "s9", kind: "excluded", addedAt: "2026-11-19T12:00:00+09:00", note: "", assessment: UNRATED },
   ];
   const items = [item("a", "s1"), item("b", "s2"), item("c", "s1"), item("d", "s3")];
 

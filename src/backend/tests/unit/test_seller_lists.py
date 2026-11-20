@@ -26,11 +26,18 @@ from card_digger.application.seller_lists import (
     NOTE_MAX_LENGTH,
     SELLER_ID_MAX_LENGTH,
     InvalidSellerListEntry,
+    SellerNotListed,
+    assess_seller,
     list_seller,
     unlist_seller,
 )
 from card_digger.domain.errors import SellerListUnavailable
-from card_digger.domain.models import SellerListEntry, SellerListKind
+from card_digger.domain.models import (
+    AssessmentLevel,
+    SellerAssessment,
+    SellerListEntry,
+    SellerListKind,
+)
 
 
 AT = datetime(2026, 11, 19, 3, 0, tzinfo=timezone.utc)
@@ -42,8 +49,24 @@ def entry(
     *,
     added_at: datetime = AT,
     note: str = "",
+    assessment: SellerAssessment = SellerAssessment(),
 ) -> SellerListEntry:
-    return SellerListEntry(seller_id=seller_id, kind=kind, added_at=added_at, note=note)
+    return SellerListEntry(
+        seller_id=seller_id,
+        kind=kind,
+        added_at=added_at,
+        note=note,
+        assessment=assessment,
+    )
+
+
+#: A seller the reader has looked at and judged on two axes of the three.
+RATED = SellerAssessment(
+    condition=AssessmentLevel.HIGH,
+    frequency=None,
+    price=AssessmentLevel.LOW,
+    assessed_at=AT + timedelta(days=1),
+)
 
 
 @pytest.fixture(params=["memory", "file"])
@@ -125,20 +148,92 @@ class TestTheFile:
         )
 
     def test_it_stores_the_decision_and_nothing_about_the_seller(self, tmp_path: Path):
-        """The exact field set, so a name or a rating cannot be added quietly.
+        """The exact field set, so a name or Mercari's rating cannot be added quietly.
 
         ADR 0004 allows this file on the condition that it holds an identifier
-        and the reader's own decision, and no fact the marketplace reported.
+        and what the reader decided and judged, and no fact the marketplace
+        reported. `assessment` is the reader's own rating, written by them; it
+        is not the rating Mercari shows, and the fields inside it are pinned
+        too so that one cannot be slipped in beside the other.
         """
         path = tmp_path / FILE_NAME
-        JsonFileSellerLists(path).put(entry(note="メモ"))
+        JsonFileSellerLists(path).put(entry(note="メモ", assessment=RATED))
 
         document = json.loads(path.read_text(encoding="utf-8"))
 
         assert document["version"] == FORMAT_VERSION
         assert [set(record) for record in document["entries"]] == [
-            {"sellerId", "kind", "addedAt", "note"}
+            {"sellerId", "kind", "addedAt", "note", "assessment"}
         ]
+        assert set(document["entries"][0]["assessment"]) == {
+            "condition",
+            "frequency",
+            "price",
+            "assessedAt",
+        }
+
+    def test_the_reader_s_ratings_come_back_as_they_were_stored(self, tmp_path: Path):
+        path = tmp_path / FILE_NAME
+        JsonFileSellerLists(path).put(entry(assessment=RATED))
+
+        assert JsonFileSellerLists(path).entries() == (entry(assessment=RATED),)
+        stored = json.loads(path.read_text(encoding="utf-8"))["entries"][0]["assessment"]
+        assert stored == {
+            "condition": "high",
+            "frequency": None,
+            "price": "low",
+            "assessedAt": (AT + timedelta(days=1)).isoformat(),
+        }
+
+    def test_a_file_from_before_there_were_ratings_is_read_as_unrated(
+        self, tmp_path: Path
+    ):
+        """Version 1, as every file written before 2026-11-20 is.
+
+        Nothing the reader saved is lost by upgrading: the entries are all
+        there, each unrated, and the file becomes version 2 the next time
+        something is written.
+        """
+        path = tmp_path / FILE_NAME
+        path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "entries": [
+                        {
+                            "sellerId": "100000001",
+                            "kind": "saved",
+                            "addedAt": AT.isoformat(),
+                            "note": "服も出品している",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        store = JsonFileSellerLists(path)
+
+        assert store.entries() == (entry(note="服も出品している"),)
+        # Reading alone rewrites nothing.
+        assert json.loads(path.read_text(encoding="utf-8"))["version"] == 1
+
+        store.put(entry("100000002"))
+
+        document = json.loads(path.read_text(encoding="utf-8"))
+        assert document["version"] == 2
+        assert [record["sellerId"] for record in document["entries"]] == [
+            "100000001",
+            "100000002",
+        ]
+
+    def test_the_version_was_raised_so_an_older_build_stops_rather_than_drops_them(self):
+        """The reason the number moved (ADR 0004, 2026-11-20).
+
+        A build from before the ratings reads only version 1. Had the field
+        been added without raising the number, that build would read the file,
+        skip what it did not know, and write the ratings away.
+        """
+        assert FORMAT_VERSION == 2
 
     def test_the_note_is_stored_readable(self, tmp_path: Path):
         """Not escaped to `\\uXXXX`. The reader may open this file."""
@@ -177,6 +272,34 @@ class TestTheFile:
                     "version": FORMAT_VERSION,
                     "entries": [
                         {"sellerId": "1", "kind": "saved", "addedAt": "2026-11-19T03:00:00"}
+                    ],
+                }
+            ),
+            # A rating nobody could have chosen. Read as unrated, it would be
+            # written back as unrated over whatever the reader had put.
+            json.dumps(
+                {
+                    "version": FORMAT_VERSION,
+                    "entries": [
+                        {
+                            "sellerId": "1",
+                            "kind": "saved",
+                            "addedAt": AT.isoformat(),
+                            "assessment": {"condition": "excellent"},
+                        }
+                    ],
+                }
+            ),
+            json.dumps(
+                {
+                    "version": FORMAT_VERSION,
+                    "entries": [
+                        {
+                            "sellerId": "1",
+                            "kind": "saved",
+                            "addedAt": AT.isoformat(),
+                            "assessment": "high",
+                        }
                     ],
                 }
             ),
@@ -333,3 +456,135 @@ class TestUnlistingASeller:
 
     def test_a_seller_on_neither_list_is_not_an_error(self):
         assert unlist_seller(InMemorySellerLists(), seller_id="100000001") is False
+
+
+class TestRatingASeller:
+    """What the reader themselves makes of a seller (ADR 0004, 2026-11-20)."""
+
+    def rate(self, lists, *, at: datetime = AT, **levels):
+        given = {"condition": None, "frequency": None, "price": None, **levels}
+        return assess_seller(
+            lists, seller_id="100000001", clock=FrozenClock(at), **given
+        )
+
+    def test_it_is_kept_with_the_date_it_was_made(self):
+        lists = InMemorySellerLists((entry(note="服も出品している"),))
+        later = AT + timedelta(days=3)
+
+        made = self.rate(
+            lists, at=later, condition=AssessmentLevel.HIGH, price=AssessmentLevel.MIDDLE
+        )
+
+        assert made.assessment == SellerAssessment(
+            condition=AssessmentLevel.HIGH,
+            frequency=None,
+            price=AssessmentLevel.MIDDLE,
+            assessed_at=later,
+        )
+        assert lists.entries() == (made,)
+
+    def test_it_leaves_the_list_the_date_and_the_note_alone(self):
+        lists = InMemorySellerLists(
+            (entry(kind=SellerListKind.EXCLUDED, note="専門の出品者"),)
+        )
+
+        made = self.rate(lists, at=AT + timedelta(days=3), frequency=AssessmentLevel.LOW)
+
+        assert (made.kind, made.added_at, made.note) == (
+            SellerListKind.EXCLUDED,
+            AT,
+            "専門の出品者",
+        )
+
+    def test_a_seller_on_neither_list_cannot_be_rated(self):
+        """There is nowhere to keep it, and nothing is made to hold it.
+
+        A rating for somebody the reader has not listed would be a record
+        about a person they have decided nothing about.
+        """
+        lists = InMemorySellerLists()
+
+        with pytest.raises(SellerNotListed):
+            self.rate(lists, condition=AssessmentLevel.HIGH)
+
+        assert lists.entries() == ()
+
+    def test_saving_the_same_ratings_again_does_not_make_them_look_new(self):
+        lists = InMemorySellerLists((entry(assessment=RATED),))
+
+        made = self.rate(
+            lists,
+            at=AT + timedelta(days=30),
+            condition=AssessmentLevel.HIGH,
+            price=AssessmentLevel.LOW,
+        )
+
+        assert made.assessment.assessed_at == RATED.assessed_at
+
+    def test_changing_one_axis_dates_the_whole_judgement_now(self):
+        lists = InMemorySellerLists((entry(assessment=RATED),))
+        later = AT + timedelta(days=30)
+
+        made = self.rate(
+            lists,
+            at=later,
+            condition=AssessmentLevel.HIGH,
+            frequency=AssessmentLevel.HIGH,
+            price=AssessmentLevel.LOW,
+        )
+
+        assert made.assessment.assessed_at == later
+
+    def test_clearing_every_axis_clears_the_date_with_them(self):
+        """No judgement is left for it to be the date of."""
+        lists = InMemorySellerLists((entry(assessment=RATED),))
+
+        made = self.rate(lists, at=AT + timedelta(days=30))
+
+        assert made.assessment == SellerAssessment()
+
+    def test_unrated_is_not_the_middle(self):
+        assert SellerAssessment().levels == (None, None, None)
+        assert AssessmentLevel.MIDDLE is not None
+
+    def test_it_survives_a_reworded_note(self):
+        lists = InMemorySellerLists((entry(assessment=RATED),))
+
+        made = list_seller(
+            lists,
+            seller_id="100000001",
+            kind=SellerListKind.SAVED,
+            note="書き直したメモ",
+            clock=FrozenClock(AT + timedelta(days=5)),
+        )
+
+        assert made.assessment == RATED
+
+    def test_it_survives_a_move_to_the_other_list(self):
+        """What the reader makes of a seller is about the seller, not the list."""
+        lists = InMemorySellerLists((entry(assessment=RATED),))
+
+        made = list_seller(
+            lists,
+            seller_id="100000001",
+            kind=SellerListKind.EXCLUDED,
+            note="",
+            clock=FrozenClock(AT + timedelta(days=5)),
+        )
+
+        assert made.assessment == RATED
+
+    def test_taking_the_seller_off_both_lists_forgets_it(self):
+        lists = InMemorySellerLists((entry(assessment=RATED),))
+
+        unlist_seller(lists, seller_id="100000001")
+        made = list_seller(
+            lists,
+            seller_id="100000001",
+            kind=SellerListKind.SAVED,
+            note="",
+            clock=FrozenClock(AT + timedelta(days=5)),
+        )
+
+        assert made.assessment == SellerAssessment()
+

@@ -41,7 +41,7 @@ Mercariの大量出品・引退品を検索し、画像で一次選別し、Sell
 - **デプロイ先を`src/`に持たない。** デプロイ先の違いは設定で吸収する。デプロイ先を替える変更が
   `src/`を触ったら方針違反（[architecture §8](docs/development/architecture.md#8-デプロイ先をソースコードに持たない2026-11-08決定)）
 - **出品者リストに、Mercariが言ったことを保存しない。** 保存するのはSeller ID・種別・追加日時・
-  読み手のメモだけ。名前や評価を足すなら、先にADRを書き直す
+  読み手のメモ・読み手自身の評価だけ。名前やMercariでの評価を足すなら、先にADRを書き直す
   （[ADR 0004 論点1](docs/adr/0004-store-seller-lists-in-a-local-file.md#論点1--何を保存するか)）
 - **出品者を調べるのは、押されたときだけ。** 検索やTabを開いた拍子に`/evaluation`を呼ばない。
   1人あたりMercariへ3回かかる（[出品者探索 §4](docs/product/seller-discovery-spec.md#4-出品者を調べる)）。

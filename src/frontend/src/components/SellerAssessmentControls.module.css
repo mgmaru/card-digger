@@ -1,0 +1,49 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+/* メモの下に1段。見出しの右に3つの軸を並べる。 */
+.assessment {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+/* 軸どうしで折り返す。2段目へ回った軸は、見出しの下ではなく1つ目の軸の下に来る。 */
+.axes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
+}
+
+.heading,
+.label,
+.when {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+.axis {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.select {
+  font-size: var(--text-note);
+}
+
+.when {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 狭い画面では見出しを1段に独立させ、軸に幅をすべて渡す。 */
+@media (max-width: 40em) {
+  .assessment {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+}

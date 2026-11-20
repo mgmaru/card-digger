@@ -26,6 +26,7 @@ from card_digger.application.seller_breadth import BreadthLevel, SellerBreadth
 from card_digger.application.seller_knowledge import KnowledgeLevel, SellerKnowledge
 from card_digger.domain.errors import ErrorCode, Operation
 from card_digger.domain.models import (
+    AssessmentLevel,
     CollectionError,
     CollectionMeta,
     CollectionStopReason,
@@ -34,6 +35,7 @@ from card_digger.domain.models import (
     RatingBreakdown,
     SaleFormat,
     Seller,
+    SellerAssessment,
     SellerListEntry,
     SellerListKind,
 )
@@ -372,18 +374,41 @@ class SellerEvaluationResponse(CamelModel):
     sold_out_meta: CollectionMetaResponse
 
 
+class SellerAssessmentResponse(CamelModel):
+    """What the reader themselves makes of a seller, axis by axis.
+
+    Not the marketplace's ratings, which are never stored. `null` on an axis
+    is "not rated" (ADR 0004).
+    """
+
+    condition: AssessmentLevel | None
+    frequency: AssessmentLevel | None
+    price: AssessmentLevel | None
+    assessed_at: datetime | None
+
+    @classmethod
+    def of(cls, assessment: SellerAssessment) -> "SellerAssessmentResponse":
+        return cls(
+            condition=assessment.condition,
+            frequency=assessment.frequency,
+            price=assessment.price,
+            assessed_at=assessment.assessed_at,
+        )
+
+
 class SellerListEntryResponse(CamelModel):
     """One seller the reader chose to remember.
 
-    The identifier and the reader's own decision about it. Nothing the
-    marketplace said about the seller is stored, so nothing of that kind is
-    here to return (ADR 0004).
+    The identifier and the reader's own decisions and judgements about it.
+    Nothing the marketplace said about the seller is stored, so nothing of
+    that kind is here to return (ADR 0004).
     """
 
     seller_id: str
     kind: SellerListKind
     added_at: datetime
     note: str
+    assessment: SellerAssessmentResponse
 
     @classmethod
     def of(cls, entry: SellerListEntry) -> "SellerListEntryResponse":
@@ -392,6 +417,7 @@ class SellerListEntryResponse(CamelModel):
             kind=entry.kind,
             added_at=entry.added_at,
             note=entry.note,
+            assessment=SellerAssessmentResponse.of(entry.assessment),
         )
 
 
@@ -417,6 +443,19 @@ class SellerListPutRequest(CamelModel):
 
     kind: SellerListKind
     note: str = ""
+
+
+class SellerAssessmentPutRequest(CamelModel):
+    """The reader's rating of a seller on each of the three axes.
+
+    All three, every time, with `null` for one left unrated: what is stored
+    is then what the screen showed, and never half of two edits. A level that
+    is not one of the three is refused before it reaches the application.
+    """
+
+    condition: AssessmentLevel | None = None
+    frequency: AssessmentLevel | None = None
+    price: AssessmentLevel | None = None
 
 
 class SafetyStopStatusResponse(CamelModel):

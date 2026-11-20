@@ -17,14 +17,25 @@
  * screen is one press away, under the words that say what it does.
  */
 
-import { useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import { FailureNotice } from "../components/FailureNotice";
+import { SellerAssessmentControls } from "../components/SellerAssessmentControls";
 import { SellerListButtons } from "../components/SellerListButtons";
 import { SellerListError, SellerListNote } from "../components/SellerListNote";
 import { Tabs } from "../components/Tabs";
 import { toDateString } from "../jst";
+import {
+  filterEntries,
+  LIST_FILTER_LABELS,
+  LIST_FILTER_ORDER,
+  LIST_SORT_LABELS,
+  LIST_SORT_ORDER,
+  sortEntries,
+  type ListFilter,
+  type ListSort,
+} from "../sellerAssessment";
 import { mercariSellerUrl } from "../sellerCandidates";
 import { useSellerDiscovery } from "../sellerDiscoveryState";
 import type { SellerListEntry, SellerListKind } from "../types/api";
@@ -74,7 +85,12 @@ function Row({ entry }: { entry: SellerListEntry }) {
           <Link to={`/sellers/${entry.sellerId}`}>Sellerを分析</Link>
         </p>
       </div>
-      <SellerListNote entry={entry} sellerLabel={label} />
+      {/* What the reader wrote and what the reader judged, together: both are
+          theirs, and both are what tells one row of identifiers from the next. */}
+      <div className={styles.own}>
+        <SellerListNote entry={entry} sellerLabel={label} />
+        <SellerAssessmentControls entry={entry} sellerLabel={label} />
+      </div>
       <SellerListButtons
         sellerId={entry.sellerId}
         sellerLabel={label}
@@ -87,12 +103,20 @@ function Row({ entry }: { entry: SellerListEntry }) {
 export function SellerListsPage() {
   const { listsStatus, entries, reloadLists } = useSellerDiscovery();
   const [active, setActive] = useState<SellerListKind>("saved");
+  // How the list is read. Nothing here is sent anywhere, to the backend or to
+  // Mercari: the entries are already on screen.
+  const [sort, setSort] = useState<ListSort>("added");
+  const [filter, setFilter] = useState<ListFilter>("all");
+  const id = useId();
 
   const saved = entries.filter((entry) => entry.kind === "saved");
   const excluded = entries.filter((entry) => entry.kind === "excluded");
-  // Newest first. The file keeps them oldest first, which is the order they
-  // were decided in; on screen the one just added is the one being looked for.
-  const shown = [...(active === "saved" ? saved : excluded)].reverse();
+  const onTab = active === "saved" ? saved : excluded;
+  // Newest first unless asked otherwise. The file keeps them oldest first,
+  // which is the order they were decided in; on screen the one just added is
+  // the one being looked for.
+  const narrowed = useMemo(() => filterEntries(onTab, filter), [onTab, filter]);
+  const shown = useMemo(() => sortEntries(narrowed.kept, sort), [narrowed.kept, sort]);
 
   return (
     <section aria-label="出品者リスト">
@@ -129,10 +153,57 @@ export function SellerListsPage() {
 
           <SellerListError />
 
-          {shown.length === 0 ? (
+          {onTab.length > 0 && (
+            <div className={styles.view}>
+              <span className={styles.inline}>
+                <label htmlFor={`${id}-sort`} className={styles.label}>
+                  並び順
+                </label>
+                <select
+                  id={`${id}-sort`}
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value as ListSort)}
+                >
+                  {LIST_SORT_ORDER.map((key) => (
+                    <option key={key} value={key}>
+                      {LIST_SORT_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <span className={styles.inline}>
+                <label htmlFor={`${id}-filter`} className={styles.label}>
+                  絞り込み
+                </label>
+                <select
+                  id={`${id}-filter`}
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value as ListFilter)}
+                >
+                  {LIST_FILTER_ORDER.map((key) => (
+                    <option key={key} value={key}>
+                      {LIST_FILTER_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              {narrowed.heldBack > 0 && (
+                <span className={styles.heldBack}>
+                  {narrowed.heldBack.toLocaleString("ja-JP")}
+                  人を表示していません（未評価の人を含みます）
+                </span>
+              )}
+            </div>
+          )}
+
+          {onTab.length === 0 ? (
             <p className={styles.empty}>
               {EMPTY[active]}
               。検索結果の「出品者」か、Seller画面から追加できます。
+            </p>
+          ) : shown.length === 0 ? (
+            <p className={styles.empty}>
+              この絞り込みに当てはまる出品者はいません。「すべて」に戻すと表示されます。
             </p>
           ) : (
             <ul className={styles.list}>
@@ -144,8 +215,8 @@ export function SellerListsPage() {
 
           <div className={styles.limits}>
             <p>
-              保存しているのは、Seller ID、どちらのリストか、追加した日、メモだけです。
-              出品者の名前・評価・商品は保存していません。
+              保存しているのは、Seller ID、どちらのリストか、追加した日、メモ、自分の評価だけです。
+              出品者の名前・Mercariでの評価・商品は保存していません。
               名前は、この画面を開いてから調べた出品者についてだけ表示されます。
             </p>
           </div>

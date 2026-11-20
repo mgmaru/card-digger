@@ -5,9 +5,10 @@ not a database, because there is one reader, a few hundred entries at the very
 most, and nothing to query: every use reads the whole list.
 
 The file holds what `SellerListEntry` holds and nothing else: an identifier,
-which list, a date and the reader's own note. No name, rating or listing of
-the seller is written, so there is nothing in it that describes a person
-beyond the fact that the reader made a decision about them.
+which list, a date, the reader's own note and the reader's own ratings. No
+name, marketplace rating or listing of the seller is written, so there is
+nothing in it that describes a person beyond what the reader decided and
+judged about them.
 """
 
 from __future__ import annotations
@@ -19,12 +20,28 @@ from datetime import datetime
 from pathlib import Path
 
 from card_digger.domain.errors import SellerListUnavailable
-from card_digger.domain.models import SellerListEntry, SellerListKind
+from card_digger.domain.models import (
+    AssessmentLevel,
+    SellerAssessment,
+    SellerListEntry,
+    SellerListKind,
+)
 
 
 #: Written into the file so that a later shape can tell an old file from a
-#: damaged one. There has only ever been this one.
-FORMAT_VERSION = 1
+#: damaged one.
+#:
+#: 2 since the reader's own ratings were added (ADR 0004, 2026-11-20). The
+#: number was raised, rather than the field quietly added to version 1, for
+#: the sake of the day an older build is put back: that build reads only
+#: version 1, so it stops and says it cannot read the file. Had the number
+#: stayed, it would have read the file happily, skipped the ratings, and
+#: thrown them all away the first time it wrote.
+FORMAT_VERSION = 2
+
+#: Every version this build can read. A version 1 file is one with no ratings
+#: in it; it is read as it stands and written back as version 2.
+READABLE_VERSIONS = frozenset({1, 2})
 
 FILE_NAME = "seller-lists.json"
 
@@ -102,7 +119,7 @@ class JsonFileSellerLists:
 
         try:
             document = json.loads(text)
-            if document["version"] != FORMAT_VERSION:
+            if document["version"] not in READABLE_VERSIONS:
                 raise ValueError("unknown version")
             entries = [_entry_from(record) for record in document["entries"]]
         except (ValueError, KeyError, TypeError) as error:
@@ -142,21 +159,40 @@ def _oldest_first(entries) -> tuple[SellerListEntry, ...]:
     return tuple(sorted(entries, key=lambda entry: (entry.added_at, entry.seller_id)))
 
 
-def _record_of(entry: SellerListEntry) -> dict[str, str]:
+def _record_of(entry: SellerListEntry) -> dict:
+    assessment = entry.assessment
     return {
         "sellerId": entry.seller_id,
         "kind": entry.kind.value,
         "addedAt": entry.added_at.isoformat(),
         "note": entry.note,
+        "assessment": {
+            "condition": _level_out(assessment.condition),
+            "frequency": _level_out(assessment.frequency),
+            "price": _level_out(assessment.price),
+            "assessedAt": (
+                assessment.assessed_at.isoformat()
+                if assessment.assessed_at is not None
+                else None
+            ),
+        },
     }
 
 
-def _entry_from(record: dict) -> SellerListEntry:
-    added_at = datetime.fromisoformat(record["addedAt"])
-    if added_at.tzinfo is None:
+def _level_out(level: AssessmentLevel | None) -> str | None:
+    return level.value if level is not None else None
+
+
+def _aware(text: str) -> datetime:
+    moment = datetime.fromisoformat(text)
+    if moment.tzinfo is None:
         # Every date in the domain is timezone aware. One without an offset
         # was not written by this module.
         raise ValueError("date without an offset")
+    return moment
+
+
+def _entry_from(record: dict) -> SellerListEntry:
     seller_id = record["sellerId"]
     note = record.get("note", "")
     if not isinstance(seller_id, str) or not seller_id or not isinstance(note, str):
@@ -164,6 +200,33 @@ def _entry_from(record: dict) -> SellerListEntry:
     return SellerListEntry(
         seller_id=seller_id,
         kind=SellerListKind(record["kind"]),
-        added_at=added_at,
+        added_at=_aware(record["addedAt"]),
         note=note,
+        assessment=_assessment_from(record.get("assessment")),
+    )
+
+
+def _assessment_from(record: object) -> SellerAssessment:
+    """The reader's ratings, or none at all for an entry written without any.
+
+    Absent is the shape of every version 1 entry and means unrated. Present
+    and not understood is damage, like anything else in the file that cannot
+    be read, and is refused rather than read as unrated: reading it as
+    unrated would write "unrated" back over whatever the reader had put.
+    """
+    if record is None:
+        return SellerAssessment()
+    if not isinstance(record, dict):
+        raise ValueError("unusable assessment")
+
+    def level(name: str) -> AssessmentLevel | None:
+        value = record.get(name)
+        return AssessmentLevel(value) if value is not None else None
+
+    assessed_at = record.get("assessedAt")
+    return SellerAssessment(
+        condition=level("condition"),
+        frequency=level("frequency"),
+        price=level("price"),
+        assessed_at=_aware(assessed_at) if assessed_at is not None else None,
     )

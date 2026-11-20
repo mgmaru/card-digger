@@ -42,6 +42,7 @@ from card_digger.api.schemas import (
     SellerItemsResponse,
     SellerKnowledgeResponse,
     SellerListEntryResponse,
+    SellerAssessmentPutRequest,
     SellerListPutRequest,
     SellerListsResponse,
     SellerResponse,
@@ -59,6 +60,8 @@ from card_digger.application.seller_breadth import seller_breadth
 from card_digger.application.seller_knowledge import seller_knowledge
 from card_digger.application.seller_lists import (
     InvalidSellerListEntry,
+    SellerNotListed,
+    assess_seller,
     list_seller,
     unlist_seller,
 )
@@ -377,6 +380,41 @@ def create_app(
                 clock=now,
             )
             return _both_lists()
+        except InvalidSellerListEntry as error:
+            raise _invalid_entry(error) from error
+        except SellerListUnavailable as error:
+            raise _lists_unavailable() from error
+
+    @app.put(
+        "/api/seller-lists/{seller_id}/assessment",
+        response_model=SellerListsResponse,
+    )
+    async def seller_lists_assess(
+        seller_id: str, request: SellerAssessmentPutRequest
+    ) -> SellerListsResponse:
+        """Record what the reader makes of a seller on one of the lists.
+
+        Reads and writes a local file. Sends no request to the marketplace:
+        these are the reader's own ratings, not Mercari's, and nothing is
+        looked up to store them (ADR 0004).
+
+        404 for a seller on neither list. There is nowhere to keep a rating
+        for somebody the reader has not listed.
+        """
+        try:
+            assess_seller(
+                lists,
+                seller_id=seller_id,
+                condition=request.condition,
+                frequency=request.frequency,
+                price=request.price,
+                clock=now,
+            )
+            return _both_lists()
+        except SellerNotListed as error:
+            raise HTTPException(
+                status_code=404, detail={"code": "not_found"}
+            ) from error
         except InvalidSellerListEntry as error:
             raise _invalid_entry(error) from error
         except SellerListUnavailable as error:

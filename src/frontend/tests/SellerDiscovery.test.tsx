@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../src/api/client";
 import { AppRoutes } from "../src/App";
 import { SearchProvider } from "../src/searchState";
+import { UNRATED } from "../src/sellerAssessment";
 import { SellerDiscoveryProvider } from "../src/sellerDiscoveryState";
 import type {
   BreadthLevel,
@@ -24,6 +25,7 @@ import type {
   Item,
   SearchResponse,
   SellerAnalysisResponse,
+  SellerAssessment,
   SellerEvaluationResponse,
   SellerListEntry,
 } from "../src/types/api";
@@ -34,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   sellerEvaluation: vi.fn(),
   sellerLists: vi.fn(),
   putSellerListEntry: vi.fn(),
+  putSellerAssessment: vi.fn(),
   removeSellerListEntry: vi.fn(),
 }));
 
@@ -135,8 +138,14 @@ const LOOKS: Record<string, SellerEvaluationResponse> = {
   gone: evaluation("gone", "引っ越し中", "mixed", 6, 10),
 };
 
-function entry(sellerId: string, kind: SellerListEntry["kind"], note = ""): SellerListEntry {
-  return { sellerId, kind, addedAt: "2026-11-19T12:00:00+09:00", note };
+function entry(
+  sellerId: string,
+  kind: SellerListEntry["kind"],
+  note = "",
+  assessment: SellerAssessment = UNRATED,
+  addedAt = "2026-11-19T12:00:00+09:00",
+): SellerListEntry {
+  return { sellerId, kind, addedAt, note, assessment };
 }
 
 /** The lists as the backend holds them, so a change is answered truthfully. */
@@ -177,10 +186,34 @@ beforeEach(() => {
   mocks.sellerEvaluation.mockImplementation(async (id: string) => LOOKS[id]);
   mocks.putSellerListEntry.mockImplementation(
     async (sellerId: string, kind: SellerListEntry["kind"], note: string) => {
+      // As the backend does it: what the reader made of a seller survives a
+      // new note and a move to the other list.
+      const before = stored.find((kept) => kept.sellerId === sellerId);
       stored = [
         ...stored.filter((kept) => kept.sellerId !== sellerId),
-        entry(sellerId, kind, note.trim()),
+        entry(sellerId, kind, note.trim(), before?.assessment),
       ];
+      return { entries: stored };
+    },
+  );
+  mocks.putSellerAssessment.mockImplementation(
+    async (
+      sellerId: string,
+      levels: Pick<SellerAssessment, "condition" | "frequency" | "price">,
+    ) => {
+      stored = stored.map((kept) =>
+        kept.sellerId === sellerId
+          ? {
+              ...kept,
+              assessment: {
+                ...levels,
+                assessedAt: Object.values(levels).some((level) => level !== null)
+                  ? "2026-11-20T10:00:00+09:00"
+                  : null,
+              },
+            }
+          : kept,
+      );
       return { entries: stored };
     },
   );
@@ -786,6 +819,207 @@ describe("the words a title has to contain", () => {
     expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
       "指定した条件に一致: 2件",
     );
+  });
+});
+
+describe("the reader's own ratings, on the 出品者リスト screen", () => {
+  const rated = (
+    condition: SellerAssessment["condition"],
+    frequency: SellerAssessment["frequency"] = null,
+    price: SellerAssessment["price"] = null,
+  ): SellerAssessment => ({
+    condition,
+    frequency,
+    price,
+    assessedAt: "2026-11-15T09:00:00+09:00",
+  });
+  const ratings = (label: string) =>
+    within(screen.getByRole("group", { name: `${label}への自分の評価` }));
+  const listed = () =>
+    screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+
+  it("starts with every axis unrated, and no date", async () => {
+    stored = [entry("111", "saved")];
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    const own = ratings("Seller 111");
+    expect(own.getByLabelText("状態")).toHaveValue("");
+    expect(own.getByLabelText("出品頻度")).toHaveValue("");
+    expect(own.getByLabelText("価格")).toHaveValue("");
+    expect(screen.queryByText(/に評価$/)).not.toBeInTheDocument();
+  });
+
+  it("offers three steps and 未評価 on each axis, in words", async () => {
+    stored = [entry("111", "saved")];
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    const steps = (axis: string) =>
+      within(ratings("Seller 111").getByLabelText(axis))
+        .getAllByRole("option")
+        .map((option) => option.textContent);
+    expect(steps("状態")).toEqual(["未評価", "◎ 美品が多い", "○ ふつう", "△ 傷みが多い"]);
+    expect(steps("出品頻度")).toEqual([
+      "未評価",
+      "◎ よく出品する",
+      "○ ときどき",
+      "△ ほとんど出さない",
+    ]);
+    // ◎ is the end a buyer is glad of on every axis. On price that is cheap.
+    expect(steps("価格")).toEqual(["未評価", "◎ 安い", "○ 相場なみ", "△ 高い"]);
+  });
+
+  it("stores a rating as soon as it is chosen, with the other two axes as they were", async () => {
+    stored = [entry("111", "saved", "メモ", rated("high"))];
+    const user = userEvent.setup();
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    await user.selectOptions(ratings("Seller 111").getByLabelText("価格"), "low");
+
+    expect(mocks.putSellerAssessment.mock.calls).toEqual([
+      ["111", { condition: "high", frequency: null, price: "low" }],
+    ]);
+    // What was stored, and when.
+    await waitFor(() =>
+      expect(ratings("Seller 111").getByLabelText("価格")).toHaveValue("low"),
+    );
+    expect(screen.getByText("2026-11-20 に評価")).toBeInTheDocument();
+  });
+
+  it("clears a rating by choosing 未評価", async () => {
+    stored = [entry("111", "saved", "", rated("high"))];
+    const user = userEvent.setup();
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    await user.selectOptions(ratings("Seller 111").getByLabelText("状態"), "");
+
+    expect(mocks.putSellerAssessment.mock.calls).toEqual([
+      ["111", { condition: null, frequency: null, price: null }],
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByText(/に評価$/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it("asks Mercari nothing, and is not Mercari's rating", async () => {
+    stored = [entry("111", "saved")];
+    const user = userEvent.setup();
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    await user.selectOptions(ratings("Seller 111").getByLabelText("状態"), "high");
+
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    expect(mocks.sellerAnalysis).not.toHaveBeenCalled();
+    // Called the reader's own, so it is not taken for the one Mercari shows.
+    expect(screen.getByText("自分の評価")).toBeInTheDocument();
+  });
+
+  it("keeps the ratings when the note is saved again", async () => {
+    stored = [entry("111", "saved", "古いメモ", rated("high", "low"))];
+    const user = userEvent.setup();
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    const note = screen.getByRole("textbox", { name: "Seller 111のメモ" });
+    await user.clear(note);
+    await user.type(note, "新しいメモ");
+    await user.click(screen.getByRole("button", { name: "Seller 111のメモを保存" }));
+
+    await waitFor(() => expect(note).toHaveValue("新しいメモ"));
+    expect(ratings("Seller 111").getByLabelText("状態")).toHaveValue("high");
+    expect(ratings("Seller 111").getByLabelText("出品頻度")).toHaveValue("low");
+  });
+
+  it("says so when a rating could not be stored, and shows what is stored", async () => {
+    stored = [entry("111", "saved")];
+    mocks.putSellerAssessment.mockRejectedValue(new ApiError("network"));
+    const user = userEvent.setup();
+    mount("/seller-lists");
+    await screen.findByRole("tab", { name: /保存/ });
+
+    await user.selectOptions(ratings("Seller 111").getByLabelText("状態"), "high");
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(ratings("Seller 111").getByLabelText("状態")).toHaveValue("");
+  });
+
+  describe("reading the list by them", () => {
+    beforeEach(() => {
+      stored = [
+        entry("old", "saved", "", rated("low", "high", "middle"), "2026-11-01T12:00:00+09:00"),
+        entry("mint", "saved", "", rated("high", "low", null), "2026-11-05T12:00:00+09:00"),
+        entry("cheap", "saved", "", rated("middle", null, "high"), "2026-11-10T12:00:00+09:00"),
+        entry("new", "saved", "", UNRATED, "2026-11-18T12:00:00+09:00"),
+      ];
+    });
+
+    it("is newest first until asked otherwise, as it always was", async () => {
+      mount("/seller-lists");
+      await screen.findByRole("tab", { name: /保存/ });
+
+      expect(screen.getByLabelText("並び順")).toHaveValue("added");
+      expect(listed()).toEqual(["Seller new", "Seller cheap", "Seller mint", "Seller old"]);
+    });
+
+    it("puts the best on an axis first, and the unrated on that axis last", async () => {
+      const user = userEvent.setup();
+      mount("/seller-lists");
+      await screen.findByRole("tab", { name: /保存/ });
+
+      await user.selectOptions(screen.getByLabelText("並び順"), "condition");
+      expect(listed()).toEqual(["Seller mint", "Seller cheap", "Seller old", "Seller new"]);
+
+      // 価格: cheap is ◎, old is ○, and two are unrated — newest of them first.
+      await user.selectOptions(screen.getByLabelText("並び順"), "price");
+      expect(listed()).toEqual(["Seller cheap", "Seller old", "Seller new", "Seller mint"]);
+    });
+
+    it("can show only the sellers rated ◎ on an axis, and says how many it left out", async () => {
+      const user = userEvent.setup();
+      mount("/seller-lists");
+      await screen.findByRole("tab", { name: /保存/ });
+
+      await user.selectOptions(screen.getByLabelText("絞り込み"), "frequency");
+
+      expect(listed()).toEqual(["Seller old"]);
+      expect(
+        screen.getByText("3人を表示していません（未評価の人を含みます）"),
+      ).toBeInTheDocument();
+      // The tab still counts everybody on the list.
+      expect(screen.getByRole("tab", { name: /保存/ })).toHaveTextContent("4");
+    });
+
+    it("brings everybody back with すべて, and sends nothing either way", async () => {
+      const user = userEvent.setup();
+      mount("/seller-lists");
+      await screen.findByRole("tab", { name: /保存/ });
+      await user.selectOptions(screen.getByLabelText("絞り込み"), "frequency");
+
+      await user.selectOptions(screen.getByLabelText("絞り込み"), "all");
+
+      expect(listed()).toHaveLength(4);
+      expect(mocks.putSellerAssessment).not.toHaveBeenCalled();
+      expect(mocks.putSellerListEntry).not.toHaveBeenCalled();
+      expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    });
+
+    it("says so when nobody is ◎ on the axis, rather than looking empty", async () => {
+      stored = [entry("111", "saved")];
+      const user = userEvent.setup();
+      mount("/seller-lists");
+      await screen.findByRole("tab", { name: /保存/ });
+
+      await user.selectOptions(screen.getByLabelText("絞り込み"), "condition");
+
+      expect(
+        screen.getByText(/この絞り込みに当てはまる出品者はいません/),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/保存した出品者はまだいません/)).not.toBeInTheDocument();
+    });
   });
 });
 

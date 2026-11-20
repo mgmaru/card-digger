@@ -87,6 +87,8 @@ uv run uvicorn --factory card_digger.api.main:create_app --reload
 **未設定ならHome Directoryの`.card-digger/`に置く。**Repositoryの中へは置かない。デプロイが
 版のDirectoryを差し替えても残すためである
 （[ADR 0004 論点2](../../docs/adr/0004-store-seller-lists-in-a-local-file.md#論点2--どこへどんな形で保存するか)）。
+**前の版のCard Diggerへ戻すと、このファイルを読めないことがある。**読めないときはErrorを出して止まり、書き換えない
+（[ADR 0004 ファイルの版](../../docs/adr/0004-store-seller-lists-in-a-local-file.md#ファイルの版)）。
 
 `uvicorn`の既定Bind先は`127.0.0.1`である。**`--host 0.0.0.0`を付けない。** 認証が無いまま
 LANへ公開することになる（[MVP仕様 §10](../../docs/product/mvp-spec.md#10-data取扱い)）。

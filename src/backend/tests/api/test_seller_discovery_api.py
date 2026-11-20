@@ -45,6 +45,9 @@ from card_digger.domain.models import (
 SELLER_ID = "100000001"
 AT = datetime(2026, 11, 19, 3, 0, tzinfo=timezone.utc)
 
+#: A seller the reader has rated on no axis, as the API says it.
+UNRATED = {"condition": None, "frequency": None, "price": None, "assessedAt": None}
+
 SELLER = Seller(
     id=SELLER_ID,
     name="sample seller",
@@ -251,6 +254,7 @@ class TestSellerLists:
                     "kind": "saved",
                     "addedAt": "2026-11-19T03:00:00Z",
                     "note": "服も出品している",
+                    "assessment": UNRATED,
                 }
             ]
         }
@@ -334,10 +338,143 @@ class TestSellerLists:
         assert port.calls == []
 
     def test_an_entry_carries_nothing_the_marketplace_said(self):
-        """The exact field set. No name, no rating, no listing (ADR 0004)."""
+        """The exact field set. No name, no Mercari rating, no listing (ADR 0004).
+
+        `assessment` is the reader's own, and its fields are pinned as well.
+        """
         body = client().put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"}).json()
 
-        assert set(body["entries"][0]) == {"sellerId", "kind", "addedAt", "note"}
+        assert set(body["entries"][0]) == {
+            "sellerId",
+            "kind",
+            "addedAt",
+            "note",
+            "assessment",
+        }
+        assert set(body["entries"][0]["assessment"]) == {
+            "condition",
+            "frequency",
+            "price",
+            "assessedAt",
+        }
+
+
+class TestTheReadersOwnRatings:
+    """What the reader makes of a seller on a list (ADR 0004, 2026-11-20)."""
+
+    URL = "/api/seller-lists"
+
+    def test_a_listed_seller_can_be_rated_axis_by_axis(self):
+        app = client()
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved", "note": "メモ"})
+
+        response = app.put(
+            f"{self.URL}/{SELLER_ID}/assessment",
+            json={"condition": "high", "frequency": None, "price": "low"},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "entries": [
+                {
+                    "sellerId": SELLER_ID,
+                    "kind": "saved",
+                    "addedAt": "2026-11-19T03:00:00Z",
+                    "note": "メモ",
+                    "assessment": {
+                        "condition": "high",
+                        "frequency": None,
+                        "price": "low",
+                        "assessedAt": "2026-11-19T03:00:00Z",
+                    },
+                }
+            ]
+        }
+
+    def test_an_axis_left_out_is_unrated(self):
+        app = client()
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"})
+
+        body = app.put(
+            f"{self.URL}/{SELLER_ID}/assessment", json={"frequency": "middle"}
+        ).json()
+
+        assert body["entries"][0]["assessment"] == {
+            "condition": None,
+            "frequency": "middle",
+            "price": None,
+            "assessedAt": "2026-11-19T03:00:00Z",
+        }
+
+    def test_a_seller_on_neither_list_is_404_and_nothing_is_stored(self):
+        app = client()
+
+        response = app.put(
+            f"{self.URL}/{SELLER_ID}/assessment", json={"condition": "high"}
+        )
+
+        assert response.status_code == 404
+        assert response.json() == {"detail": {"code": "not_found"}}
+        assert app.get(self.URL).json() == {"entries": []}
+
+    def test_a_level_that_is_not_one_of_the_three_is_422(self):
+        app = client()
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"})
+
+        response = app.put(
+            f"{self.URL}/{SELLER_ID}/assessment", json={"condition": "excellent"}
+        )
+
+        assert response.status_code == 422
+        assert app.get(self.URL).json()["entries"][0]["assessment"] == UNRATED
+
+    def test_it_survives_a_new_note_and_a_move_between_the_lists(self):
+        app = client()
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"})
+        app.put(f"{self.URL}/{SELLER_ID}/assessment", json={"price": "high"})
+
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved", "note": "書き直した"})
+        body = app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "excluded"}).json()
+
+        assert body["entries"][0]["assessment"]["price"] == "high"
+
+    def test_it_is_forgotten_when_the_seller_is_taken_off_both_lists(self):
+        app = client()
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"})
+        app.put(f"{self.URL}/{SELLER_ID}/assessment", json={"price": "high"})
+
+        app.delete(f"{self.URL}/{SELLER_ID}")
+        body = app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"}).json()
+
+        assert body["entries"][0]["assessment"] == UNRATED
+
+    def test_none_of_it_reaches_the_marketplace(self):
+        """The reader's own ratings, so nothing is looked up to store them.
+
+        A `ScriptedPort` with no script raises on any call at all.
+        """
+        port = ScriptedPort()
+        app = client(port)
+        app.put(f"{self.URL}/{SELLER_ID}", json={"kind": "saved"})
+
+        app.put(
+            f"{self.URL}/{SELLER_ID}/assessment",
+            json={"condition": "high", "frequency": "low", "price": "middle"},
+        )
+
+        assert port.calls == []
+
+    def test_the_development_frontend_may_send_it(self):
+        """The same `PUT` the lists already allow, from the same origin."""
+        response = client().options(
+            f"{self.URL}/{SELLER_ID}/assessment",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "PUT",
+            },
+        )
+
+        assert response.status_code == 200
 
 
 class TestWhereTheListsAreKept:
