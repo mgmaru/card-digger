@@ -116,6 +116,35 @@ describe("grouping by seller", () => {
     expect(candidate?.worstRank).toBe(2);
   });
 
+  it("counts 美品 as 目立った傷や汚れなし and better", () => {
+    const [candidate] = sellerCandidates([
+      item("a", "s1", "1"),
+      item("b", "s1", "2"),
+      item("c", "s1", "3"),
+      item("d", "s1", "5"),
+    ]);
+
+    // The line is at 3. 新品、未使用 alone would leave almost nobody.
+    expect(candidate?.fineHitCount).toBe(3);
+  });
+
+  it("does not count a grade nobody could place as 美品", () => {
+    const [candidate] = sellerCandidates([
+      item("a", "s1", null),
+      item("b", "s1", "9"),
+      item("c", "s1", "3"),
+    ]);
+
+    // Not known to be fine is not fine. It is not worn either: see above.
+    expect(candidate?.fineHitCount).toBe(1);
+  });
+
+  it("counts none when every hit is worn", () => {
+    const [candidate] = sellerCandidates([item("a", "s1", "5")]);
+
+    expect(candidate?.fineHitCount).toBe(0);
+  });
+
   it("has no worst grade when none could be placed", () => {
     const [candidate] = sellerCandidates([item("a", "s1", null)]);
 
@@ -211,6 +240,38 @@ describe("ordering", () => {
       "mixed",
       "narrow",
       "wide",
+      "nothing-listed",
+    ]);
+  });
+
+  it("by fine hits goes by how many, not by the most worn one", () => {
+    const many = sellerCandidates([
+      item("a", "one-mint", "1"),
+      item("b", "many", "1"),
+      item("c", "many", "2"),
+      item("d", "many", "3"),
+      item("e", "many", "5"),
+      item("f", "worn", "5"),
+      item("g", "unplaced", null),
+    ]);
+
+    // By condition `many` would sit below `one-mint`: its worn card decides.
+    // Here its three decide.
+    expect(ids(sortCandidates(many, "fineHits", new Map()))).toEqual([
+      "many",
+      "one-mint",
+      "worn",
+      "unplaced",
+    ]);
+    expect(ids(sortCandidates(many, "condition", new Map()))[0]).toBe("one-mint");
+  });
+
+  it("by fine hits leaves sellers with the same count in the order found", () => {
+    expect(ids(sortCandidates(candidates, "fineHits", evaluations))).toEqual([
+      "narrow",
+      "never-looked-at",
+      "wide",
+      "mixed",
       "nothing-listed",
     ]);
   });

@@ -170,6 +170,12 @@ export function SellerCandidateRow({
           <dt>一致した出品</dt>
           <dd>{count(candidate.hits.length)}</dd>
         </div>
+        {/* How many of the line above are 美品. A count and not a share: the
+            reader asked for whoever lists many (出品者探索 §5.4). */}
+        <div className={styles.fact}>
+          <dt>一致した美品</dt>
+          <dd>{count(candidate.fineHitCount)}</dd>
+        </div>
         {/* Named after the listings it describes. 商品の状態 alone, beside
             出品の幅 and 評価, read as a third fact about the seller; it is a
             fact about the listings counted on the line above
@@ -352,8 +358,9 @@ export function SellerCandidateLimits() {
   return (
     <div className={styles.limits}>
       <p>
-        「一致した出品」と「一致した出品の状態」は、この検索で取得した出品についてのものです。
+        「一致した出品」「一致した美品」「一致した出品の状態」は、この検索で取得した出品についてのものです。
         出品者の出品全体の状態ではありません。
+        「一致した美品」は、状態が「目立った傷や汚れなし」以上の出品の件数です。状態が不明の出品は数えません。
         商品の状態は出品者が選んだ区分であり、実物を確認したものではありません。
       </p>
       <p>

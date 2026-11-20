@@ -25,6 +25,15 @@ import type {
 
 export type ConditionCount = { id: string; name: string; count: number };
 
+/**
+ * The most worn grade still counted as 美品, as Mercari's number.
+ *
+ * `3` is 目立った傷や汚れなし, so 美品 is that grade and the two better ones.
+ * The reader drew the line there (2026-11-20): cards are mostly listed as
+ * 目立った傷や汚れなし, and a line at 新品、未使用 would leave almost nobody.
+ */
+export const FINE_UP_TO_RANK = 3;
+
 export type SellerCandidate = {
   sellerId: string;
   /** This seller's listings in the result, in the order the result holds them. */
@@ -35,6 +44,15 @@ export type SellerCandidate = {
   conditions: ConditionCount[];
   /** Listings whose grade could not be placed. Never counted as a bad one. */
   unknownConditionCount: number;
+  /**
+   * How many of their hits are 美品: graded `FINE_UP_TO_RANK` or better.
+   *
+   * **Of the listings this search found, not of everything they sell.** A
+   * seller's own listing pages carry no grade, so this is the only count of
+   * it there is without asking Mercari again. A listing whose grade could not
+   * be placed is not counted: not known to be fine is not fine.
+   */
+  fineHitCount: number;
   /**
    * The most worn grade among their hits, as Mercari's number, or `null` when
    * none could be placed. Larger is more worn: `1` is 新品、未使用.
@@ -83,6 +101,9 @@ export function sellerCandidates(items: readonly Item[]): SellerCandidate[] {
       firstIndex,
       conditions: ranks.map((rank) => counted.get(rank) as ConditionCount),
       unknownConditionCount: unknown,
+      fineHitCount: ranks
+        .filter((rank) => rank <= FINE_UP_TO_RANK)
+        .reduce((sum, rank) => sum + (counted.get(rank) as ConditionCount).count, 0),
       worstRank: ranks.at(-1) ?? null,
     };
   });
@@ -141,6 +162,7 @@ export type CandidateSort =
   | "cardShare"
   | "cardShareHigh"
   | "goodRatings"
+  | "fineHits"
   | "condition"
   | "hits";
 
@@ -149,6 +171,7 @@ export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
   cardShare: "カードの割合が低い順",
   cardShareHigh: "カードの割合が高い順",
   goodRatings: "良い評価が多い順",
+  fineHits: "一致した美品が多い順",
   condition: "一致した出品の状態が良い順",
   hits: "一致した出品が多い順",
 };
@@ -158,6 +181,7 @@ export const CANDIDATE_SORT_ORDER: CandidateSort[] = [
   "cardShare",
   "cardShareHigh",
   "goodRatings",
+  "fineHits",
   "condition",
   "hits",
 ];
@@ -239,6 +263,11 @@ export function withGoodRatings(
  * seller with one mint card and one damaged one is not a seller of mint cards.
  * A seller with no grade that could be placed comes last, and is not treated
  * as worn.
+ *
+ * By fine hits, the seller with the most 美品 among their hits comes first.
+ * It is the other question: the order by condition puts a seller with twenty
+ * unused cards and one worn one near the bottom, and one with a single unused
+ * card at the top. This one counts, so whoever lists many comes first.
  */
 export function sortCandidates(
   candidates: readonly SellerCandidate[],
@@ -270,6 +299,8 @@ export function sortCandidates(
           (goodRatings(evaluations.get(b.sellerId)) ?? -1) -
             (goodRatings(evaluations.get(a.sellerId)) ?? -1) || found(a, b)
         );
+      case "fineHits":
+        return b.fineHitCount - a.fineHitCount || found(a, b);
       case "condition":
         return (
           (a.worstRank ?? Number.POSITIVE_INFINITY) -

@@ -322,6 +322,8 @@ describe("the 出品者 tab", () => {
     expect(rowNames()).toEqual(["Seller shop", "Seller home", "Seller gone"]);
     const shop = rows()[0] as HTMLElement;
     expect(shop).toHaveTextContent("一致した出品2件");
+    // One of the two is 目立った傷や汚れなし or better.
+    expect(shop).toHaveTextContent("一致した美品1件");
     expect(shop).toHaveTextContent("目立った傷や汚れなし 1件、傷や汚れあり 1件");
     expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
   });
@@ -329,17 +331,18 @@ describe("the 出品者 tab", () => {
   it("names the condition after the listings it describes, not as a fact about the seller", async () => {
     await searchAndOpenSellers();
 
-    // 商品の状態 alone read as something about the seller. The first two
+    // 商品の状態 alone read as something about the seller. The first three
     // lines are about the listings this search found; the last two are about
     // the seller.
     const shop = within(rows()[0] as HTMLElement);
     expect(shop.getAllByRole("term").map((term) => term.textContent)).toEqual([
       "一致した出品",
+      "一致した美品",
       "一致した出品の状態",
       "カードの割合",
       "評価",
     ]);
-    expect(shop.getAllByRole("definition")[1]).toHaveTextContent(
+    expect(shop.getAllByRole("definition")[2]).toHaveTextContent(
       "目立った傷や汚れなし 1件、傷や汚れあり 1件",
     );
   });
@@ -425,6 +428,29 @@ describe("looking at the sellers", () => {
     expect(rowNames()).toEqual(["ゆうママ", "引っ越し中", "カード専門店"]);
     // Reading order only. Nobody was asked about again.
     expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(3);
+  });
+
+  it("sorts by how many of a seller's hits are 美品, from the search alone", async () => {
+    mocks.search.mockResolvedValue({
+      ...RESULT,
+      items: [
+        item("a", "worn", "5"),
+        item("b", "one", "3"),
+        item("c", "two", "3"),
+        item("d", "two", "3"),
+        item("e", "two", "5"),
+      ],
+    });
+    const user = await searchAndOpenSellers();
+
+    await user.selectOptions(screen.getByLabelText("並び順"), "fineHits");
+
+    expect(rowNames()).toEqual(["Seller two", "Seller one", "Seller worn"]);
+    expect(rows()[0]).toHaveTextContent("一致した美品2件");
+    expect(rows()[2]).toHaveTextContent("一致した美品0件");
+    // Counted from what the search returned. Nobody was looked at for it.
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    expect(mocks.search).toHaveBeenCalledTimes(1);
   });
 
   it("carries on past a seller whose look failed, and still owes them one", async () => {
