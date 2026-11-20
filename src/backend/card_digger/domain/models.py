@@ -203,15 +203,66 @@ class SellerListKind(str, Enum):
     EXCLUDED = "excluded"
 
 
+class AssessmentLevel(str, Enum):
+    """How the reader rates a seller on one axis. Three steps, and no score.
+
+    Named for where a seller stands for somebody buying, not for a number:
+    `high` is the end the reader is glad of on every axis — cards in good
+    condition, listed often, priced low. Three and not five so that choosing
+    one is quick; a finer scale stops the hand at "three or four?" (ADR 0004).
+    """
+
+    HIGH = "high"
+    MIDDLE = "middle"
+    LOW = "low"
+
+
+@dataclass(frozen=True)
+class SellerAssessment:
+    """What the reader themselves makes of a seller, axis by axis.
+
+    **The reader's own judgement, not the marketplace's.** Mercari has ratings
+    too, given by the people a seller traded with; those are its facts and are
+    never stored. These are written by the reader after looking, which puts
+    them on the same side as the note (ADR 0004, issue 1, 2026-11-20).
+
+    Axes and not one overall mark: a single mark cannot say whether a seller
+    is the one to open on a day spent looking for cards in good condition or
+    on a day spent looking for bargains. `None` on an axis is "not rated",
+    which is different from the middle step and is never read as it.
+
+    **A judgement before buying**, made to decide whom to look at first.
+    Whether what arrived matched the listing is a different record and is not
+    kept here.
+    """
+
+    #: Whether their cards tend to be in good condition.
+    condition: AssessmentLevel | None = None
+    #: Whether they list often.
+    frequency: AssessmentLevel | None = None
+    #: Whether they price below the going rate.
+    price: AssessmentLevel | None = None
+    #: When the reader last changed any of the three. Unlike everything else
+    #: stored, a judgement goes stale — somebody who has sold off a collection
+    #: no longer lists often — so the screen says how old it is. `None` while
+    #: no axis has ever been rated.
+    assessed_at: datetime | None = None
+
+    @property
+    def levels(self) -> tuple[AssessmentLevel | None, ...]:
+        return (self.condition, self.frequency, self.price)
+
+
 @dataclass(frozen=True)
 class SellerListEntry:
     """One seller the reader chose to remember, and nothing about the seller.
 
-    The identifier, which list, when, and the reader's own words. **No name,
-    no rating and no listing is kept here**: those are the marketplace's facts
-    and are read from it each time, so what is stored cannot go stale and
-    cannot describe a person any further than "I decided this about them"
-    (ADR 0004).
+    The identifier, which list, when, the reader's own words and the reader's
+    own ratings. **No name, no marketplace rating and no listing is kept
+    here**: those are the marketplace's facts and are read from it each time,
+    so nothing stored is a copy of something that can change behind it, and
+    nothing stored describes a person any further than "I decided this about
+    them" (ADR 0004).
     """
 
     seller_id: str
@@ -219,3 +270,5 @@ class SellerListEntry:
     added_at: datetime
     #: Written by the reader. Empty when they wrote nothing.
     note: str = ""
+    #: Rated by the reader. Every axis unrated until they rate one.
+    assessment: SellerAssessment = SellerAssessment()

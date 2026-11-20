@@ -11,7 +11,12 @@ so saving one costs no request and works while the safety stop is holding.
 
 from __future__ import annotations
 
-from card_digger.domain.models import SellerListEntry, SellerListKind
+from card_digger.domain.models import (
+    AssessmentLevel,
+    SellerAssessment,
+    SellerListEntry,
+    SellerListKind,
+)
 from card_digger.domain.ports import Clock, SellerListPort
 
 
@@ -84,7 +89,14 @@ def list_seller(
     )
 
     entry = SellerListEntry(
-        seller_id=cleaned_id, kind=kind, added_at=added_at, note=cleaned_note
+        seller_id=cleaned_id,
+        kind=kind,
+        added_at=added_at,
+        note=cleaned_note,
+        # What the reader makes of a seller is about the seller, not about the
+        # list they are on: it survives a reworded note and a move to the
+        # other list alike. Only taking them off both forgets it.
+        assessment=existing.assessment if existing is not None else SellerAssessment(),
     )
     lists.put(entry)
     return entry
@@ -93,3 +105,59 @@ def list_seller(
 def unlist_seller(lists: SellerListPort, *, seller_id: str) -> bool:
     """Take a seller off whichever list they are on. Not an error if on none."""
     return lists.remove(clean_seller_id(seller_id))
+
+
+class SellerNotListed(LookupError):
+    """The seller is on neither list, so there is nowhere to keep a rating."""
+
+
+def assess_seller(
+    lists: SellerListPort,
+    *,
+    seller_id: str,
+    condition: AssessmentLevel | None,
+    frequency: AssessmentLevel | None,
+    price: AssessmentLevel | None,
+    clock: Clock,
+) -> SellerListEntry:
+    """Record what the reader makes of a seller already on one of the lists.
+
+    All three axes are given every time, so what is stored is what the screen
+    showed when the reader let go of it, and never a mix of two edits.
+
+    **Only a seller on a list can be rated.** The ratings exist to tell the
+    sellers on a list apart; one for somebody on neither would be a record
+    about a person the reader has not decided anything about, which is the
+    thing the lists were careful not to become (ADR 0004).
+
+    **The date moves when a rating does, and only then.** Saving the same
+    three again is not a fresh judgement, and should not make an old one look
+    new. Clearing all three clears the date with them: there is then no
+    judgement for it to be the date of.
+    """
+    cleaned_id = clean_seller_id(seller_id)
+    existing = next(
+        (entry for entry in lists.entries() if entry.seller_id == cleaned_id), None
+    )
+    if existing is None:
+        raise SellerNotListed(cleaned_id)
+
+    levels = (condition, frequency, price)
+    if levels == existing.assessment.levels:
+        return existing
+
+    assessment = SellerAssessment(
+        condition=condition,
+        frequency=frequency,
+        price=price,
+        assessed_at=clock.now() if any(level is not None for level in levels) else None,
+    )
+    entry = SellerListEntry(
+        seller_id=existing.seller_id,
+        kind=existing.kind,
+        added_at=existing.added_at,
+        note=existing.note,
+        assessment=assessment,
+    )
+    lists.put(entry)
+    return entry
