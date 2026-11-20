@@ -260,6 +260,52 @@ poc/mercapi/.venv/bin/python poc/mercapi/photos_probe.py --skip-render --skip-pa
 **成立しないのは描画ではなくURLの取得側です。** 一覧120件ぶんの詳細は2秒間隔で240秒になり、
 検索1回20〜30秒の道具に載りません。**利用者が選んだ1件なら243msで載ります。**
 
+## 出品者の出品を、状態付きで読めるか
+
+Card Diggerは出品者を3 Request（Profile、販売中の一覧、売却済みの一覧）で調べます。
+2つの一覧は`items/get_items`から来ており、**Forkのモデルには商品の状態がありません。**
+そのため「この出品者が美品を何件出しているか」を、出品者の出品全体からは数えられません。
+
+**なぜ無いのかは、誰も確かめていません。**次の2つを見ます。
+
+1. `items/get_items`が状態を送っていて、Forkが捨てているだけか（1件が持っていた項目名をすべて記録する）
+2. 検索の`sellerId`で出品者を絞れるか。絞れたとき、状態が付いているか
+
+2が通れば、2つの一覧を**出品者を指定した検索2回に置き換えられます。**3 Requestのまま、状態が付き、
+1回で読める件数が30件から最大120件に増えます。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/seller_condition_probe.py --seller-id <出品者ID>
+```
+
+`src/backend`の環境でも動きます（`mercapi`と`httpx`しか使いません）。
+
+```bash
+cd src/backend
+uv run python ../../poc/mercapi/seller_condition_probe.py --seller-id <出品者ID>
+```
+
+出品者IDは、出品者ページのURL（`https://jp.mercari.com/user/profile/<ID>`）の末尾の数字です。
+**販売中が数十件あり、売却済みもある出品者**を選ぶと、すべての質問に答えが出ます。
+
+| 項目 | 内容 |
+|---|---|
+| Request | **4件**（一覧2件、検索2件）。同時実行数1、開始間隔2秒以上、自動再試行なし |
+| 一覧が拒否されたとき | そこで止める |
+| 検索が拒否されたとき | 記録して止める。**「絞り込みは拒否された」も答えである** |
+| 絞り込みが効いたかの判定 | **HTTP 200では判定しない。**返ってきた出品の出品者を、指定した出品者と1件ずつ比べる。無視された絞り込みも200を返す |
+| 一覧の出品を検索も返したか | 一覧の30件が、検索結果に含まれるかを数える。**検索が棚の一部を黙って落とすなら、一覧の代わりにならない** |
+| 画面に出るもの | 項目名と件数だけ。出品者IDは下2桁、出品のIDとTitleは出さない |
+| `artifacts/seller-conditions.json` | 出品のIDを含む。Git管理外 |
+
+検索がHTTP 400を返したときは、`sellerId`の型が違う可能性があります。時間を置いて、1回だけ試します。
+
+```bash
+poc/mercapi/.venv/bin/python poc/mercapi/seller_condition_probe.py --seller-id <出品者ID> --seller-id-as-int
+```
+
+**まだ実行していません。**結果が出たら、ここと[出品者探索 実装仕様](../../docs/product/seller-discovery-spec.md)へ書きます。
+
 ## テスト
 
 ```bash
@@ -290,6 +336,8 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `photos_probe.py`: 画像の枚数・大きさと、複数枚表示の描画速度を測るランナー
 - `test_photos_probe.py`: 枚数の数え方、見られるかの判定、測定の妥当性、Harnessの単体テスト
 - `photos-result.md`: 2026-09-05の商品画像の枚数と描画速度の観測結果
+- `seller_condition_probe.py`: 出品者の出品一覧が状態を持つか、出品者を指定した検索が効くかを観測するランナー
+- `test_seller_condition_probe.py`: 項目名の記録、絞り込みの判定、一覧との突き合わせ、通信しない通し実行の単体テスト
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証
