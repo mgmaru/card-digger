@@ -129,6 +129,7 @@ class MercapiClient(Protocol):
         price_max: int | None = ...,
         page_token: str | None = ...,
         seller_ids: Sequence[str] = ...,
+        item_conditions: Sequence[int] = ...,
     ) -> SearchResults: ...
 
     async def item(self, id_: str) -> Item | None: ...
@@ -438,11 +439,19 @@ class MercariAdapter:
         *,
         price_min: int | None = None,
         price_max: int | None = None,
+        condition_ids: Sequence[str] = (),
     ) -> SearchPage:
         operation = Operation.SEARCH
         query = keyword.strip()
         if not query:
             raise MarketplaceError(ErrorCode.INVALID_INPUT, operation, "empty keyword")
+        # Checked against the table before anything is sent. A number Mercari
+        # has no condition for would either be ignored, which reads as "any
+        # condition" to whoever asked for a few, or match nothing.
+        if any(condition not in ITEM_CONDITIONS for condition in condition_ids):
+            raise MarketplaceError(
+                ErrorCode.INVALID_INPUT, operation, "unknown item condition"
+            )
 
         results = await self._call(
             operation,
@@ -467,6 +476,11 @@ class MercariAdapter:
                 # "no bound".
                 price_min=price_min,
                 price_max=price_max,
+                # Applied by Mercari before ordering and paging, like the
+                # price band, so the collection budget is spent only on
+                # listings in these conditions. An empty list is how the API
+                # spells "any condition".
+                item_conditions=sorted({int(condition) for condition in condition_ids}),
                 page_token=cursor,
             ),
         )

@@ -89,6 +89,7 @@ export function SearchPage() {
     error,
     sort,
     band,
+    fetchCondition,
     filterForm,
     filters,
     filterErrors,
@@ -103,6 +104,9 @@ export function SearchPage() {
   const [draft, setDraft] = useState<SearchFormValues>({
     ...EMPTY_SEARCH_FORM,
     keyword,
+    // A select showing 指定なし above a result collected under a condition
+    // would say the opposite of the record beside it.
+    worstCondition: fetchCondition,
   });
   const [searchErrors, setSearchErrors] = useState<SearchErrors>({});
 
@@ -115,7 +119,7 @@ export function SearchPage() {
       return;
     }
     setSearchErrors({});
-    void runSearch(checked.keyword, checked.band);
+    void runSearch(checked.keyword, checked.band, checked.worstCondition);
   };
 
   const {
@@ -219,9 +223,10 @@ export function SearchPage() {
             visibleCount={shown.length}
             filtered={narrowed || titled.heldBack.length > 0}
             band={band}
-            // Collects the same question again — the band the result came
-            // from, not whatever is currently typed above.
-            onRefetch={() => void runSearch(keyword, band)}
+            worstCondition={fetchCondition}
+            // Collects the same question again — the band and the condition
+            // the result came from, not whatever the form above says now.
+            onRefetch={() => void runSearch(keyword, band, fetchCondition)}
             busy={busy}
           />
 

@@ -8,7 +8,7 @@ against a fixed set of data, and the two are held to one contract.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, Sequence
 
 from card_digger.domain.models import (
     ListingStatus,
@@ -61,6 +61,7 @@ class MarketplacePort(Protocol):
         *,
         price_min: int | None = None,
         price_max: int | None = None,
+        condition_ids: Sequence[str] = (),
     ) -> SearchPage:
         """One page of listings for sale matching `keyword` and the price band.
 
@@ -72,6 +73,12 @@ class MarketplacePort(Protocol):
         spends the same collection budget on a smaller set — which is the only
         way to reach listings that have gone untouched, since those sit at the
         far end of an order that cannot be reversed.
+
+        **`condition_ids` narrows the population the same way.** The
+        marketplace's own numbers for how worn a listing is; only listings
+        carrying one of them come back. Empty means any condition. A number
+        the marketplace has no condition for is invalid input and is never
+        sent: an unknown number is not "no filter".
         """
         ...
 

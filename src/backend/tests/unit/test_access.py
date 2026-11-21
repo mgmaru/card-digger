@@ -255,6 +255,18 @@ class TestKeys:
     def test_two_sellers_shelves_are_two_collections(self):
         assert seller_shelf_key("1") != seller_shelf_key("2")
 
+    def test_different_conditions_are_different_collections(self):
+        """Joined, one reader would be handed a set narrowed by the other."""
+        assert search_key("ポケカ") != search_key("ポケカ", condition_ids=("3",))
+        assert search_key("ポケカ", condition_ids=("1",)) != search_key(
+            "ポケカ", condition_ids=("1", "2")
+        )
+
+    def test_the_same_conditions_in_another_order_are_the_same_collection(self):
+        assert search_key("ポケカ", condition_ids=("3", "1")) == search_key(
+            "ポケカ", condition_ids=("1", "3", "3")
+        )
+
     def test_different_keywords_are_different_collections(self):
         assert search_key("ポケカ") != search_key("ポケカ 引退品")
 

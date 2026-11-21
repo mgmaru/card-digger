@@ -29,7 +29,7 @@ a freshness rule nobody has measured.
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, Callable, TypeVar
+from typing import Awaitable, Callable, Sequence, TypeVar
 
 from card_digger.application.collection import (
     MIN_REQUEST_INTERVAL_SECONDS,
@@ -45,15 +45,22 @@ T = TypeVar("T")
 
 
 def search_key(
-    keyword: str, price_min: int | None = None, price_max: int | None = None
+    keyword: str,
+    price_min: int | None = None,
+    price_max: int | None = None,
+    condition_ids: Sequence[str] = (),
 ) -> str:
     """What makes two searches the same collection.
 
     The price band belongs in the key. It is part of the question asked of
     Mercari, so two bands are two different collections — joining one to the
     other would hand back a set narrowed by somebody else's bounds.
+
+    The conditions belong in it for the same reason. Their order does not:
+    asking for 1 and 3 is the same question as asking for 3 and 1.
     """
-    return f"search:{keyword}:{price_min}:{price_max}"
+    conditions = ",".join(sorted(set(condition_ids)))
+    return f"search:{keyword}:{price_min}:{price_max}:{conditions}"
 
 
 def seller_key(seller_id: str) -> str:

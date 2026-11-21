@@ -255,6 +255,70 @@ class TestPriceBand:
         assert port.calls_to("search")[0].args[2] == 0
 
 
+class TestSearchByCondition:
+    """The condition is part of the question, like the band, and for the same
+    reason: Mercari applies it before ordering and paging, so the budget is
+    spent on listings in good condition and reaches further back among them.
+    The filter on the screen cannot do that.
+    """
+
+    def test_the_conditions_reach_the_marketplace(self):
+        port = ScriptedPort(search=make_search_page(()))
+
+        client(port).post(
+            "/api/search", json={"keyword": "ポケカ", "conditionIds": ["1", "2", "3"]}
+        )
+
+        assert port.calls_to("search")[0].kwargs["condition_ids"] == ("1", "2", "3")
+
+    def test_omitted_is_any_condition(self):
+        port = ScriptedPort(search=make_search_page(()))
+
+        client(port).post("/api/search", json={"keyword": "ポケカ"})
+
+        assert port.calls_to("search")[0].kwargs["condition_ids"] == ()
+
+    def test_each_once_and_in_order(self):
+        port = ScriptedPort(search=make_search_page(()))
+
+        client(port).post(
+            "/api/search", json={"keyword": "ポケカ", "conditionIds": ["3", "1", "3"]}
+        )
+
+        assert port.calls_to("search")[0].kwargs["condition_ids"] == ("1", "3")
+
+    @pytest.mark.parametrize(
+        "conditions", [["7"], ["0"], ["x"], ["3", ""], [3], "3", ["1"] * 21]
+    )
+    def test_a_number_with_no_condition_is_the_callers_mistake(self, conditions):
+        """422, and nothing is sent. Not a failed collection: the screen words
+        those as Mercari not answering."""
+        port = ScriptedPort(search=make_search_page(()))
+
+        response = client(port).post(
+            "/api/search", json={"keyword": "ポケカ", "conditionIds": conditions}
+        )
+
+        assert response.status_code == 422
+        assert port.calls == []
+
+    def test_only_listings_in_those_conditions_come_back(self):
+        items = (
+            make_item("m000000000001", item_condition=ItemCondition(id="1", name="a")),
+            make_item("m000000000002", item_condition=ItemCondition(id="3", name="b")),
+            make_item("m000000000003", item_condition=ItemCondition(id="5", name="c")),
+            make_item("m000000000004"),
+        )
+
+        body = client(MockAdapter(items=items)).post(
+            "/api/search", json={"keyword": "sample", "conditionIds": ["1", "2", "3"]}
+        ).json()
+
+        # The worn one and the one with no condition are not collected at all.
+        assert [item["id"] for item in body["items"]] == ["m000000000001", "m000000000002"]
+        assert body["meta"]["uniqueItemCount"] == 2
+
+
 class TestSearchResponse:
     def test_it_returns_what_the_mock_marketplace_holds(self):
         items = make_items(3)
@@ -918,7 +982,9 @@ class HeldMarketplace:
         self.reached = asyncio.Event()
         self.release = asyncio.Event()
 
-    async def search_items_page(self, keyword, cursor=None, *, price_min=None, price_max=None):
+    async def search_items_page(
+        self, keyword, cursor=None, *, price_min=None, price_max=None, condition_ids=()
+    ):
         self.reached.set()
         await self.release.wait()
         return make_search_page(make_items(1))
@@ -949,7 +1015,9 @@ class CountingMarketplace:
         await asyncio.sleep(0)
         self.running -= 1
 
-    async def search_items_page(self, keyword, cursor=None, *, price_min=None, price_max=None):
+    async def search_items_page(
+        self, keyword, cursor=None, *, price_min=None, price_max=None, condition_ids=()
+    ):
         self.searches += 1
         await self._one()
         return make_search_page(make_items(2))

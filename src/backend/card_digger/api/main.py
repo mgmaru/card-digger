@@ -249,7 +249,12 @@ def create_app(
             # The band is part of the key. Two bands are two questions, and
             # joining one to the other would hand back a set somebody else
             # narrowed.
-            search_key(request.keyword, request.min_price_yen, request.max_price_yen),
+            search_key(
+                request.keyword,
+                request.min_price_yen,
+                request.max_price_yen,
+                request.condition_ids,
+            ),
             lambda: collect_search(
                 port,
                 request.keyword,
@@ -258,6 +263,7 @@ def create_app(
                 gate=reaching_out.gate(),
                 price_min=request.min_price_yen,
                 price_max=request.max_price_yen,
+                condition_ids=request.condition_ids,
             ),
         )
         response.status_code = http_status_for(len(collection.items), collection.meta)

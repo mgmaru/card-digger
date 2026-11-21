@@ -28,6 +28,7 @@ from card_digger.application.seller_conditions import condition_counts
 from card_digger.application.seller_knowledge import KnowledgeLevel, SellerKnowledge
 from card_digger.domain.errors import ErrorCode, Operation
 from card_digger.domain.models import (
+    ITEM_CONDITION_IDS,
     AssessmentLevel,
     CollectionError,
     CollectionMeta,
@@ -49,6 +50,11 @@ KEYWORD_MIN_LENGTH = 1
 KEYWORD_MAX_LENGTH = 100
 
 
+#: More than this is not a list of conditions. Mercari has six, and a caller
+#: may repeat one.
+CONDITION_IDS_MAX = 20
+
+
 class CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
@@ -67,6 +73,24 @@ class SearchRequest(CamelModel):
     keyword: str
     min_price_yen: int | None = Field(default=None, ge=0)
     max_price_yen: int | None = Field(default=None, ge=0)
+    #: Mercari's numbers for how worn a listing is. Only listings carrying one
+    #: of these are collected. Empty, the default, is any condition.
+    #:
+    #: A list and not "this grade or better": what is sent to Mercari is a
+    #: list, and which grades count as good enough is the screen's to decide.
+    condition_ids: list[str] = Field(default_factory=list, max_length=CONDITION_IDS_MAX)
+
+    @field_validator("condition_ids")
+    @classmethod
+    def _known_numbers_once_each_in_order(cls, value: list[str]) -> list[str]:
+        # Refused here, as the caller's mistake. Left to the adapter it would
+        # come back as a failed collection, which the screen words as Mercari
+        # not answering.
+        if any(entry not in ITEM_CONDITION_IDS for entry in value):
+            raise ValueError(
+                "conditionIds must be among " + ", ".join(ITEM_CONDITION_IDS)
+            )
+        return sorted(set(value), key=int)
 
     @field_validator("keyword")
     @classmethod

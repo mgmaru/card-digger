@@ -322,6 +322,10 @@ async function request<T>(
  * Narrowing here, after the fact, could only ever remove listings already in
  * hand.
  *
+ * The conditions go to Mercari for the same reason: only listings in one of
+ * them are collected, so the budget is not spent reading past the worn ones.
+ * An empty list is any condition.
+ *
  * Returns everything collected, unsorted. Ordering happens over this set and
  * never sends another request.
  */
@@ -331,6 +335,7 @@ export function search(
     minPriceYen: null,
     maxPriceYen: null,
   },
+  conditionIds: readonly string[] = [],
 ): Promise<SearchResponse> {
   return request<SearchResponse>(
     "/api/search",
@@ -341,6 +346,7 @@ export function search(
         keyword,
         minPriceYen: band.minPriceYen,
         maxPriceYen: band.maxPriceYen,
+        conditionIds: [...conditionIds],
       }),
     },
     SEARCH_TIMEOUT_MS,

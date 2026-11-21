@@ -9,9 +9,11 @@ up as a failing contract test rather than as a screen that only works offline.
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Sequence
 
 from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation
 from card_digger.domain.models import (
+    ITEM_CONDITION_IDS,
     ListingStatus,
     MarketplaceItem,
     PageInfo,
@@ -64,11 +66,17 @@ class MockAdapter:
         *,
         price_min: int | None = None,
         price_max: int | None = None,
+        condition_ids: Sequence[str] = (),
     ) -> SearchPage:
         operation = Operation.SEARCH
         needle = keyword.strip()
         if not needle:
             raise MarketplaceError(ErrorCode.INVALID_INPUT, operation, "empty keyword")
+        if any(condition not in ITEM_CONDITION_IDS for condition in condition_ids):
+            raise MarketplaceError(
+                ErrorCode.INVALID_INPUT, operation, "unknown item condition"
+            )
+        wanted = frozenset(condition_ids)
 
         # The band narrows before paging, as it does on the real marketplace.
         # Applying it afterwards would let the mock agree with an
@@ -80,6 +88,15 @@ class MockAdapter:
             and needle.casefold() in item.title.casefold()
             and (price_min is None or item.price_yen >= price_min)
             and (price_max is None or item.price_yen <= price_max)
+            # Before paging too. A listing with no condition matches no
+            # condition asked for, as on the real marketplace.
+            and (
+                not wanted
+                or (
+                    item.item_condition is not None
+                    and item.item_condition.id in wanted
+                )
+            )
         )
         page, next_cursor = self._slice(matches, cursor, operation)
         return SearchPage(

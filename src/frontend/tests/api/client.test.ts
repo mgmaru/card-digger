@@ -73,6 +73,49 @@ describe("the search request", () => {
     await expect(search("ポケカ 引退品")).resolves.toEqual(payload);
   });
 
+  it("sends the conditions with the keyword and the band", async () => {
+    let body: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ items: [], meta: {} }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    await search("ポケカ", { minPriceYen: 3000, maxPriceYen: null }, ["1", "2", "3"]);
+
+    expect(body).toEqual({
+      keyword: "ポケカ",
+      minPriceYen: 3000,
+      maxPriceYen: null,
+      conditionIds: ["1", "2", "3"],
+    });
+  });
+
+  it("sends an empty list when no condition is asked for", async () => {
+    let body: { conditionIds?: unknown } = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ items: [], meta: {} }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    await search("ポケカ");
+
+    // Present and empty, not left out: the backend reads both as any
+    // condition, and one spelling is easier to reason about than two.
+    expect(body.conditionIds).toEqual([]);
+  });
+
   it("treats a partial result as a result, not a failure", async () => {
     // 200 with partial=true is the section 8 rule for a collection that got
     // something before failing. The screen warns; the request succeeded.
