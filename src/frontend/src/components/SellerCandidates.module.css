@@ -166,6 +166,21 @@
   color: var(--ink-quiet);
 }
 
+/* 販売中と売却済みを、1つずつの塊として並べる。幅が足りなければ、塊の途中ではなく
+   塊の切れ目で折り返す。 */
+.shelves {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+}
+
+/* 売却済みは、買えるものではない。販売中の隣に、根拠と同じ静かさで添える。 */
+.sold {
+  font-size: var(--text-note);
+  color: var(--ink-quiet);
+}
+
 /* まだ分かっていないことは、値の濃さで書かない。 */
 .pending {
   color: var(--ink-quiet);

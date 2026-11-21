@@ -265,6 +265,7 @@ export const HUNT_SORT_ORDER: readonly CandidateSort[] = [
   "cardShare",
   "cardShareHigh",
   "goodRatings",
+  "fineOnSale",
   "condition",
   "hits",
 ];

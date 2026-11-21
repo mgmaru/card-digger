@@ -22,6 +22,8 @@ from conftest import (
     seller_items_page,
 )
 
+from mercapi.requests import SearchRequestData
+
 from card_digger.adapters.mercari import MercariAdapter
 from card_digger.adapters.mock import MockAdapter
 from card_digger.domain.errors import ErrorCode, MarketplaceError
@@ -64,6 +66,16 @@ def _mercari_port() -> MercariAdapter:
         return seller_items_page("seller_items/page_2_end.json")
 
     def one_search(call):
+        sellers = call.kwargs.get("seller_ids")
+        if sellers:
+            # Limited to one seller: that seller's shelf, or nothing.
+            if sellers != [SELLER_ID]:
+                return search_results("search/empty_end.json")
+            if call.kwargs["status"] == [SearchRequestData.Status.STATUS_SOLD_OUT]:
+                return search_results("search/by_seller_sold_out_end.json")
+            if call.kwargs.get("page_token"):
+                return search_results("search/by_seller_page_2_end.json")
+            return search_results("search/page_1_has_next.json")
         return (
             search_results("search/page_2_end.json")
             if call.kwargs.get("page_token")
@@ -103,6 +115,7 @@ def _mock_port() -> MockAdapter:
             item("m000000000002", "sample-item-2", ListingStatus.ON_SALE, 3400),
             item("m000000000003", "sample-item-3", ListingStatus.ON_SALE, 500),
             item("m000000000004", "sample-item-4", ListingStatus.SOLD_OUT, 500),
+            item("m000000000005", "sample-item-5", ListingStatus.TRADING, 500),
         ),
         sellers=(
             Seller(
@@ -246,3 +259,105 @@ class TestSellerItems:
             await port.get_seller_items_page(MISSING_SELLER_ID, ListingStatus.ON_SALE)
 
         assert raised.value.code is ErrorCode.NOT_FOUND_404
+
+
+class TestSellerShelf:
+    """A seller's listings through the search limited to them.
+
+    The other way to read a shelf, and the one that says how worn each listing
+    is. The acceptance flow counts those on the mock, so the mock must keep the
+    same promises here as the Mercari adapter does.
+    """
+
+    @pytest.mark.parametrize(
+        "status", [ListingStatus.ON_SALE, ListingStatus.SOLD_OUT]
+    )
+    async def test_returns_usable_items_for_the_status_asked_for(self, port, status):
+        page = await port.search_seller_items_page(SELLER_ID, status)
+
+        assert page.requested_status is status
+        assert page.items
+        for item in page.items:
+            assert_usable_item(item)
+
+    @pytest.mark.parametrize(
+        "status", [ListingStatus.ON_SALE, ListingStatus.SOLD_OUT]
+    )
+    async def test_every_listing_is_the_asked_sellers(self, port, status):
+        page = await port.search_seller_items_page(SELLER_ID, status)
+
+        assert {item.seller_id for item in page.items} == {SELLER_ID}
+
+    async def test_every_listing_carries_a_condition(self, port):
+        """The reason this way of reading a shelf exists."""
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert all(item.item_condition is not None for item in page.items)
+
+    async def test_the_listing_page_carries_none(self, port):
+        """And the reason the other way cannot answer the same question."""
+        page = await port.get_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert page.items
+        assert all(item.item_condition is None for item in page.items)
+
+    async def test_on_sale_returns_only_what_is_on_sale(self, port):
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert {item.listing_status for item in page.items} == {ListingStatus.ON_SALE}
+
+    async def test_sold_out_brings_trading_along_and_does_not_relabel_it(self, port):
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.SOLD_OUT)
+
+        assert {item.listing_status for item in page.items} == {
+            ListingStatus.SOLD_OUT,
+            ListingStatus.TRADING,
+        }
+
+    async def test_a_cursor_is_offered_exactly_when_another_page_exists(self, port):
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert page.page_info.has_next is (page.page_info.next_cursor is not None)
+
+    async def test_the_cursor_leads_to_a_further_page(self, port):
+        first = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+        assert first.page_info.has_next, "this port was set up to have two pages"
+
+        second = await port.search_seller_items_page(
+            SELLER_ID, ListingStatus.ON_SALE, first.page_info.next_cursor
+        )
+
+        assert second.items
+        first_ids = {item.id for item in first.items}
+        assert not first_ids & {item.id for item in second.items}
+
+    async def test_the_total_is_never_smaller_than_the_page(self, port):
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert page.found_count is not None
+        assert page.found_count >= len(page.items)
+
+    @pytest.mark.parametrize(
+        "status", [ListingStatus.TRADING, ListingStatus.UNKNOWN]
+    )
+    async def test_only_on_sale_and_sold_out_can_be_asked_for(self, port, status):
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page(SELLER_ID, status)
+
+        assert raised.value.code is ErrorCode.INVALID_INPUT
+
+    async def test_an_empty_seller_is_invalid_input(self, port):
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page("  ", ListingStatus.ON_SALE)
+
+        assert raised.value.code is ErrorCode.INVALID_INPUT
+
+    async def test_a_seller_nobody_has_is_an_empty_page_and_not_an_error(self, port):
+        """A search cannot tell "no such seller" from "nothing listed"."""
+        page = await port.search_seller_items_page(
+            MISSING_SELLER_ID, ListingStatus.ON_SALE
+        )
+
+        assert page.items == ()
+        assert page.page_info.has_next is False
+

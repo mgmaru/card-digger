@@ -29,6 +29,8 @@ import {
   type CandidateSort,
   cardShare,
   type EvaluationRecord,
+  type FineShelf,
+  fineShelf,
   evaluationSeconds,
   isOwedALook,
   mercariSellerUrl,
@@ -49,6 +51,25 @@ const MISSING = "-";
 const people = (value: number) => `${value.toLocaleString("ja-JP")}人`;
 const count = (value: number) => `${value.toLocaleString("ja-JP")}件`;
 const percent = (ratio: number) => `${(ratio * 100).toFixed(1)}%`;
+
+/**
+ * How many of one status are 美品, over how many were read.
+ *
+ * The total is added only when it is more than was read: 117 of 1,152 is one
+ * page of a large shelf, and the count beside it is of that page. Listings
+ * with no grade are named when there are any, because they are in the
+ * denominator and could not be in the count.
+ */
+function fineText(label: string, shelf: FineShelf): string {
+  const read = `${label} ${count(shelf.fineCount)} / ${count(shelf.analyzedCount)}`;
+  const all =
+    shelf.foundCount !== null && shelf.foundCount > shelf.analyzedCount
+      ? `（全${count(shelf.foundCount)}）`
+      : "";
+  const ungraded =
+    shelf.unknownCount > 0 ? `・状態不明 ${count(shelf.unknownCount)}` : "";
+  return `${read}${all}${ungraded}`;
+}
 
 /**
  * What ended a run, in the words the other screens use for the same failure.
@@ -200,6 +221,26 @@ export function SellerCandidateRow({
                     over sixty are the same share and different claims. */}
                 <span className={styles.basis}>
                   カード {count(share.cardCount)} / {count(share.analyzedCount)}
+                </span>
+              </>
+            )}
+          </dd>
+        </div>
+        {/* Of the seller's own shelf, where the two lines at the top are of
+            what the search matched. For sale first: it is what can be bought,
+            and what the order by 美品 goes by (出品者探索 §5.7). */}
+        <div className={styles.fact}>
+          <dt>美品の出品</dt>
+          <dd className={evaluation === null ? undefined : styles.shelves}>
+            {evaluation === null ? (
+              MISSING
+            ) : (
+              <>
+                <span>
+                  {fineText("販売中", fineShelf(evaluation.onSaleConditions))}
+                </span>
+                <span className={styles.sold}>
+                  {fineText("売却済み", fineShelf(evaluation.soldOutConditions))}
                 </span>
               </>
             )}
@@ -359,6 +400,11 @@ export function SellerCandidateLimits() {
       <p>
         「カードの割合」は、販売中と売却済みそれぞれ最初の1ページのTitleから数えています。
         Titleにカードの語（ポケカ、トレカ、遊戯王など）が無い出品は、カードでも数えないので、実際より低めに出ます。
+      </p>
+      <p>
+        「美品の出品」は、状態が「目立った傷や汚れなし」以上の出品の件数です。
+        販売中と売却済みそれぞれ最初の1ページ（最大120件）から数えており、カード以外の出品も含みます。
+        状態が不明の出品は数えません。「全○件」は、Mercariが返したその出品者の出品の総数です。
       </p>
       <p>
         閾値は仮説であり、精度を実証した値ではありません。

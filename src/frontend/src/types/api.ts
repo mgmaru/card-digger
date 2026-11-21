@@ -235,6 +235,32 @@ export type SellerEvaluationResponse = {
   breadth: SellerBreadth;
   onSaleMeta: CollectionMeta;
   soldOutMeta: CollectionMeta;
+  /** How worn what they have for sale is. Counts, never listings. */
+  onSaleConditions: ShelfConditions;
+  /** How worn what they sold is. */
+  soldOutConditions: ShelfConditions;
+};
+
+/** How many listings carried one grade. The grade is Mercari's, by name. */
+export type ShelfConditionCount = { id: string; name: string; count: number };
+
+/**
+ * The grades on the listings of one status that a look read.
+ *
+ * **Counts and nothing decided.** Where "in good condition" starts is this
+ * screen's line to draw, not the backend's.
+ *
+ * `analyzedItemCount` is how many listings were read: one page, at most 120.
+ * `foundCount` is how many Mercari says there are, `null` when it did not
+ * say. They differ whenever the seller has more than a page.
+ */
+export type ShelfConditions = {
+  analyzedItemCount: number;
+  foundCount: number | null;
+  /** Least worn first. Only grades Mercari named. */
+  counts: ShelfConditionCount[];
+  /** Listings whose grade could not be placed. Neither worn nor good. */
+  unknownCount: number;
 };
 
 /** Which of the reader's two lists a seller is on. */

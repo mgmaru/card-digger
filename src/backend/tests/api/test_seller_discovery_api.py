@@ -23,6 +23,7 @@ from conftest import (
     make_item,
     make_items,
     make_seller_page,
+    make_shelf_page,
 )
 from fastapi.testclient import TestClient
 
@@ -35,6 +36,7 @@ from card_digger.api.main import DATA_DIRECTORY_VARIABLE, create_app
 from card_digger.application.seller_lists import NOTE_MAX_LENGTH
 from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation
 from card_digger.domain.models import (
+    ItemCondition,
     ListingStatus,
     MarketplaceItem,
     RatingBreakdown,
@@ -76,19 +78,44 @@ def client(port=None, *, lists=None, clock: FrozenClock | None = None) -> TestCl
     )
 
 
-def shelf(on_sale=(), sold_out=(), *, more_on_sale: bool = False) -> ScriptedPort:
+def shelf(
+    on_sale=(),
+    sold_out=(),
+    *,
+    more_on_sale: bool = False,
+    on_sale_found: int | None = None,
+    sold_out_found: int | None = None,
+) -> ScriptedPort:
+    """A seller whose listings are read the way a brief look reads them.
+
+    Through the search limited to the seller, and only that way: there is no
+    listing page scripted, so a look that asked for one would fail here.
+    """
     return ScriptedPort(
         seller=SELLER,
-        seller_pages={
+        shelf_pages={
             ListingStatus.ON_SALE: [
-                make_seller_page(
+                make_shelf_page(
                     on_sale,
                     ListingStatus.ON_SALE,
-                    next_cursor="30" if more_on_sale else None,
+                    next_cursor="cursor-2" if more_on_sale else None,
+                    found_count=on_sale_found,
                 )
             ],
-            ListingStatus.SOLD_OUT: [make_seller_page(sold_out, ListingStatus.SOLD_OUT)],
+            ListingStatus.SOLD_OUT: [
+                make_shelf_page(
+                    sold_out, ListingStatus.SOLD_OUT, found_count=sold_out_found
+                )
+            ],
         },
+    )
+
+
+def graded(item_id: str, number: str | None, name: str | None = "名前") -> MarketplaceItem:
+    """A listing carrying one condition, or none when `number` is `None`."""
+    return make_item(
+        item_id,
+        item_condition=None if number is None else ItemCondition(id=number, name=name),
     )
 
 
@@ -101,10 +128,13 @@ class TestSellerEvaluation:
         response = client(port).get(self.URL)
 
         assert response.status_code == 200
+        # The two statuses through the search limited to the seller, which is
+        # what carries each listing's condition. Never the listing page as
+        # well: that would be five requests a seller.
         assert [call.method for call in port.calls] == [
             "seller",
-            "seller_items:on_sale",
-            "seller_items:sold_out",
+            "seller_shelf:on_sale",
+            "seller_shelf:sold_out",
         ]
 
     def test_it_does_not_follow_the_second_page(self):
@@ -112,7 +142,7 @@ class TestSellerEvaluation:
 
         body = client(port).get(self.URL).json()
 
-        assert len(port.calls_to("seller_items:on_sale")) == 1
+        assert len(port.calls_to("seller_shelf:on_sale")) == 1
         # Said in the answer: the bands were computed over the first page.
         assert body["onSaleMeta"]["stopReason"] == "max_pages"
         assert body["onSaleMeta"]["truncated"] is True
@@ -128,6 +158,92 @@ class TestSellerEvaluation:
             "breadth",
             "onSaleMeta",
             "soldOutMeta",
+            "onSaleConditions",
+            "soldOutConditions",
+        }
+        # Counts of grades, and no listing among them.
+        assert set(body["onSaleConditions"]) == {
+            "analyzedItemCount",
+            "foundCount",
+            "counts",
+            "unknownCount",
+        }
+
+    def test_it_counts_the_grades_on_each_status_least_worn_first(self):
+        port = shelf(
+            on_sale=(
+                graded("a", "3", "目立った傷や汚れなし"),
+                graded("b", "1", "新品、未使用"),
+                graded("c", "3", "目立った傷や汚れなし"),
+                graded("d", "5", "傷や汚れあり"),
+            ),
+            sold_out=(graded("e", "4", "やや傷や汚れあり"),),
+        )
+
+        body = client(port).get(self.URL).json()
+
+        assert body["onSaleConditions"]["analyzedItemCount"] == 4
+        assert body["onSaleConditions"]["counts"] == [
+            {"id": "1", "name": "新品、未使用", "count": 1},
+            {"id": "3", "name": "目立った傷や汚れなし", "count": 2},
+            {"id": "5", "name": "傷や汚れあり", "count": 1},
+        ]
+        # Each status by itself: what is for sale now and what was sold are
+        # two different questions about a seller.
+        assert body["soldOutConditions"]["counts"] == [
+            {"id": "4", "name": "やや傷や汚れあり", "count": 1}
+        ]
+
+    def test_a_grade_nobody_can_place_is_counted_apart(self):
+        """No grade, and a number the table has no name for. Neither is worn."""
+        port = shelf(
+            on_sale=(
+                graded("a", None),
+                graded("b", "9", None),
+                graded("c", "2", "未使用に近い"),
+            )
+        )
+
+        conditions = client(port).get(self.URL).json()["onSaleConditions"]
+
+        assert conditions["analyzedItemCount"] == 3
+        assert conditions["unknownCount"] == 2
+        assert conditions["counts"] == [{"id": "2", "name": "未使用に近い", "count": 1}]
+
+    def test_it_says_how_many_there_are_beside_how_many_it_read(self):
+        """A page is at most 120. The seller may have a thousand."""
+        port = shelf(
+            on_sale=make_items(3), more_on_sale=True, on_sale_found=1152, sold_out_found=0
+        )
+
+        body = client(port).get(self.URL).json()
+
+        assert body["onSaleConditions"]["analyzedItemCount"] == 3
+        assert body["onSaleConditions"]["foundCount"] == 1152
+        assert body["soldOutConditions"]["foundCount"] == 0
+
+    def test_a_total_the_marketplace_did_not_give_is_null_and_not_a_guess(self):
+        body = client(shelf(on_sale=make_items(3))).get(self.URL).json()
+
+        assert body["onSaleConditions"]["foundCount"] is None
+
+    def test_a_whole_search_page_is_read_and_none_of_it_thrown_away(self):
+        """A search page holds 120. The seller screen's ceiling is a hundred."""
+        port = shelf(on_sale=make_items(120))
+
+        body = client(port).get(self.URL).json()
+
+        assert body["onSaleConditions"]["analyzedItemCount"] == 120
+        assert body["onSaleMeta"]["discardedByLimitCount"] == 0
+
+    def test_a_seller_with_nothing_listed_has_no_grades(self):
+        conditions = client(shelf()).get(self.URL).json()["onSaleConditions"]
+
+        assert conditions == {
+            "analyzedItemCount": 0,
+            "foundCount": None,
+            "counts": [],
+            "unknownCount": 0,
         }
 
     def test_the_breadth_is_read_off_the_same_sample_as_the_knowledge(self):
@@ -224,6 +340,12 @@ class TestSellerEvaluation:
                 ],
                 ListingStatus.SOLD_OUT: [make_seller_page((), ListingStatus.SOLD_OUT)],
             },
+            shelf_pages={
+                ListingStatus.ON_SALE: [
+                    make_shelf_page(make_items(2), ListingStatus.ON_SALE)
+                ],
+                ListingStatus.SOLD_OUT: [make_shelf_page((), ListingStatus.SOLD_OUT)],
+            },
         )
         app = client(port)
 
@@ -233,6 +355,11 @@ class TestSellerEvaluation:
         assert "onSale" not in evaluation
         assert len(analysis["onSale"]["items"]) == 2
         assert len(port.calls_to("seller")) == 2
+        # The seller screen still reads the listing page: it shows the like
+        # count, which a search does not carry, and pages through what was
+        # sold. Only the brief look moved to the search.
+        assert len(port.calls_to("seller_items:on_sale")) == 1
+        assert len(port.calls_to("seller_shelf:on_sale")) == 1
 
 
 class TestSellerLists:

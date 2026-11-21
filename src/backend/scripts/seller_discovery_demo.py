@@ -191,6 +191,22 @@ _SHELVES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 }
 
 
+#: How worn each shelf is, as the condition numbers its listings cycle
+#: through. A look reads these through the search limited to the seller; the
+#: seller's own listing page does not carry them, here or on Mercari.
+#:
+#: Different on purpose, so that ordering by listings in good condition has
+#: something to do: the shop lists little that is worn, the household a
+#: mixture, and one household listing carries no condition at all.
+_SHELF_CONDITIONS: dict[str, tuple[str | None, ...]] = {
+    HOUSEHOLD.id: ("3", "4", "3", "5", None, "4", "3", "6"),
+    CLEARING_OUT.id: ("3", "3", "4", "2"),
+    CARD_SHOP.id: ("1", "2", "3", "2", "1", "3", "2"),
+    RETIRING.id: ("5", "4"),
+    ONE_LISTING.id: (),
+}
+
+
 def _item(
     number: int,
     title: str,
@@ -238,7 +254,8 @@ def _seed_items() -> tuple[MarketplaceItem, ...]:
             (ListingStatus.ON_SALE, on_sale),
             (ListingStatus.SOLD_OUT, sold_out),
         ):
-            for title in titles:
+            conditions = _SHELF_CONDITIONS[seller_id]
+            for index, title in enumerate(titles):
                 number += 1
                 items.append(
                     _item(
@@ -247,6 +264,7 @@ def _seed_items() -> tuple[MarketplaceItem, ...]:
                         seller_id=seller_id,
                         status=status,
                         price_yen=1000 + (number % 9) * 300,
+                        condition=conditions[index % len(conditions)],
                     )
                 )
     return tuple(items)

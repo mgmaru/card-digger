@@ -99,11 +99,20 @@ SELLER_ITEMS_LIMITS = CollectionLimits(
 #: the profile, and it is still a sample of titles from both what they sell
 #: and what they sold (seller discovery specification, section 4).
 #:
-#: The other two ceilings are the seller screen's and are never the one that
-#: stops a single page.
+#: **The page is a search page** (since 2026-11-21): the look reads each
+#: status through the search limited to the seller, which is the only listing
+#: of a shelf that says how worn each item is. A search page holds up to 120
+#: listings where the listing page holds 30, so the item ceiling is that page
+#: and not the seller screen's hundred — a ceiling of a hundred would read 120
+#: and throw twenty away.
+#:
+#: The time ceiling is the seller screen's and is never the one that stops a
+#: single page.
+SELLER_SHELF_PAGE_ITEMS = 120
+
 SELLER_EVALUATION_LIMITS = CollectionLimits(
     max_pages=1,
-    max_items=SELLER_ITEMS_LIMITS.max_items,
+    max_items=SELLER_SHELF_PAGE_ITEMS,
     max_duration_seconds=SELLER_ITEMS_LIMITS.max_duration_seconds,
 )
 

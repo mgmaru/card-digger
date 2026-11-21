@@ -53,7 +53,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1,<0.142" },
-    { name = "mercapi", git = "https://github.com/mgmaru/mercapi.git?rev=9c3a87aa963201a3a7d76ec23e5c9d9e09de7362" },
+    { name = "mercapi", git = "https://github.com/mgmaru/mercapi.git?rev=e8e8cda872dd8a98320cd73ccbc1beaa2c6b9c3e" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4,<2" },
     { name = "uvicorn", specifier = ">=0.52.4,<0.53" },
@@ -329,7 +329,7 @@ wheels = [
 [[package]]
 name = "mercapi"
 version = "0.4.2"
-source = { git = "https://github.com/mgmaru/mercapi.git?rev=9c3a87aa963201a3a7d76ec23e5c9d9e09de7362#9c3a87aa963201a3a7d76ec23e5c9d9e09de7362" }
+source = { git = "https://github.com/mgmaru/mercapi.git?rev=e8e8cda872dd8a98320cd73ccbc1beaa2c6b9c3e#e8e8cda872dd8a98320cd73ccbc1beaa2c6b9c3e" }
 dependencies = [
     { name = "ecdsa" },
     { name = "httpx" },

@@ -134,4 +134,4 @@ seller{id, name}, shipping_from_area{id, name}, shipping_method_id, status, thum
 |---|---|
 | `mgmaru/mercapi` | 検索に`seller_ids`を足す（[Pull Request #4](https://github.com/mgmaru/mercapi/pull/4)） |
 | [MVP仕様 §5.6](../../docs/product/mvp-spec.md#商品の状態2026-09-04決定) | 「Seller商品一覧Responseは状態を持たない」の根拠を、この観測にする。番号6が検索に現れたことを足す |
-| Card Digger | **まだ決めていない。**出品者を調べるときの一覧2件を、出品者を指定した検索2件に置き換えるかは、利用者と決める |
+| Card Digger | 出品者を調べるときの一覧2件を、出品者を指定した検索2件に置き換えた（2026-11-21。[出品者探索 §4.2](../../docs/product/seller-discovery-spec.md#42-1人あたり3回)）。数えた件数を「美品の出品」として行に出す（[§5.7](../../docs/product/seller-discovery-spec.md#57-美品の出品2026-11-21追加)） |

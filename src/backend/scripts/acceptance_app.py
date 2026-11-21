@@ -191,11 +191,19 @@ _SHELF: tuple[str, ...] = (
 )
 
 
+#: The condition numbers the rest of a shelf cycles through. Only a look at
+#: the seller reads them, through the search limited to that seller; the
+#: seller screen reads the listing page, which carries none, here as on
+#: Mercari.
+_SHELF_CONDITIONS: tuple[str, ...] = ("3", "1", "4", "3", "5", "2")
+
+
 def _shelf_items(
     start: int, count: int, *, seller: Seller, status: ListingStatus
 ) -> Iterator[MarketplaceItem]:
     for offset in range(count):
         number = start + offset
+        condition = _SHELF_CONDITIONS[offset % len(_SHELF_CONDITIONS)]
         yield _item(
             number,
             f"{_SHELF[offset % len(_SHELF)]} #{offset + 1}",
@@ -205,6 +213,7 @@ def _shelf_items(
             # Spread over four years so the seller screen shows a real range.
             created_days_ago=40 + offset * 13,
             updated_days_ago=20 + offset * 11,
+            condition=ItemCondition(id=condition, name=ITEM_CONDITIONS[condition]),
         )
 
 

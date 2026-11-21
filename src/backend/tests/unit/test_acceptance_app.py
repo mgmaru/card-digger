@@ -126,11 +126,32 @@ class TestTheSeedSupportsTheFlow:
         assert len(named) >= 3
         assert any(item.item_condition is None for item in found)
 
-    def test_no_seller_shelf_listing_claims_a_condition(self):
-        """Mercari's seller endpoint reports none, so neither does the seed."""
-        shelf = [item for item in acceptance_app.SEED if item.listing_status is not ListingStatus.ON_SALE]
+    async def test_no_seller_listing_page_claims_a_condition(self):
+        """Mercari's seller endpoint reports none, so the offline one does not.
 
-        assert shelf and all(item.item_condition is None for item in shelf)
+        The seed gives the shelf conditions, because a look at a seller reads
+        them through the search. What must not happen is the seller screen
+        showing them: it reads the listing page, which on Mercari has none.
+        """
+        port = acceptance_app.acceptance_marketplace()
+        seller_id = acceptance_app.SELLERS[0].id
+
+        for status in (ListingStatus.ON_SALE, ListingStatus.SOLD_OUT):
+            page = await port.get_seller_items_page(seller_id, status)
+
+            assert page.items
+            assert all(item.item_condition is None for item in page.items)
+
+    async def test_a_look_at_a_seller_finds_conditions_on_the_shelf(self):
+        """Through the search limited to the seller, which is where they are."""
+        port = acceptance_app.acceptance_marketplace()
+
+        page = await port.search_seller_items_page(
+            acceptance_app.SELLERS[0].id, ListingStatus.SOLD_OUT
+        )
+
+        assert page.items
+        assert all(item.item_condition is not None for item in page.items)
 
     def test_the_search_reaches_two_sellers(self):
         """Step 6 opens a seller from a card, so there has to be a choice."""

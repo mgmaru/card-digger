@@ -592,6 +592,10 @@ class MarketplacePort(Protocol):
 - `UNKNOWN`はRequest Parameterとして使用できない
 - Applicationへ`mercapi` Object、生Response、DPoP、Header、Cookieを返さない
 
+**2026-11-21に、Portへ`search_seller_items_page`を足した。**出品者1人の出品を、出品一覧ではなく検索から読む。
+出品一覧は商品の状態を送っておらず、検索は送っているためである。規則は
+[出品者探索 実装仕様 §4.2](../product/seller-discovery-spec.md#42-1人あたり3回)が持つ。
+
 ## 8. 収集Policy
 
 複数ページを集める処理はAdapterではなくUse case層へ置く。すべて同時実行数1、外部Requestの

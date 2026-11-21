@@ -371,6 +371,17 @@ git switch -c chore/sync-upstream-YYYYMMDD main
 |---|---|---|---|---|
 | **2026-09-05** | `b3bdec98` | **`9c3a87aa`** | 商品詳細の`seller.is_inactive`を読む（[Fork PR #3](https://github.com/mgmaru/mercapi/pull/3)）。Seller画面の「非アクティブ」表示に必要 | Fork 94 → **99 passed**、`black --check`クリア、Card Digger Backend **475 passed**、E2E **6 passed** |
 
+| **2026-11-21** | `9c3a87aa` | **`e8e8cda8`** | 検索を出品者で絞る`seller_ids`を足す（[Fork PR #4](https://github.com/mgmaru/mercapi/pull/4)）。出品者の出品を商品の状態付きで読むのに必要。Forkの単体Testを`ubuntu-24.04`で走らせるCIの修正（[Fork PR #5](https://github.com/mgmaru/mercapi/pull/5)）も入る | Fork 101 → **111 passed**（3.9〜3.13）、`black --check`クリア、Card Digger Backend **707 passed**、E2E **14 passed** |
+
+**2026-11-21の更新について。**完全なSHAは旧`9c3a87aa963201a3a7d76ec23e5c9d9e09de7362`、
+新`e8e8cda872dd8a98320cd73ccbc1beaa2c6b9c3e`である。`seller_ids`が実Mercariで効くことは、
+Forkを変える前に[観測した](../../poc/mercapi/seller-condition-result.md)（出品者1人、160 / 160）。
+**Fork経由で`seller_ids`を送る経路は、実Mercariではまだ動かしていない。**観測はForkの署名を借りて
+同じPayloadを直接送ったもので、L1〜L3はFixtureとMockで通している。
+
+**既知の制約（2026-11-21）。**観測は出品者1人である。絞り込みが無視された応答は、Adapterが
+Parse Errorにする（[出品者探索 §4.2](../product/seller-discovery-spec.md#42-1人あたり3回)）。
+
 L1〜L3はいずれもFixtureとMockで通しており、**Fork経由で実Mercariの応答を読む経路だけは
 自動Testの対象外**である（[Test運用規約 §3](test-policy.md#3-test層)）。この1点は
 **2026-09-05に実アプリを起動して目視で確認した** —— 実Mercariの検索からSeller画面まで開き、

@@ -28,6 +28,7 @@ import type {
   SearchResponse,
   SellerEvaluationResponse,
   SellerListEntry,
+  ShelfConditions,
 } from "../src/types/api";
 
 const mocks = vi.hoisted(() => ({
@@ -93,6 +94,33 @@ const BY_KEYWORD: Record<string, SearchResponse> = {
   "ポケカ 物置": result([item("c", "shop"), item("d", "attic"), item("e", "retiring"), item("f", "shop")]),
 };
 
+/** The grades on one status of a shelf, as a look reports them. */
+function grades(
+  counts: Record<string, number> = {},
+  { found = null, unknown = 0 }: { found?: number | null; unknown?: number } = {},
+): ShelfConditions {
+  const names: Record<string, string> = {
+    "1": "新品、未使用",
+    "2": "未使用に近い",
+    "3": "目立った傷や汚れなし",
+    "4": "やや傷や汚れあり",
+    "5": "傷や汚れあり",
+    "6": "全体的に状態が悪い",
+  };
+  const listed = Object.entries(counts).map(([id, count]) => ({
+    id,
+    name: names[id] ?? "",
+    count,
+  }));
+  return {
+    analyzedItemCount: listed.reduce((sum, grade) => sum + grade.count, 0) + unknown,
+    foundCount: found,
+    counts: listed,
+    unknownCount: unknown,
+  };
+}
+
+
 function look(
   sellerId: string,
   name: string,
@@ -132,6 +160,8 @@ function look(
     },
     onSaleMeta: META,
     soldOutMeta: META,
+    onSaleConditions: grades(),
+    soldOutConditions: grades(),
   };
 }
 
@@ -1243,6 +1273,7 @@ describe("reading the finished list", () => {
       "カードの割合が低い順",
       "カードの割合が高い順",
       "良い評価が多い順",
+      "販売中の美品が多い順",
       "一致した出品の状態が良い順",
       "一致した出品が多い順",
     ]);

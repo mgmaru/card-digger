@@ -33,6 +33,11 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 （2026-09-04、標本139件すべてが`seller.is_inactive`を持つ）を出所とする。値の有無だけを変えた
 `derived`であり、Field名・階層・型は発明していない。
 
+`search/by_seller_*.json`は、[出品者の出品と商品の状態の観測](../../../../poc/mercapi/seller-condition-result.md)
+（2026-11-20、出品者1人）を出所とする。検索の`sellerId`に出品者を1人入れると、返る出品はすべてその出品者のもので
+（160 / 160）、すべてが`itemConditionId`を持ち、売却済みの検索には`ITEM_STATUS_TRADING`が1件混ざっていた。
+番号`6`もこの観測で検索結果に現れた。形は検索のFixtureと同じで、**出品者ID・販売状態・状態の番号だけを変えた`derived`である。**
+
 | Fixture | 区分 | 派生元 | 取得元 | 検証観点 |
 |---|---|---|---|---|
 | `search/page_1_has_next.json` | observed | — | 検索 | 通常出品とAuctionが並ぶ1ページ目。`nextPageToken`を次Cursorにする |
@@ -46,6 +51,8 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `search/missing_updated.json` | derived | `search/page_1_has_next.json` | 検索 | 更新日時欠落をParse Errorにする |
 | `search/missing_image.json` | derived | `search/page_1_has_next.json` | 検索 | 画像URL欠落をParse Errorにする |
 | `search/no_price.json` | derived | `search/page_1_has_next.json` | 検索 | `isNoPrice`のPlaceholder価格を実価格として扱わない |
+| `search/by_seller_page_2_end.json` | derived | `search/page_2_end.json` | 出品者を指定した検索 | 出品者を指定した検索の終端Page。1ページ目には`search/page_1_has_next.json`を使う（2件とも同じ出品者） |
+| `search/by_seller_sold_out_end.json` | derived | `search/statuses.json` | 出品者を指定した検索 | 売却済みの検索が`trading`を一緒に返し、`trading`のまま運ぶ。番号`6`の状態を読む |
 | `item/auction.json` | observed | — | 商品詳細 | `auction_info`の全Fieldを読み、`highest_bid`を価格にする |
 | `item/fixed_price.json` | observed | — | 商品詳細 | `auction_info`欠落を通常出品にする |
 | `item/auction_info_unknown_shape.json` | derived | `item/auction.json` | 商品詳細 | 未知形状の`auction_info`を`unknown`にする |
