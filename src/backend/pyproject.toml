@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Card Digger backend: domain model, Mercari adapter and collection policies"
 requires-python = ">=3.11"
 dependencies = [
-  "mercapi @ git+https://github.com/mgmaru/mercapi.git@9c3a87aa963201a3a7d76ec23e5c9d9e09de7362",
+  "mercapi @ git+https://github.com/mgmaru/mercapi.git@e8e8cda872dd8a98320cd73ccbc1beaa2c6b9c3e",
   "fastapi>=0.141.1,<0.142",
   # Plain uvicorn, not uvicorn[standard]: the MVP binds to loopback for one
   # user and uses neither websockets nor uvloop. Reload is a development
