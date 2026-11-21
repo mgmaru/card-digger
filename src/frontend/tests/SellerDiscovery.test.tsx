@@ -28,6 +28,7 @@ import type {
   SellerAssessment,
   SellerEvaluationResponse,
   SellerListEntry,
+  SellerShelfResponse,
   ShelfConditions,
 } from "../src/types/api";
 
@@ -35,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   search: vi.fn(),
   sellerAnalysis: vi.fn(),
   sellerEvaluation: vi.fn(),
+  sellerShelf: vi.fn(),
   sellerLists: vi.fn(),
   putSellerListEntry: vi.fn(),
   putSellerAssessment: vi.fn(),
@@ -1148,6 +1150,273 @@ describe("the reader's own ratings, on the 出品者リスト screen", () => {
       ).toBeInTheDocument();
       expect(screen.queryByText(/保存した出品者はまだいません/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("from a listing to its seller", () => {
+  /** The card of one listing in the 商品 tab, by its title. */
+  const card = (title: string) =>
+    screen.getByRole("heading", { level: 3, name: title }).closest("article") as HTMLElement;
+
+  async function searchAndStay() {
+    const user = userEvent.setup();
+    mount();
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ まとめ");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    await screen.findByLabelText("取得範囲");
+    return user;
+  }
+
+  it("leads from a card to the rest of that seller's shelf", async () => {
+    await searchAndStay();
+
+    expect(
+      within(card("商品 a")).getByRole("link", { name: "この出品者の出品を見る" }),
+    ).toHaveAttribute("href", "/sellers/shop/shelf");
+    // Laying the cards out asks about nobody.
+    expect(mocks.sellerShelf).not.toHaveBeenCalled();
+  });
+
+  it("saves the seller from the card, without leaving the result", async () => {
+    const user = await searchAndStay();
+
+    await user.click(
+      within(card("商品 b")).getByRole("button", { name: "「商品 b」の出品者を保存する" }),
+    );
+
+    expect(mocks.putSellerListEntry.mock.calls).toEqual([["home", "saved", ""]]);
+    await waitFor(() =>
+      expect(card("商品 b")).toHaveTextContent("出品者: 保存リスト"),
+    );
+    // A list is a local file. Nothing was asked of Mercari, and the result
+    // was not collected again.
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("says so on every card of a seller who is already saved", async () => {
+    stored = [entry("shop", "saved")];
+    await searchAndStay();
+
+    // `a` and `c` are both shop's.
+    expect(card("商品 a")).toHaveTextContent("出品者: 保存リスト");
+    expect(card("商品 c")).toHaveTextContent("出品者: 保存リスト");
+    expect(
+      within(card("商品 a")).queryByRole("button", { name: /出品者を保存する/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card("商品 b")).getByRole("button", { name: /出品者を保存する/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("cannot save anybody until the lists have been read", async () => {
+    // Otherwise a seller who was excluded could be moved to the saved list
+    // by somebody who was never told they were excluded.
+    mocks.sellerLists.mockReturnValue(new Promise(() => {}));
+    await searchAndStay();
+
+    expect(
+      within(card("商品 a")).getByRole("button", { name: /出品者を保存する/ }),
+    ).toBeDisabled();
+  });
+
+  it("offers nothing but saving on a card", async () => {
+    await searchAndStay();
+
+    // Excluding, moving and writing a note are done where a seller is the
+    // subject. A card repeated across a grid does not carry them.
+    expect(within(card("商品 a")).queryByRole("button", { name: /除外/ })).toBeNull();
+  });
+});
+
+describe("the seller's shelf screen", () => {
+  const SHELF: SellerShelfResponse = {
+    sellerId: "shop",
+    items: [
+      { ...item("s1", "shop", "3"), updatedAt: "2026-10-01T00:00:00+09:00" },
+      { ...item("s2", "shop", "5"), updatedAt: "2024-03-01T00:00:00+09:00" },
+      { ...item("s3", "shop", "3"), updatedAt: "2025-06-01T00:00:00+09:00" },
+    ],
+    meta: {
+      ...META,
+      uniqueItemCount: 3,
+      stopReason: "max_pages",
+      reachedEnd: false,
+      truncated: true,
+    },
+    foundCount: 1152,
+  };
+  const titles = () =>
+    screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+
+  beforeEach(() => {
+    mocks.sellerShelf.mockResolvedValue(SHELF);
+  });
+
+  it("asks Mercari once, for that seller, and for nothing else", async () => {
+    mount("/sellers/shop/shelf");
+    await screen.findByLabelText("取得範囲");
+
+    expect(mocks.sellerShelf.mock.calls).toEqual([["shop"]]);
+    // Not the profile, not the study of a seller, not a search.
+    expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    expect(mocks.sellerAnalysis).not.toHaveBeenCalled();
+    expect(mocks.search).not.toHaveBeenCalled();
+  });
+
+  it("says it is collecting while it is", () => {
+    mocks.sellerShelf.mockReturnValue(new Promise(() => {}));
+    mount("/sellers/shop/shelf");
+
+    expect(screen.getByRole("status")).toHaveTextContent("出品者の出品を取得中");
+  });
+
+  it("names the seller by the identifier, and leads to them on Mercari", async () => {
+    mount("/sellers/shop/shelf");
+    await screen.findByLabelText("取得範囲");
+
+    // No profile was read, so there is no name to show.
+    const name = screen.getByRole("link", { name: "Seller shop" });
+    expect(name).toHaveAttribute("href", "https://jp.mercari.com/user/profile/shop");
+    expect(name).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "Sellerを分析" })).toHaveAttribute(
+      "href",
+      "/sellers/shop",
+    );
+  });
+
+  it("says how many it read, how many there are, and what it did not read", async () => {
+    mount("/sellers/shop/shelf");
+
+    const record = await screen.findByLabelText("取得範囲");
+    expect(record).toHaveTextContent("販売中の出品を 3件 取得");
+    expect(record).toHaveTextContent("全部で 1,152件です");
+    expect(record).toHaveTextContent("Mercariへ1回問い合わせました");
+    expect(record).toHaveTextContent("最初の1ページ（最大120件）です。続きは取得していません。");
+    expect(record).toHaveTextContent("売却済みの出品と、出品者の名前・評価は取得していません。");
+  });
+
+  it("says the shelf is whole when it is, and does not repeat the total", async () => {
+    mocks.sellerShelf.mockResolvedValue({
+      ...SHELF,
+      meta: { ...SHELF.meta, stopReason: "end_of_results", reachedEnd: true, truncated: false },
+      foundCount: 3,
+    });
+    mount("/sellers/shop/shelf");
+
+    const record = await screen.findByLabelText("取得範囲");
+    expect(record).toHaveTextContent("この出品者の販売中の出品は、これで全部です。");
+    // Three read and three there are. Saying 全部で 3件 as well would say it twice.
+    expect(record).not.toHaveTextContent("全部で 3件");
+  });
+
+  it("shows each listing with its condition, and no way back to the same seller", async () => {
+    mount("/sellers/shop/shelf");
+    await screen.findByLabelText("取得範囲");
+
+    const first = screen.getAllByRole("article")[0] as HTMLElement;
+    expect(first).toHaveTextContent("商品の状態");
+    expect(within(first).getByRole("link", { name: "Mercariで商品を見る" })).toBeInTheDocument();
+    // Every card here is this seller's. Nothing on a card leads to them.
+    expect(screen.queryByRole("link", { name: "この出品者の出品を見る" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /出品者を保存する/ })).toBeNull();
+    expect(screen.getAllByRole("link", { name: "Sellerを分析" })).toHaveLength(1);
+  });
+
+  it("orders what it read without asking again", async () => {
+    const user = userEvent.setup();
+    mount("/sellers/shop/shelf");
+    await screen.findByLabelText("取得範囲");
+
+    await user.selectOptions(screen.getByLabelText("並び順"), "updated_asc");
+
+    // The listing nobody has touched for longest comes first.
+    expect(titles()).toEqual(["商品 s2", "商品 s3", "商品 s1"]);
+    expect(mocks.sellerShelf).toHaveBeenCalledTimes(1);
+  });
+
+  it("collects again only when 再取得 is pressed", async () => {
+    const user = userEvent.setup();
+    mount("/sellers/shop/shelf");
+    await screen.findByLabelText("取得範囲");
+
+    await user.click(screen.getByRole("button", { name: "再取得" }));
+
+    await waitFor(() => expect(mocks.sellerShelf).toHaveBeenCalledTimes(2));
+  });
+
+  it("can save the seller, and write why", async () => {
+    const user = userEvent.setup();
+    mount("/sellers/shop/shelf");
+    await screen.findByLabelText("取得範囲");
+
+    const panel = within(screen.getByRole("region", { name: "出品者リスト" }));
+    await user.click(panel.getByRole("button", { name: "Seller shopを保存する" }));
+
+    expect(mocks.putSellerListEntry.mock.calls).toEqual([["shop", "saved", ""]]);
+    expect(await panel.findByText(/保存リストに入れています/)).toBeInTheDocument();
+    expect(panel.getByRole("textbox", { name: "Seller shopのメモ" })).toBeInTheDocument();
+  });
+
+  it("does not call nothing for sale a seller who does not exist, or the reverse", async () => {
+    mocks.sellerShelf.mockResolvedValue({
+      ...SHELF,
+      items: [],
+      meta: { ...SHELF.meta, uniqueItemCount: 0, stopReason: "end_of_results", reachedEnd: true },
+      foundCount: 0,
+    });
+    mount("/sellers/shop/shelf");
+
+    const record = await screen.findByLabelText("取得範囲");
+    expect(record).toHaveTextContent(
+      "販売中の出品は見つかりませんでした。出品者がいない場合も、同じ表示になります。",
+    );
+    expect(screen.queryByLabelText("並び順")).not.toBeInTheDocument();
+  });
+
+  it("says so when the collection failed, and offers to try again", async () => {
+    mocks.sellerShelf.mockRejectedValueOnce(new ApiError("timeout"));
+    const user = userEvent.setup();
+    mount("/sellers/shop/shelf");
+
+    expect(await screen.findByText("取得が時間内に終わりませんでした")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "取得をやり直す" }));
+
+    expect(await screen.findByLabelText("取得範囲")).toBeInTheDocument();
+    expect(mocks.sellerShelf).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the name when the seller was looked at earlier", async () => {
+    const user = await searchAndOpenSellers();
+    await user.click(lookButton());
+    await screen.findByText("調べられる出品者は全員調べました");
+    await user.click(screen.getByRole("tab", { name: /商品/ }));
+
+    await user.click(screen.getAllByRole("link", { name: "この出品者の出品を見る" })[0] as HTMLElement);
+
+    await screen.findByLabelText("取得範囲");
+    // Read by the look, and kept above the router. Not asked for here.
+    expect(screen.getByRole("link", { name: "カード専門店" })).toHaveAttribute(
+      "href",
+      "https://jp.mercari.com/user/profile/shop",
+    );
+  });
+
+  it("leaves the search result where it was", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(screen.getByLabelText("キーワード"), "ポケカ まとめ");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+    await screen.findByLabelText("取得範囲");
+
+    await user.click(screen.getAllByRole("link", { name: "この出品者の出品を見る" })[0] as HTMLElement);
+    await screen.findByText("販売中の出品を", { exact: false });
+    await user.click(screen.getByRole("link", { name: "商品検索へ戻る" }));
+
+    expect(await screen.findByRole("heading", { level: 3, name: "商品 a" })).toBeInTheDocument();
+    // Going and coming back collected the shelf once and the search not again.
+    expect(mocks.search).toHaveBeenCalledTimes(1);
+    expect(mocks.sellerShelf).toHaveBeenCalledTimes(1);
   });
 });
 

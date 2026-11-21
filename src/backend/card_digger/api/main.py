@@ -46,6 +46,7 @@ from card_digger.api.schemas import (
     SellerListPutRequest,
     SellerListsResponse,
     SellerResponse,
+    SellerShelfResponse,
     ShelfConditionsResponse,
 )
 from card_digger.application.access import (
@@ -53,8 +54,13 @@ from card_digger.application.access import (
     search_key,
     seller_evaluation_key,
     seller_key,
+    seller_shelf_key,
 )
-from card_digger.application.analyze_seller import SellerAnalysis, analyze_seller
+from card_digger.application.analyze_seller import (
+    SellerAnalysis,
+    analyze_seller,
+    collect_seller_shelf,
+)
 from card_digger.application.collect_search import collect_search
 from card_digger.application.collection import SELLER_EVALUATION_LIMITS
 from card_digger.application.seller_breadth import seller_breadth
@@ -63,6 +69,7 @@ from card_digger.application.seller_lists import (
     InvalidSellerListEntry,
     SellerNotListed,
     assess_seller,
+    clean_seller_id,
     list_seller,
     unlist_seller,
 )
@@ -361,6 +368,48 @@ def create_app(
             sold_out_meta=CollectionMetaResponse.of(analysis.sold_out.meta),
             on_sale_conditions=ShelfConditionsResponse.of(analysis.on_sale),
             sold_out_conditions=ShelfConditionsResponse.of(analysis.sold_out),
+        )
+
+    @app.get(
+        "/api/sellers/{seller_id}/shelf",
+        response_model=SellerShelfResponse,
+    )
+    async def seller_shelf(seller_id: str, response: Response) -> SellerShelfResponse:
+        """What one seller has for sale, with conditions. One request.
+
+        Opened from a listing: the reader found something worth a second look
+        and wants to see what else that person is selling. No profile and no
+        sold listings, so there is nothing here to say the seller does not
+        exist — an empty answer is "nothing for sale that could be found".
+        """
+        # Refused here, as the caller's mistake. Sent on, an empty id would
+        # come back as a failed collection, which the screen words as Mercari
+        # not answering — and an id with a space in it is not one Mercari has.
+        try:
+            seller_id = clean_seller_id(seller_id)
+        except InvalidSellerListEntry as error:
+            raise _invalid_entry(error) from None
+
+        collection = await reaching_out.collect(
+            seller_shelf_key(seller_id),
+            lambda: collect_seller_shelf(
+                port,
+                seller_id,
+                clock=now,
+                sleeper=wait,
+                gate=reaching_out.gate(),
+            ),
+        )
+        # The same rule as a search: having collected something wins, and an
+        # empty answer with no error is still an answer.
+        response.status_code = http_status_for(len(collection.items), collection.meta)
+        if collection.meta.stop_reason is CollectionStopReason.SAFETY_STOP:
+            _say_when_to_come_back(response.headers, reaching_out)
+        return SellerShelfResponse(
+            seller_id=seller_id,
+            items=[ItemResponse.of(item) for item in collection.items],
+            meta=CollectionMetaResponse.of(collection.meta),
+            found_count=collection.found_count,
         )
 
     def _both_lists() -> SellerListsResponse:

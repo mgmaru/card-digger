@@ -343,6 +343,24 @@ class SellerItemsResponse(CamelModel):
     meta: CollectionMetaResponse
 
 
+class SellerShelfResponse(CamelModel):
+    """What one seller has for sale: one page, with each listing's condition.
+
+    The listings, unlike `SellerEvaluationResponse`, because looking at them
+    is the point. `found_count` is how many the marketplace says there are,
+    `null` when it did not say; `items` is at most one page of them.
+
+    There is no seller here beyond the id that was asked about. The profile
+    is not read, so nothing in this answer says who they are — or whether
+    there is such a seller at all.
+    """
+
+    seller_id: str
+    items: list[ItemResponse]
+    meta: CollectionMetaResponse
+    found_count: int | None
+
+
 class SellerAnalysisResponse(CamelModel):
     seller: SellerResponse
     on_sale: SellerItemsResponse

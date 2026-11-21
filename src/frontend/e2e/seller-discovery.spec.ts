@@ -295,3 +295,61 @@ test("narrowing a result by the words in its titles", async ({ page }) => {
     page.getByRole("region", { name: "調べる出品者" }).getByLabel("タイトルに含む語"),
   ).toHaveValue("ポケ");
 });
+
+/**
+ * From a listing to the shelf it came from.
+ *
+ * A good seller is found through a listing worth a second look. The card
+ * leads to the rest of that seller's shelf for one request, and can save them
+ * without leaving the result.
+ */
+test("opening a seller's shelf from a listing, and saving them from the card", async ({
+  page,
+}) => {
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname.startsWith("/api/") && pathname !== "/api/seller-lists") {
+      asked.push(`${request.method()} ${pathname}`);
+    }
+  });
+
+  await page.goto("/");
+  await page.getByLabel("キーワード").fill(KEYWORD);
+  await page.getByRole("button", { name: "検索" }).click();
+  await expect(page.getByLabel("取得範囲")).toBeVisible();
+
+  // One of the ten listings of the first seller.
+  const card = page
+    .locator("article")
+    .filter({ hasText: "ポケカ 引退品 押入れから発掘 未整理" });
+
+  // --- Saving from the card stays on the result ----------------------------
+  await card.getByRole("button", { name: /の出品者を保存する$/ }).click();
+  await expect(card).toContainText("出品者: 保存リスト");
+  await expect(page.locator("article")).toHaveCount(12);
+
+  // --- The shelf costs one request, and shows conditions -------------------
+  await card.getByRole("link", { name: "この出品者の出品を見る" }).click();
+  const record = page.getByLabel("取得範囲");
+  await expect(record).toContainText("販売中の出品を 30件 取得");
+  await expect(record).toContainText("全部で 104件です");
+  await expect(record).toContainText("続きは取得していません");
+  await expect(page.locator("article")).toHaveCount(30);
+  await expect(page.locator("article").first()).toContainText("商品の状態");
+  // Saved from the card a moment ago, and the shelf knows.
+  await expect(page.getByRole("region", { name: "出品者リスト" })).toContainText(
+    "保存リストに入れています",
+  );
+
+  // --- Back to the result, which was not collected again -------------------
+  await page.getByRole("link", { name: "商品検索へ戻る" }).click();
+  await expect(page.locator("article")).toHaveCount(12);
+  expect(asked.filter((entry) => entry === "POST /api/search")).toHaveLength(1);
+  expect(asked.filter((entry) => entry.endsWith("/shelf"))).toEqual([
+    `GET /api/sellers/${SELLER_ONE}/shelf`,
+  ]);
+  expect(asked.filter((entry) => entry.includes("/evaluation"))).toEqual([]);
+  expect(asked.filter((entry) => entry.includes("/analysis"))).toEqual([]);
+});
+

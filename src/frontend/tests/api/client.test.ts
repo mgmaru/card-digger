@@ -18,6 +18,7 @@ import {
   sellerAnalysis,
   sellerEvaluation,
   sellerLists,
+  sellerShelf,
 } from "../../src/api/client";
 
 function respondWith(
@@ -368,6 +369,7 @@ describe("the seller analysis request", () => {
     ["search", () => search("ポケカ")],
     ["sellerAnalysis", () => sellerAnalysis("100000001")],
     ["sellerEvaluation", () => sellerEvaluation("100000001")],
+    ["sellerShelf", () => sellerShelf("100000001")],
     ["sellerLists", () => sellerLists()],
     ["putSellerListEntry", () => putSellerListEntry("100000001", "saved", "")],
     [
@@ -424,6 +426,16 @@ describe("the requests behind finding sellers", () => {
     await sellerEvaluation("a b/c");
 
     expect(sent[0]?.url).toBe("/api/sellers/a%20b%2Fc/evaluation");
+    expect(sent[0]?.init?.method).toBe("GET");
+  });
+
+  it("asks for a seller's shelf by its own path", async () => {
+    const sent = recordRequests({});
+
+    await sellerShelf("a b/c");
+
+    // Not the evaluation and not the analysis: one page of what is for sale.
+    expect(sent[0]?.url).toBe("/api/sellers/a%20b%2Fc/shelf");
     expect(sent[0]?.init?.method).toBe("GET");
   });
 

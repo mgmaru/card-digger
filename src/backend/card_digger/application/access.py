@@ -79,6 +79,17 @@ def seller_evaluation_key(seller_id: str) -> str:
     return f"seller-evaluation:{seller_id}"
 
 
+def seller_shelf_key(seller_id: str) -> str:
+    """What makes two looks at one seller's shelf the same collection.
+
+    A key of its own. A shelf is one page of what is for sale, with the
+    listings in the answer; an evaluation is that and more with none of them,
+    and an analysis is deeper again. Joining any two would hand back the wrong
+    shape.
+    """
+    return f"seller-shelf:{seller_id}"
+
+
 class MarketplaceAccess:
     """One per application. Nothing here may be rebuilt per request.
 

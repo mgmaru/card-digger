@@ -9,7 +9,7 @@
  * Every duration is counted to `collectedAt`, not to now.
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import { dormancy, elapsedDays, elapsedLabel } from "../elapsed";
@@ -82,11 +82,31 @@ export function ItemCard({
   item,
   collectedAt,
   variant = "search",
+  sellerActions,
 }: {
   item: Item;
   collectedAt: string;
-  variant?: "search" | "seller";
+  /**
+   * Where the card is shown, which decides what it can say.
+   *
+   * - `search`: a search result. It carries a condition, and the seller is
+   *   somebody the reader has not chosen yet, so the card leads to them.
+   * - `shelf`: one seller's listings, read through the search. A condition
+   *   as well, but every card is the same seller, so nothing leads to them.
+   * - `seller`: the seller screen, read through the listing page, which
+   *   carries no condition.
+   */
+  variant?: "search" | "shelf" | "seller";
+  /**
+   * What can be done about this listing's seller, for the `search` variant.
+   *
+   * Handed in rather than built here. It needs the reader's seller lists,
+   * and a card that reached for them itself could not be drawn without them.
+   */
+  sellerActions?: ReactNode;
 }) {
+  // Both ways of reading listings through the search give these.
+  const fromSearch = variant !== "seller";
   const [imageFailed, setImageFailed] = useState(false);
   const format = FORMATS[item.saleFormat];
   const image = item.imageUrls[0];
@@ -139,7 +159,7 @@ export function ItemCard({
       <dl className={styles.dates}>
         {/* Search only. A seller's listing page reports no condition at all,
             so every card there would read 状態不明 — a row of nothing. */}
-        {variant === "search" && (
+        {fromSearch && (
           <>
             <dt>商品の状態</dt>
             <dd className={styles.condition}>{conditionLabel(item.itemCondition)}</dd>
@@ -178,9 +198,17 @@ export function ItemCard({
           Mercariで商品を見る
         </a>
         {variant === "search" && (
-          <Link to={`/sellers/${item.sellerId}`}>Sellerを分析</Link>
+          <>
+            {/* The rest of the shelf this listing came from. A listing worth
+                a second look tends to sit beside others that are, which is
+                how a good seller is found (出品者探索 §17). One request. */}
+            <Link to={`/sellers/${item.sellerId}/shelf`}>この出品者の出品を見る</Link>
+            <Link to={`/sellers/${item.sellerId}`}>Sellerを分析</Link>
+          </>
         )}
       </p>
+
+      {variant === "search" && sellerActions}
 
       {/*
         The untouched-for bar. Pinned to the bottom by `margin-top: auto`, so
@@ -194,7 +222,7 @@ export function ItemCard({
         inventory rather than hunting a grid for the dormant one, and section
         6.2 does not ask for it.
       */}
-      {variant === "search" && (
+      {fromSearch && (
       <p
         className={styles.bar}
         aria-hidden="true"

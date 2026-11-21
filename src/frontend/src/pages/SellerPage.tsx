@@ -18,8 +18,8 @@ import { SellerListPanel } from "../components/SellerListPanel";
 import { SellerKnowledgePanel } from "../components/SellerKnowledge";
 import { SellerProfile } from "../components/SellerProfile";
 import { latestMoment } from "../elapsed";
+import { SELLER_FAILURES } from "../sellerFailures";
 import { useSellerAnalysis } from "../useSellerAnalysis";
-import type { ApiFailureKind } from "../api/client";
 import type { SellerAnalysisResponse } from "../types/api";
 
 import styles from "./SellerPage.module.css";
@@ -32,27 +32,6 @@ import styles from "./SellerPage.module.css";
  * decision, so it asks for time rather than offering a button that would
  * override it.
  */
-const FAILURES: Record<ApiFailureKind, { message: string; retryable: boolean }> = {
-  invalid_input: { message: "Seller IDを読み取れませんでした", retryable: false },
-  not_found: { message: "このSellerは見つかりませんでした", retryable: false },
-  rate_limited: {
-    message: "Mercariが一時的に応答を制限しています。時間を置いてください",
-    retryable: true,
-  },
-  safety_stop: {
-    message:
-      "続けて拒否されたため取得を止めました。自動では再試行しません。時間を置いてからお試しください",
-    retryable: false,
-  },
-  timeout: { message: "取得が時間内に終わりませんでした", retryable: true },
-  upstream: { message: "Mercari側から応答を受け取れませんでした", retryable: true },
-  network: {
-    message: "Backendへ接続できませんでした。起動しているか確認してください",
-    retryable: true,
-  },
-  unexpected: { message: "取得できませんでした", retryable: true },
-};
-
 /**
  * When this seller last moved anything we can see.
  *
@@ -87,7 +66,7 @@ function collectedAt(analysis: SellerAnalysisResponse): string {
 export function SellerPage() {
   const { sellerId } = useParams<{ sellerId: string }>();
   const { status, analysis, error, retry } = useSellerAnalysis(sellerId ?? "");
-  const failure = error ? FAILURES[error.kind] : null;
+  const failure = error ? SELLER_FAILURES[error.kind] : null;
 
   return (
     <section>

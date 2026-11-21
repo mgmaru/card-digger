@@ -14,6 +14,7 @@ import { CollectionRecord } from "../components/CollectionRecord";
 import { FailureNotice } from "../components/FailureNotice";
 import { FilterControls } from "../components/FilterControls";
 import { ItemGrid } from "../components/ItemGrid";
+import { ItemSellerSave } from "../components/ItemSellerSave";
 import { SearchForm } from "../components/SearchForm";
 import { SellerCandidates } from "../components/SellerCandidates";
 import { SellerListError } from "../components/SellerListNote";
@@ -307,6 +308,9 @@ export function SearchPage() {
                     <ItemGrid
                       items={shown}
                       collectedAt={result.meta.collectedAt}
+                      sellerActions={(item) => (
+                        <ItemSellerSave sellerId={item.sellerId} itemTitle={item.title} />
+                      )}
                     />
                   )}
                 </>

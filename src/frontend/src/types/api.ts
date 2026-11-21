@@ -263,6 +263,20 @@ export type ShelfConditions = {
   unknownCount: number;
 };
 
+/**
+ * What one seller has for sale: one page, each listing with its condition.
+ *
+ * Opened from a listing. One request, so there is no profile here and nothing
+ * to say who the seller is, or whether there is one. `foundCount` is how many
+ * Mercari says there are; `items` is at most a page of them.
+ */
+export type SellerShelfResponse = {
+  sellerId: string;
+  items: Item[];
+  meta: CollectionMeta;
+  foundCount: number | null;
+};
+
 /** Which of the reader's two lists a seller is on. */
 export type SellerListKind = "saved" | "excluded";
 

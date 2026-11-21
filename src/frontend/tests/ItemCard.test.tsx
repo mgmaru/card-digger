@@ -43,6 +43,19 @@ function mount(patch: Partial<Item> = {}) {
   );
 }
 
+function mountShelfCard(patch: Partial<Item> = {}) {
+  return render(
+    <MemoryRouter>
+      <ItemCard
+        item={item(patch)}
+        collectedAt={COLLECTED_AT}
+        variant="shelf"
+        sellerActions={<button type="button">出品者を保存</button>}
+      />
+    </MemoryRouter>,
+  );
+}
+
 function mountSellerCard(patch: Partial<Item> = {}) {
   return render(
     <MemoryRouter>
@@ -217,5 +230,49 @@ describe("links", () => {
       "href",
       "/sellers/s1",
     );
+  });
+
+  it("leads to the rest of the shelf the listing came from", () => {
+    mount();
+    expect(screen.getByRole("link", { name: "この出品者の出品を見る" })).toHaveAttribute(
+      "href",
+      "/sellers/s1/shelf",
+    );
+  });
+
+  it("draws what it was handed about the seller, on a search result", () => {
+    render(
+      <MemoryRouter>
+        <ItemCard
+          item={item()}
+          collectedAt={COLLECTED_AT}
+          sellerActions={<button type="button">出品者を保存</button>}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "出品者を保存" })).toBeInTheDocument();
+  });
+});
+
+describe("a card on one seller's shelf", () => {
+  it("says how worn the listing is, which the search it came through knows", () => {
+    mountShelfCard();
+    expect(screen.getByText("商品の状態")).toBeInTheDocument();
+    expect(screen.getByText("目立った傷や汚れなし")).toBeInTheDocument();
+  });
+
+  it("carries the bar, so the listing nobody has touched stands out", () => {
+    const { container } = mountShelfCard();
+    expect(bar(container)).not.toBeNull();
+  });
+
+  it("leads to the listing on Mercari and nowhere about the seller", () => {
+    // Every card on a shelf is the same seller. A link to them on each one
+    // would lead back to the screen the reader is already on.
+    mountShelfCard();
+    expect(screen.getByRole("link", { name: "Mercariで商品を見る" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "この出品者の出品を見る" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Sellerを分析" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "出品者を保存" })).toBeNull();
   });
 });

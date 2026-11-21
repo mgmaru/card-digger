@@ -22,6 +22,7 @@ import type {
   SellerListKind,
   SellerAssessment,
   SellerListsResponse,
+  SellerShelfResponse,
 } from "../types/api";
 
 /**
@@ -376,6 +377,22 @@ export function sellerEvaluation(
     `/api/sellers/${encodeURIComponent(sellerId)}/evaluation`,
     { method: "GET" },
     SELLER_EVALUATION_TIMEOUT_MS,
+  );
+}
+
+/**
+ * What one seller has for sale, with each listing's condition.
+ *
+ * One request to Mercari: a page of the search limited to that seller. For a
+ * reader who found one listing worth a second look and wants to see the rest
+ * of the shelf it came from.
+ */
+export function sellerShelf(sellerId: string): Promise<SellerShelfResponse> {
+  return request<SellerShelfResponse>(
+    `/api/sellers/${encodeURIComponent(sellerId)}/shelf`,
+    { method: "GET" },
+    // One page, like one page of a search.
+    SEARCH_TIMEOUT_MS,
   );
 }
 
