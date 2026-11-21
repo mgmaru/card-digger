@@ -34,6 +34,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* 狭い画面で、名前と選択欄を合わせた幅が画面を越えないようにする。 */
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 選択肢の文言は長い（「目立った傷や汚れなし以上」）。入りきらないときは欄のほうを縮める。 */
+.condition {
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .number {

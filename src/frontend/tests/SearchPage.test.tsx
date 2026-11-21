@@ -145,10 +145,12 @@ describe("input errors", () => {
     const user = userEvent.setup();
     mount();
     await searchFor(user, "  ポケカ 引退  ");
-    expect(searchMock).toHaveBeenCalledWith("ポケカ 引退", {
-      minPriceYen: null,
-      maxPriceYen: null,
-    });
+    expect(searchMock).toHaveBeenCalledWith(
+      "ポケカ 引退",
+      { minPriceYen: null, maxPriceYen: null },
+      // No condition asked for, which is sent as an empty list.
+      [],
+    );
   });
 });
 
@@ -241,10 +243,11 @@ describe("success", () => {
 
     await user.click(screen.getByRole("button", { name: "再取得" }));
     await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
-    expect(searchMock).toHaveBeenLastCalledWith("ポケカ", {
-      minPriceYen: null,
-      maxPriceYen: null,
-    });
+    expect(searchMock).toHaveBeenLastCalledWith(
+      "ポケカ",
+      { minPriceYen: null, maxPriceYen: null },
+      [],
+    );
   });
 });
 
@@ -530,6 +533,146 @@ describe("how far back the search reached", () => {
   });
 });
 
+describe("collecting by condition", () => {
+  const fetchCondition = () => screen.getByLabelText("取得する商品の状態");
+  const sentConditions = () => searchMock.mock.calls.at(-1)?.[2];
+
+  it("offers each condition or better, in words, and starts with none", () => {
+    mount();
+
+    expect(fetchCondition()).toHaveValue("");
+    expect(
+      within(fetchCondition())
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "指定なし",
+      "新品、未使用だけ",
+      "未使用に近い以上",
+      "目立った傷や汚れなし以上",
+      "やや傷や汚れあり以上",
+      "傷や汚れあり以上",
+    ]);
+  });
+
+  it("goes to Mercari as the chosen condition and every better one", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.selectOptions(fetchCondition(), "目立った傷や汚れなし以上");
+
+    await searchFor(user, "ポケカ");
+
+    expect(sentConditions()).toEqual(["1", "2", "3"]);
+  });
+
+  it("collects nothing until the button is pressed", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+
+    // It changes the question, and the question is only asked from the button.
+    await user.selectOptions(fetchCondition(), "未使用に近い以上");
+
+    expect(searchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("is shown beside the result it produced", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.selectOptions(fetchCondition(), "目立った傷や汚れなし以上");
+    await searchFor(user, "ポケカ");
+
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した商品の状態: 目立った傷や汚れなし以上",
+    );
+  });
+
+  it("is not mentioned when none was asked for", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+
+    expect(screen.getByLabelText("取得範囲")).not.toHaveTextContent("指定した商品の状態");
+  });
+
+  it("keeps describing the collection on screen while the form is changed", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.selectOptions(fetchCondition(), "目立った傷や汚れなし以上");
+    await searchFor(user, "ポケカ");
+
+    await user.selectOptions(fetchCondition(), "指定なし");
+
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した商品の状態: 目立った傷や汚れなし以上",
+    );
+  });
+
+  it("re-collects under the condition the result came from", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.selectOptions(fetchCondition(), "目立った傷や汚れなし以上");
+    await searchFor(user, "ポケカ");
+    await user.selectOptions(fetchCondition(), "指定なし");
+
+    await user.click(screen.getByRole("button", { name: "再取得" }));
+
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
+    // Not what the form says now: 再取得 asks the same question again.
+    expect(sentConditions()).toEqual(["1", "2", "3"]);
+  });
+
+  it("says so when listings outside the condition came back", async () => {
+    // What an ignored condition would look like: a full answer, with worn
+    // listings in it. `b` is やや傷や汚れあり and `c` has no condition.
+    searchMock.mockResolvedValue({
+      ...RESULT,
+      items: [
+        RESULT.items[0],
+        { ...(RESULT.items[1] as Item), itemCondition: { id: "4", name: "やや傷や汚れあり" } },
+        { ...(RESULT.items[2] as Item), itemCondition: null },
+      ],
+    });
+    const user = userEvent.setup();
+    mount();
+    await user.selectOptions(fetchCondition(), "目立った傷や汚れなし以上");
+    await searchFor(user, "ポケカ");
+
+    expect(screen.getByLabelText("取得範囲")).toHaveTextContent(
+      "指定した状態に合わない出品が 2件あります。Mercariが商品の状態の指定を受け付けていない可能性があります。",
+    );
+  });
+
+  it("says nothing of the kind when every listing is in the condition", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.selectOptions(fetchCondition(), "目立った傷や汚れなし以上");
+    await searchFor(user, "ポケカ");
+
+    expect(screen.getByLabelText("取得範囲")).not.toHaveTextContent("合わない出品");
+  });
+
+  it("is a different control from the filter under the results", async () => {
+    const user = userEvent.setup();
+    mount();
+    await searchFor(user, "ポケカ");
+
+    // One collects and one hides. Two names, so they can be told apart.
+    expect(fetchCondition()).not.toBe(screen.getByLabelText("商品の状態"));
+    await user.selectOptions(screen.getByLabelText("商品の状態"), "目立った傷や汚れなし以上");
+    expect(searchMock).toHaveBeenCalledTimes(1);
+    expect(fetchCondition()).toHaveValue("");
+  });
+
+  it("says that naming a condition collects only listings in it", () => {
+    mount();
+
+    expect(
+      screen.getByText(/商品の状態を指定したときも同じで、その状態の出品だけを取得します/),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("the price band", () => {
   it("goes to Mercari, and only when the button is pressed", async () => {
     const user = userEvent.setup();
@@ -545,10 +688,11 @@ describe("the price band", () => {
 
     await user.click(screen.getByRole("button", { name: "検索" }));
     await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
-    expect(searchMock).toHaveBeenLastCalledWith("ポケカ", {
-      minPriceYen: 3000,
-      maxPriceYen: 5000,
-    });
+    expect(searchMock).toHaveBeenLastCalledWith(
+      "ポケカ",
+      { minPriceYen: 3000, maxPriceYen: 5000 },
+      [],
+    );
   });
 
   it("is shown beside the result it produced", async () => {

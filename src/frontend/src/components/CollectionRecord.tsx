@@ -9,6 +9,11 @@
  */
 
 import { durationLabel, longestWithoutUpdate } from "../elapsed";
+import {
+  outsideCondition,
+  worstConditionLabel,
+  type WorstCondition,
+} from "../itemConditions";
 import { toDateString, toDateTimeString } from "../jst";
 import { SORT_LABELS } from "../searchQuery";
 import type { SortKey } from "../searchState";
@@ -64,6 +69,7 @@ export function CollectionRecord({
   visibleCount,
   filtered,
   band,
+  worstCondition,
   onRefetch,
   busy,
 }: {
@@ -76,11 +82,18 @@ export function CollectionRecord({
   filtered: boolean;
   /** The band this collection ran under. Part of what was asked, so it is shown. */
   band: PriceBand;
+  /** The most worn condition asked for. Shown for the same reason. */
+  worstCondition: WorstCondition;
   onRefetch: () => void;
   busy: boolean;
 }) {
   const range = dateRange(meta);
   const priceBand = bandLabel(band);
+  const condition = worstConditionLabel(worstCondition);
+  // Mercari was asked for these conditions only. Any listing outside them
+  // means it did not narrow the way the form said, and the reach below was
+  // not bought by the condition.
+  const outside = outsideCondition(items, worstCondition);
   const reach = longestWithoutUpdate(items, meta.collectedAt);
 
   return (
@@ -99,6 +112,22 @@ export function CollectionRecord({
 
       {priceBand && (
         <p className={styles.extent}>指定した価格帯: {priceBand}</p>
+      )}
+
+      {condition && (
+        <p className={styles.extent}>指定した商品の状態: {condition}</p>
+      )}
+
+      {/* A limit of this collection, written beside it: the mark is 朱 and the
+          words are ink (視覚方針 §3.3). Not the red heading, which is kept
+          for a result that is partial. */}
+      {outside > 0 && (
+        <div className={styles.limits}>
+          <p>
+            指定した状態に合わない出品が {outside.toLocaleString("ja-JP")}
+            件あります。Mercariが商品の状態の指定を受け付けていない可能性があります。
+          </p>
+        </div>
       )}
 
       {range && <p className={styles.extent}>取得した商品の掲載日時: {range}</p>}
