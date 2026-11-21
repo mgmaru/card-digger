@@ -8,13 +8,20 @@ them. Neither is ever described as everything the seller has.
 from __future__ import annotations
 
 import pytest
-from conftest import ScriptedPort, make_item, make_items, make_seller_page
+from conftest import (
+    ScriptedPort,
+    make_item,
+    make_items,
+    make_seller_page,
+    make_shelf_page,
+)
 
 from card_digger.application.analyze_seller import analyze_seller
 from card_digger.application.collection import (
     CONSECUTIVE_REFUSALS_BEFORE_STOP,
     SELLER_EVALUATION_LIMITS,
     SELLER_ITEMS_LIMITS,
+    SELLER_SHELF_PAGE_ITEMS,
     RequestGate,
 )
 from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation
@@ -379,38 +386,57 @@ def _raises_rate_limit():
     return call
 
 
+def shelf_port(on_sale, sold_out) -> ScriptedPort:
+    """A seller scripted only through the search limited to them."""
+    return ScriptedPort(
+        seller=[SELLER],
+        shelf_pages={
+            ListingStatus.ON_SALE: on_sale,
+            ListingStatus.SOLD_OUT: sold_out,
+        },
+    )
+
+
 class TestALookAcrossManySellers:
     """The same collection, run shallowly, for when it is repeated per seller.
 
     What matters is the request count. It is multiplied by the number of
     sellers a search turned up and paid for at two seconds each.
+
+    The two statuses are read through the search limited to the seller, which
+    costs the same one request a page and is the only listing of a shelf that
+    says how worn each item is.
     """
 
-    async def test_it_stops_after_one_page_of_each_status(self, clock, sleeper):
-        port = port_with(
-            on_sale=[
-                make_seller_page(make_items(30), ListingStatus.ON_SALE, next_cursor="30"),
-                make_seller_page(make_items(30, start=31), ListingStatus.ON_SALE),
-            ],
-            sold_out=[
-                make_seller_page(
-                    make_items(30, start=100), ListingStatus.SOLD_OUT, next_cursor="30"
-                ),
-                make_seller_page(make_items(30, start=131), ListingStatus.SOLD_OUT),
-            ],
-        )
-
-        analysis = await analyze_seller(
+    async def look(self, port, clock, sleeper):
+        return await analyze_seller(
             port,
             SELLER_ID,
             clock=clock,
             sleeper=sleeper,
             limits=SELLER_EVALUATION_LIMITS,
             ask_whether_inactive=False,
+            through_search=True,
         )
 
-        assert len(port.calls_to("seller_items:on_sale")) == 1
-        assert len(port.calls_to("seller_items:sold_out")) == 1
+    async def test_it_stops_after_one_page_of_each_status(self, clock, sleeper):
+        port = shelf_port(
+            on_sale=[
+                make_shelf_page(make_items(30), ListingStatus.ON_SALE, next_cursor="p2"),
+                make_shelf_page(make_items(30, start=31), ListingStatus.ON_SALE),
+            ],
+            sold_out=[
+                make_shelf_page(
+                    make_items(30, start=100), ListingStatus.SOLD_OUT, next_cursor="p2"
+                ),
+                make_shelf_page(make_items(30, start=131), ListingStatus.SOLD_OUT),
+            ],
+        )
+
+        analysis = await self.look(port, clock, sleeper)
+
+        assert len(port.calls_to("seller_shelf:on_sale")) == 1
+        assert len(port.calls_to("seller_shelf:sold_out")) == 1
         for collection in (analysis.on_sale, analysis.sold_out):
             assert len(collection.items) == 30
             # Said, not hidden: the bands were computed over the first page.
@@ -420,28 +446,96 @@ class TestALookAcrossManySellers:
 
     async def test_it_spends_three_requests_on_a_seller(self, clock, sleeper):
         """The profile and one page of each status, and not the item detail."""
-        port = port_with(
-            on_sale=[make_seller_page(make_items(3), ListingStatus.ON_SALE)],
-            sold_out=[make_seller_page(make_items(2, start=10), ListingStatus.SOLD_OUT)],
+        port = shelf_port(
+            on_sale=[make_shelf_page(make_items(3), ListingStatus.ON_SALE)],
+            sold_out=[make_shelf_page(make_items(2, start=10), ListingStatus.SOLD_OUT)],
         )
 
-        analysis = await analyze_seller(
-            port,
-            SELLER_ID,
-            clock=clock,
-            sleeper=sleeper,
-            limits=SELLER_EVALUATION_LIMITS,
-            ask_whether_inactive=False,
-        )
+        analysis = await self.look(port, clock, sleeper)
 
         assert len(port.calls) == 3
         assert port.calls_to("item") == []
         # Not asked is not the same as answered no.
         assert analysis.seller_is_inactive is None
 
-    def test_only_the_page_count_differs_from_the_seller_screen(self):
+    async def test_it_does_not_ask_for_the_listing_page_as_well(self, clock, sleeper):
+        """One way or the other. Both would be five requests a seller."""
+        port = shelf_port(
+            on_sale=[make_shelf_page(make_items(3), ListingStatus.ON_SALE)],
+            sold_out=[make_shelf_page((), ListingStatus.SOLD_OUT)],
+        )
+
+        await self.look(port, clock, sleeper)
+
+        assert port.calls_to("seller_items:on_sale") == []
+        assert port.calls_to("seller_items:sold_out") == []
+
+    async def test_it_keeps_the_total_the_search_reported(self, clock, sleeper):
+        port = shelf_port(
+            on_sale=[
+                make_shelf_page(
+                    make_items(3),
+                    ListingStatus.ON_SALE,
+                    next_cursor="p2",
+                    found_count=1152,
+                )
+            ],
+            sold_out=[make_shelf_page((), ListingStatus.SOLD_OUT, found_count=0)],
+        )
+
+        analysis = await self.look(port, clock, sleeper)
+
+        assert analysis.on_sale.found_count == 1152
+        # Nothing found is an answer, and is not the same as no answer.
+        assert analysis.sold_out.found_count == 0
+
+    async def test_a_total_that_was_not_given_stays_unknown(self, clock, sleeper):
+        port = shelf_port(
+            on_sale=[make_shelf_page(make_items(3), ListingStatus.ON_SALE)],
+            sold_out=[make_shelf_page((), ListingStatus.SOLD_OUT)],
+        )
+
+        analysis = await self.look(port, clock, sleeper)
+
+        assert analysis.on_sale.found_count is None
+
+    async def test_a_missing_seller_is_not_searched_for(self, clock, sleeper):
+        """A search cannot say "no such seller". The profile is what does."""
+        port = ScriptedPort(
+            seller=MarketplaceError(ErrorCode.NOT_FOUND_404, Operation.SELLER_PROFILE)
+        )
+
+        analysis = await self.look(port, clock, sleeper)
+
+        assert analysis.seller is None
+        assert [call.method for call in port.calls] == ["seller"]
+
+    async def test_a_failure_in_one_status_leaves_the_other_alone(self, clock, sleeper):
+        port = shelf_port(
+            on_sale=[MarketplaceError(ErrorCode.PARSE_ERROR, Operation.SELLER_ON_SALE)],
+            sold_out=[make_shelf_page(make_items(2), ListingStatus.SOLD_OUT)],
+        )
+
+        analysis = await self.look(port, clock, sleeper)
+
+        assert analysis.on_sale.meta.stop_reason is CollectionStopReason.ERROR
+        assert len(analysis.sold_out.items) == 2
+
+    def test_the_seller_screen_reads_the_listing_page_as_before(self):
+        """The default is unchanged. Only the brief look asks for the search."""
+        import inspect
+
+        assert (
+            inspect.signature(analyze_seller).parameters["through_search"].default
+            is False
+        )
+
+    def test_one_page_and_what_a_search_page_holds(self):
         assert SELLER_EVALUATION_LIMITS.max_pages == 1
-        assert SELLER_EVALUATION_LIMITS.max_items == SELLER_ITEMS_LIMITS.max_items
+        # A search page holds up to 120 listings. The seller screen's hundred
+        # would read them and throw twenty away.
+        assert SELLER_EVALUATION_LIMITS.max_items == SELLER_SHELF_PAGE_ITEMS == 120
+        assert SELLER_EVALUATION_LIMITS.max_items > SELLER_ITEMS_LIMITS.max_items
         assert (
             SELLER_EVALUATION_LIMITS.max_duration_seconds
             == SELLER_ITEMS_LIMITS.max_duration_seconds

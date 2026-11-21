@@ -137,6 +137,26 @@ class SellerItemsPage:
     page_info: PageInfo
 
 
+@dataclass(frozen=True)
+class SellerShelfPage:
+    """One page of a seller's listings, as a search limited to them returns it.
+
+    The same listings as `SellerItemsPage`, read through the search instead of
+    through the seller's own listing page. The difference is what each listing
+    carries: a search result says how worn the item is, and a listing page
+    entry does not say it under any name (observed 2026-11-20,
+    `poc/mercapi/seller-condition-result.md`).
+    """
+
+    items: tuple[MarketplaceItem, ...]
+    requested_status: ListingStatus
+    page_info: PageInfo
+    #: How many listings the marketplace says there are in all, of which this
+    #: page is a part. `None` when it did not say. Not a count of what was
+    #: read, and never presented as one.
+    found_count: int | None = None
+
+
 class CollectionStopReason(str, Enum):
     TARGET_REACHED = "target_reached"
     END_OF_RESULTS = "end_of_results"

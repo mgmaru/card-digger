@@ -37,6 +37,10 @@ class SellerItemsCollection:
     status: ListingStatus
     items: tuple[MarketplaceItem, ...]
     meta: CollectionMeta
+    #: The marketplace's own count of this seller's listings in this status,
+    #: when the listings were read through the search and it said. `None`
+    #: otherwise: the listing page reports no total.
+    found_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +66,7 @@ async def analyze_seller(
     gate: RequestGate | None = None,
     limits: CollectionLimits = SELLER_ITEMS_LIMITS,
     ask_whether_inactive: bool = True,
+    through_search: bool = False,
 ) -> SellerAnalysis:
     """Collect one seller.
 
@@ -70,7 +75,14 @@ async def analyze_seller(
     and without the one extra item detail that the seller screen spends to
     read Mercari's `is_inactive`. The order of the requests and what a failure
     means are the same either way, which is the reason this is one function
-    with two knobs and not two functions.
+    with knobs and not two functions.
+
+    `through_search` reads the two statuses through the search limited to the
+    seller instead of through their listing page. Still one request a page.
+    What it buys is the condition of each listing, which the listing page does
+    not carry, and a larger page. What it gives up is the like count, and the
+    certainty that sold listings are all there: how far back the search keeps
+    them is not known.
     """
     gate = gate or RequestGate(clock, sleeper)
 
@@ -102,10 +114,22 @@ async def analyze_seller(
         )
 
     on_sale = await _collect_status(
-        port, seller_id, ListingStatus.ON_SALE, gate=gate, clock=clock, limits=limits
+        port,
+        seller_id,
+        ListingStatus.ON_SALE,
+        gate=gate,
+        clock=clock,
+        limits=limits,
+        through_search=through_search,
     )
     sold_out = await _collect_status(
-        port, seller_id, ListingStatus.SOLD_OUT, gate=gate, clock=clock, limits=limits
+        port,
+        seller_id,
+        ListingStatus.SOLD_OUT,
+        gate=gate,
+        clock=clock,
+        limits=limits,
+        through_search=through_search,
     )
     return SellerAnalysis(
         seller_id=seller_id,
@@ -162,8 +186,18 @@ async def _collect_status(
     gate: RequestGate,
     clock: Clock,
     limits: CollectionLimits,
+    through_search: bool,
 ) -> SellerItemsCollection:
+    # The total the search reports, kept from the first page that gave one.
+    # Later pages repeat it, and one that omits it is not a reason to forget.
+    found: list[int] = []
+
     async def fetch(cursor: str | None):
+        if through_search:
+            shelf = await port.search_seller_items_page(seller_id, status, cursor)
+            if shelf.found_count is not None and not found:
+                found.append(shelf.found_count)
+            return shelf.items, shelf.page_info
         page = await port.get_seller_items_page(seller_id, status, cursor)
         return page.items, page.page_info
 
@@ -179,7 +213,10 @@ async def _collect_status(
         clock=clock,
     )
     return SellerItemsCollection(
-        status=status, items=collected.items, meta=collected.meta
+        status=status,
+        items=collected.items,
+        meta=collected.meta,
+        found_count=found[0] if found else None,
     )
 
 

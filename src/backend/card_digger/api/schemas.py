@@ -22,7 +22,9 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
+from card_digger.application.analyze_seller import SellerItemsCollection
 from card_digger.application.seller_breadth import BreadthLevel, SellerBreadth
+from card_digger.application.seller_conditions import condition_counts
 from card_digger.application.seller_knowledge import KnowledgeLevel, SellerKnowledge
 from card_digger.domain.errors import ErrorCode, Operation
 from card_digger.domain.models import (
@@ -354,6 +356,52 @@ class SellerBreadthResponse(CamelModel):
         )
 
 
+class ConditionCountResponse(CamelModel):
+    """How many listings carried one grade. The grade is Mercari's, by name."""
+
+    id: str
+    name: str
+    count: int
+
+
+class ShelfConditionsResponse(CamelModel):
+    """How worn the listings of one status are, counted. No listings.
+
+    Counts and nothing decided about them: where "in good condition" starts is
+    the screen's line to draw (seller discovery specification, section 5.7).
+
+    `analyzed_item_count` is how many listings were read, at most one page.
+    `found_count` is how many the marketplace says there are, and is `null`
+    when it did not say. The two differ whenever the seller has more than a
+    page, which is the reason both are here.
+    """
+
+    analyzed_item_count: int
+    found_count: int | None
+    #: Least worn first. Only grades the marketplace named.
+    counts: list[ConditionCountResponse]
+    #: Listings whose grade could not be placed. Not worn, not good: unknown.
+    unknown_count: int
+
+    @classmethod
+    def of(cls, collection: SellerItemsCollection) -> "ShelfConditionsResponse":
+        counted = condition_counts(collection.items)
+        return cls(
+            analyzed_item_count=counted.item_count,
+            found_count=collection.found_count,
+            counts=[
+                # Placed grades only, so both are present: see `condition_counts`.
+                ConditionCountResponse(
+                    id=str(entry.condition.id),
+                    name=str(entry.condition.name),
+                    count=entry.count,
+                )
+                for entry in counted.counts
+            ],
+            unknown_count=counted.unknown_count,
+        )
+
+
 class SellerEvaluationResponse(CamelModel):
     """One seller, looked at briefly: who they are and what their shelf is like.
 
@@ -365,6 +413,10 @@ class SellerEvaluationResponse(CamelModel):
     The two `meta` say how far each status got. One page each is the plan, so
     `truncated` is the usual answer and is not a fault: it is what tells a
     screen that the bands were computed over the first page and no further.
+
+    The two `conditions` are the grades on those same listings. They exist
+    because the look reads each status through the search limited to the
+    seller, which is the one listing of a shelf that carries them.
     """
 
     seller: SellerResponse
@@ -372,6 +424,8 @@ class SellerEvaluationResponse(CamelModel):
     breadth: SellerBreadthResponse
     on_sale_meta: CollectionMetaResponse
     sold_out_meta: CollectionMetaResponse
+    on_sale_conditions: ShelfConditionsResponse
+    sold_out_conditions: ShelfConditionsResponse
 
 
 class SellerAssessmentResponse(CamelModel):

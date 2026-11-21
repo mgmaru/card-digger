@@ -8,6 +8,8 @@ up as a failing contract test rather than as a screen that only works offline.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from card_digger.domain.errors import ErrorCode, MarketplaceError, Operation
 from card_digger.domain.models import (
     ListingStatus,
@@ -16,6 +18,7 @@ from card_digger.domain.models import (
     SearchPage,
     Seller,
     SellerItemsPage,
+    SellerShelfPage,
 )
 
 
@@ -23,6 +26,14 @@ _REQUESTABLE_STATUSES = {
     ListingStatus.ON_SALE,
     ListingStatus.TRADING,
     ListingStatus.SOLD_OUT,
+}
+
+#: What a search limited to a seller returns for each status it can be asked
+#: for. A sold out search brings the listings still in trading with it, as the
+#: real one does.
+_SEARCHED_STATUSES = {
+    ListingStatus.ON_SALE: frozenset({ListingStatus.ON_SALE}),
+    ListingStatus.SOLD_OUT: frozenset({ListingStatus.SOLD_OUT, ListingStatus.TRADING}),
 }
 
 
@@ -121,9 +132,47 @@ class MockAdapter:
         )
         page, next_cursor = self._slice(matches, cursor, operation)
         return SellerItemsPage(
+            # As on the real marketplace: a seller's own listing page does not
+            # say how worn a listing is. Handing the condition over here would
+            # let a screen work offline on something Mercari never sends.
+            items=tuple(replace(item, item_condition=None) for item in page),
+            requested_status=status,
+            page_info=PageInfo(has_next=next_cursor is not None, next_cursor=next_cursor),
+        )
+
+    async def search_seller_items_page(
+        self,
+        seller_id: str,
+        status: ListingStatus,
+        cursor: str | None = None,
+    ) -> SellerShelfPage:
+        operation = (
+            Operation.SELLER_SOLD_OUT
+            if status is ListingStatus.SOLD_OUT
+            else Operation.SELLER_ON_SALE
+        )
+        wanted = _SEARCHED_STATUSES.get(status)
+        if wanted is None:
+            raise MarketplaceError(
+                ErrorCode.INVALID_INPUT, operation, "status cannot be searched"
+            )
+        asked = seller_id.strip()
+        if not asked:
+            raise MarketplaceError(ErrorCode.INVALID_INPUT, operation, "empty seller id")
+
+        # No check that the seller exists: a search cannot tell, and answers
+        # with an empty page.
+        matches = tuple(
+            item
+            for item in self._items
+            if item.seller_id == asked and item.listing_status in wanted
+        )
+        page, next_cursor = self._slice(matches, cursor, operation)
+        return SellerShelfPage(
             items=page,
             requested_status=status,
             page_info=PageInfo(has_next=next_cursor is not None, next_cursor=next_cursor),
+            found_count=len(matches),
         )
 
     def _slice(

@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "nextPageToken": "",
+    "previousPageToken": "",
+    "numFound": "2"
+  },
+  "items": [
+    {
+      "id": "m000000000014",
+      "name": "sample-seller-item-4",
+      "price": "500",
+      "sellerId": "100000001",
+      "status": "ITEM_STATUS_SOLD_OUT",
+      "created": "1756400000",
+      "updated": "1757177600",
+      "itemConditionId": "3",
+      "isNoPrice": false,
+      "photos": [
+        {
+          "uri": "https://example.test/image-14.webp"
+        }
+      ],
+      "thumbnails": [
+        "https://example.test/thumb-14.webp"
+      ],
+      "auction": null
+    },
+    {
+      "id": "m000000000015",
+      "name": "sample-seller-item-5",
+      "price": "500",
+      "sellerId": "100000001",
+      "status": "ITEM_STATUS_TRADING",
+      "created": "1756400000",
+      "updated": "1757177600",
+      "itemConditionId": "6",
+      "isNoPrice": false,
+      "photos": [
+        {
+          "uri": "https://example.test/image-15.webp"
+        }
+      ],
+      "thumbnails": [
+        "https://example.test/thumb-15.webp"
+      ],
+      "auction": null
+    }
+  ]
+}

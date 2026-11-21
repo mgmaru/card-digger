@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "nextPageToken": "",
+    "previousPageToken": "cursor-page-1",
+    "numFound": "3"
+  },
+  "items": [
+    {
+      "id": "m000000000013",
+      "name": "sample-seller-item-3",
+      "price": "500",
+      "sellerId": "100000001",
+      "status": "ITEM_STATUS_ON_SALE",
+      "created": "1756400000",
+      "updated": "1757177600",
+      "itemConditionId": "4",
+      "isNoPrice": false,
+      "photos": [
+        {
+          "uri": "https://example.test/image-13.webp"
+        }
+      ],
+      "thumbnails": [
+        "https://example.test/thumb-13.webp"
+      ],
+      "auction": null
+    }
+  ]
+}

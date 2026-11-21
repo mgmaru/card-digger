@@ -37,15 +37,16 @@ from card_digger.api.schemas import (
     SearchRequest,
     SearchResponse,
     SellerAnalysisResponse,
+    SellerAssessmentPutRequest,
     SellerBreadthResponse,
     SellerEvaluationResponse,
     SellerItemsResponse,
     SellerKnowledgeResponse,
     SellerListEntryResponse,
-    SellerAssessmentPutRequest,
     SellerListPutRequest,
     SellerListsResponse,
     SellerResponse,
+    ShelfConditionsResponse,
 )
 from card_digger.application.access import (
     MarketplaceAccess,
@@ -317,6 +318,10 @@ def create_app(
         Asked once for each seller a search turned up, so it is the same
         collection as the analysis above run shallowly. Three requests instead
         of up to twelve, and no listings in the answer.
+
+        The two pages are read through the search limited to the seller, not
+        through their listing page: the same request count, and each listing
+        then says how worn it is.
         """
         analysis = await reaching_out.collect(
             seller_evaluation_key(seller_id),
@@ -328,6 +333,7 @@ def create_app(
                 gate=reaching_out.gate(),
                 limits=SELLER_EVALUATION_LIMITS,
                 ask_whether_inactive=False,
+                through_search=True,
             ),
         )
         if analysis.seller is None:
@@ -347,6 +353,8 @@ def create_app(
             breadth=SellerBreadthResponse.of(seller_breadth(knowledge)),
             on_sale_meta=CollectionMetaResponse.of(analysis.on_sale.meta),
             sold_out_meta=CollectionMetaResponse.of(analysis.sold_out.meta),
+            on_sale_conditions=ShelfConditionsResponse.of(analysis.on_sale),
+            sold_out_conditions=ShelfConditionsResponse.of(analysis.sold_out),
         )
 
     def _both_lists() -> SellerListsResponse:

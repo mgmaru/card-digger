@@ -17,6 +17,7 @@ from card_digger.domain.models import (
     Seller,
     SellerItemsPage,
     SellerListEntry,
+    SellerShelfPage,
 )
 
 
@@ -91,6 +92,34 @@ class MarketplacePort(Protocol):
 
         `ListingStatus.UNKNOWN` is not a request. It describes what came back,
         so asking for it is rejected as invalid input.
+        """
+        ...
+
+    async def search_seller_items_page(
+        self,
+        seller_id: str,
+        status: ListingStatus,
+        cursor: str | None = None,
+    ) -> SellerShelfPage:
+        """One page of a seller's listings in one status, **with conditions**.
+
+        The search, limited to one seller, rather than the seller's listing
+        page. It is here because the listing page does not say how worn a
+        listing is and a search result does. One page is also larger: up to
+        120 listings where the listing page gives 30.
+
+        Only `ON_SALE` and `SOLD_OUT` can be asked for. Asked for `SOLD_OUT`,
+        the marketplace's search also returns listings still in `TRADING`;
+        they come back as `TRADING` and are not relabelled.
+
+        **Every listing returned is the asked seller's, or the call fails.** A
+        search that ignored the limit would still answer with listings in it,
+        and counting somebody else's shelf as this seller's is worse than
+        counting nothing.
+
+        A seller who does not exist is an empty page and not an error: a
+        search cannot tell "no such seller" from "nothing listed". Ask
+        `get_seller` first.
         """
         ...
 

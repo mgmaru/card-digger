@@ -35,6 +35,7 @@ from card_digger.domain.models import (
     SearchPage,
     Seller,
     SellerItemsPage,
+    SellerShelfPage,
 )
 
 
@@ -101,6 +102,13 @@ _REQUESTABLE_STATUSES = {
 }
 _STATUS_PREFIX = "ITEM_STATUS_"
 
+#: The statuses a search can be limited to, as the fork names them. There is
+#: no `TRADING`: the fork adds it to a `SOLD_OUT` search by itself.
+_SEARCHABLE_STATUSES = {
+    ListingStatus.ON_SALE: SearchRequestData.Status.STATUS_ON_SALE,
+    ListingStatus.SOLD_OUT: SearchRequestData.Status.STATUS_SOLD_OUT,
+}
+
 
 class MercapiClient(Protocol):
     """The part of the fork's public API this adapter uses.
@@ -120,6 +128,7 @@ class MercapiClient(Protocol):
         price_min: int | None = ...,
         price_max: int | None = ...,
         page_token: str | None = ...,
+        seller_ids: Sequence[str] = ...,
     ) -> SearchResults: ...
 
     async def item(self, id_: str) -> Item | None: ...
@@ -261,9 +270,14 @@ def _search_condition(condition_id: Any) -> ItemCondition | None:
     return ItemCondition(id=number, name=ITEM_CONDITIONS.get(number))
 
 
-def item_from_search_result(raw: Any) -> MarketplaceItem:
-    """Normalise one entry of a search page."""
-    operation = Operation.SEARCH
+def item_from_search_result(
+    raw: Any, operation: Operation = Operation.SEARCH
+) -> MarketplaceItem:
+    """Normalise one entry of a search page.
+
+    `operation` is what a failure is reported as. A search limited to one
+    seller is that seller's listings to whoever asked, not a search.
+    """
     item_id = _required(getattr(raw, "id_", None), "id", operation)
     format_ = sale_format(getattr(raw, "auction", None), SEARCH_AUCTION_FIELDS)
     image_urls = _image_urls(
@@ -535,6 +549,57 @@ class MercariAdapter:
             ),
         )
 
+    async def search_seller_items_page(
+        self,
+        seller_id: str,
+        status: ListingStatus,
+        cursor: str | None = None,
+    ) -> SellerShelfPage:
+        operation = _seller_operation(status)
+        search_status = _SEARCHABLE_STATUSES.get(status)
+        if search_status is None:
+            raise MarketplaceError(
+                ErrorCode.INVALID_INPUT, operation, "status cannot be searched"
+            )
+        asked = seller_id.strip()
+        if not asked:
+            raise MarketplaceError(ErrorCode.INVALID_INPUT, operation, "empty seller id")
+
+        results = await self._call(
+            operation,
+            self._client.search(
+                # No keyword: the whole shelf, not the part that matches a word.
+                "",
+                seller_ids=[asked],
+                # The same pair as the keyword search, for the same reason: it
+                # is the only time order the search accepts.
+                sort_by=SearchRequestData.SortBy.SORT_CREATED_TIME,
+                sort_order=SearchRequestData.SortOrder.ORDER_DESC,
+                status=[search_status],
+                page_token=cursor,
+            ),
+        )
+
+        meta = _required(getattr(results, "meta", None), "meta", operation)
+        token = getattr(meta, "next_page_token", None)
+        next_cursor = token or None
+        items = tuple(
+            item_from_search_result(entry, operation) for entry in (results.items or ())
+        )
+        # Checked, not trusted. Mercari honoured the limit when it was observed
+        # (160 of 160, one seller), but a limit it ignored would look exactly
+        # like this: a 200 with listings in it.
+        if any(item.seller_id != asked for item in items):
+            raise _parse_error(
+                operation, "a search limited to one seller returned another's listing"
+            )
+        return SellerShelfPage(
+            items=items,
+            requested_status=status,
+            page_info=PageInfo(has_next=next_cursor is not None, next_cursor=next_cursor),
+            found_count=_found_count(getattr(meta, "num_found", None)),
+        )
+
     @staticmethod
     async def _call(operation: Operation, awaitable: Any) -> Any:
         """Run one fork call, turning any failure into a classified error."""
@@ -546,6 +611,18 @@ class MercariAdapter:
             raise
         except Exception as exc:
             raise MarketplaceError(classify(exc), operation) from exc
+
+
+def _found_count(raw: Any) -> int | None:
+    """The marketplace's own count of matching listings, or nothing.
+
+    A count that is missing or is not a count stays `None`. It is shown beside
+    how many were read, and a guessed total there would say how much was left
+    unread without anybody having said it.
+    """
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        return None
+    return raw
 
 
 def _seller_operation(status: ListingStatus) -> Operation:

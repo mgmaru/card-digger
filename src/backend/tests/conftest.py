@@ -201,6 +201,7 @@ from card_digger.domain.models import (  # noqa: E402
     SaleFormat,
     SearchPage,
     SellerItemsPage as DomainSellerItemsPage,
+    SellerShelfPage,
 )
 
 DEFAULT_CREATED_AT = datetime(2026, 8, 1, tzinfo=timezone.utc)
@@ -260,6 +261,22 @@ def make_seller_page(
     )
 
 
+def make_shelf_page(
+    items,
+    status: ListingStatus,
+    *,
+    next_cursor: str | None = None,
+    found_count: int | None = None,
+) -> SellerShelfPage:
+    """A page of a seller's listings as the search limited to them returns it."""
+    return SellerShelfPage(
+        items=tuple(items),
+        requested_status=status,
+        page_info=PageInfo(has_next=next_cursor is not None, next_cursor=next_cursor),
+        found_count=found_count,
+    )
+
+
 class ScriptedPort:
     """A `MarketplacePort` that answers from a prepared script.
 
@@ -274,6 +291,7 @@ class ScriptedPort:
         search: Sequence[Any] | Any = None,
         seller: Sequence[Any] | Any = None,
         seller_pages: dict[ListingStatus, Sequence[Any]] | None = None,
+        shelf_pages: dict[ListingStatus, Sequence[Any]] | None = None,
         item: Sequence[Any] | Any = None,
     ) -> None:
         self._search = _as_list(search)
@@ -281,6 +299,12 @@ class ScriptedPort:
         self._item = _as_list(item)
         self._seller_pages = {
             status: list(pages) for status, pages in (seller_pages or {}).items()
+        }
+        # The same listings read through the search limited to the seller.
+        # Scripted apart from `seller_pages`, so a test says which of the two
+        # ways it expects to be asked.
+        self._shelf_pages = {
+            status: list(pages) for status, pages in (shelf_pages or {}).items()
         }
         self.calls: list[Call] = []
 
@@ -309,6 +333,15 @@ class ScriptedPort:
             f"seller_items:{status.value}",
             (seller_id, status, cursor),
             self._seller_pages.get(status, []),
+        )
+
+    async def search_seller_items_page(
+        self, seller_id: str, status: ListingStatus, cursor: str | None = None
+    ):
+        return self._next(
+            f"seller_shelf:{status.value}",
+            (seller_id, status, cursor),
+            self._shelf_pages.get(status, []),
         )
 
     def calls_to(self, method: str) -> list[Call]:

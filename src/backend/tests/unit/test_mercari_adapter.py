@@ -254,6 +254,212 @@ class TestSellerItemsResponse:
         assert page.requested_status is ListingStatus.SOLD_OUT
 
 
+class TestSellerShelfRequest:
+    """A seller's listings through the search limited to them.
+
+    The same request as a keyword search with two differences: no keyword, and
+    one seller. What comes back carries each listing's condition, which the
+    seller's own listing page does not.
+    """
+
+    async def test_asks_the_search_for_one_seller_and_no_keyword(self):
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        sent = client.calls_to("search")[0]
+        # The whole shelf, not the part of it that matches a word.
+        assert sent.args == ("",)
+        assert sent.kwargs["seller_ids"] == [SELLER_ID]
+        assert sent.kwargs["status"] == [SearchRequestData.Status.STATUS_ON_SALE]
+        assert sent.kwargs["sort_by"] is SearchRequestData.SortBy.SORT_CREATED_TIME
+        assert sent.kwargs["sort_order"] is SearchRequestData.SortOrder.ORDER_DESC
+
+    async def test_it_does_not_ask_for_the_listing_page(self):
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert client.calls_to("items_page") == []
+        assert len(client.calls) == 1
+
+    async def test_sold_listings_are_asked_for_as_sold_out(self):
+        port, client = adapter(
+            search=search_results("search/by_seller_sold_out_end.json")
+        )
+
+        await port.search_seller_items_page(SELLER_ID, ListingStatus.SOLD_OUT)
+
+        assert client.calls_to("search")[0].kwargs["status"] == [
+            SearchRequestData.Status.STATUS_SOLD_OUT
+        ]
+
+    async def test_passes_the_cursor_on(self):
+        port, client = adapter(search=search_results("search/by_seller_page_2_end.json"))
+
+        await port.search_seller_items_page(
+            SELLER_ID, ListingStatus.ON_SALE, "cursor-page-2"
+        )
+
+        assert client.calls_to("search")[0].kwargs["page_token"] == "cursor-page-2"
+
+    async def test_trims_the_seller_id(self):
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_seller_items_page(f"  {SELLER_ID} ", ListingStatus.ON_SALE)
+
+        assert client.calls_to("search")[0].kwargs["seller_ids"] == [SELLER_ID]
+
+    @pytest.mark.parametrize(
+        "status", [ListingStatus.TRADING, ListingStatus.UNKNOWN]
+    )
+    async def test_a_status_the_search_cannot_be_limited_to_is_refused(self, status):
+        """`TRADING` comes back with a sold out search. It cannot be asked for."""
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page(SELLER_ID, status)
+
+        assert raised.value.code is ErrorCode.INVALID_INPUT
+        assert client.calls == []
+
+    async def test_an_empty_seller_never_reaches_the_marketplace(self):
+        """An empty list is how the search spells "every seller"."""
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page("   ", ListingStatus.ON_SALE)
+
+        assert raised.value.code is ErrorCode.INVALID_INPUT
+        assert client.calls == []
+
+
+class TestSellerShelfResponse:
+    async def test_every_listing_says_how_worn_it_is(self):
+        port, _ = adapter(search=search_results("search/page_1_has_next.json"))
+
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert [item.item_condition.name for item in page.items] == [
+            "目立った傷や汚れなし",
+            "新品、未使用",
+        ]
+
+    async def test_the_status_asked_for_is_reported_back(self):
+        port, _ = adapter(search=search_results("search/by_seller_sold_out_end.json"))
+
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.SOLD_OUT)
+
+        assert page.requested_status is ListingStatus.SOLD_OUT
+
+    async def test_a_listing_in_trading_comes_back_as_trading(self):
+        """A sold out search brings these along. They are not relabelled."""
+        port, _ = adapter(search=search_results("search/by_seller_sold_out_end.json"))
+
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.SOLD_OUT)
+
+        assert [item.listing_status for item in page.items] == [
+            ListingStatus.SOLD_OUT,
+            ListingStatus.TRADING,
+        ]
+
+    async def test_it_carries_the_total_the_marketplace_reported(self):
+        port, _ = adapter(search=search_results("search/page_1_has_next.json"))
+
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        # Three in all, two of them on this page.
+        assert page.found_count == 3
+        assert len(page.items) == 2
+
+    async def test_a_token_leads_to_the_next_page_and_an_empty_one_ends_it(self):
+        port, _ = adapter(
+            search=[
+                search_results("search/page_1_has_next.json"),
+                search_results("search/by_seller_page_2_end.json"),
+            ]
+        )
+
+        first = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+        second = await port.search_seller_items_page(
+            SELLER_ID, ListingStatus.ON_SALE, first.page_info.next_cursor
+        )
+
+        assert first.page_info.next_cursor == "cursor-page-2"
+        assert second.page_info.has_next is False
+        assert second.page_info.next_cursor is None
+
+    async def test_a_page_with_no_items_is_still_an_answer(self):
+        """Nothing listed, or nobody by that id. A search cannot say which."""
+        port, _ = adapter(search=search_results("search/empty_end.json"))
+
+        page = await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert page.items == ()
+        assert page.page_info.has_next is False
+
+    async def test_another_sellers_listing_is_a_parse_error(self):
+        """What an ignored limit would look like: a 200 with listings in it.
+
+        `search/page_2_end.json` holds a listing of seller 100000002.
+        """
+        port, _ = adapter(search=search_results("search/page_2_end.json"))
+
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert raised.value.code is ErrorCode.PARSE_ERROR
+        assert raised.value.operation is Operation.SELLER_ON_SALE
+
+    @pytest.mark.parametrize(
+        ("status", "operation"),
+        [
+            (ListingStatus.ON_SALE, Operation.SELLER_ON_SALE),
+            (ListingStatus.SOLD_OUT, Operation.SELLER_SOLD_OUT),
+        ],
+    )
+    async def test_a_failure_is_reported_as_the_sellers_listings(self, status, operation):
+        """To whoever asked, this is a seller's shelf. Not a search."""
+        port, _ = adapter(search=status_error(429))
+
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page(SELLER_ID, status)
+
+        assert raised.value.code is ErrorCode.RATE_LIMITED_429
+        assert raised.value.operation is operation
+
+    async def test_a_listing_that_cannot_be_read_is_reported_the_same_way(self):
+        port, _ = adapter(search=search_results("search/missing_created.json"))
+
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert raised.value.code is ErrorCode.PARSE_ERROR
+        assert raised.value.operation is Operation.SELLER_ON_SALE
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [(3, 3), (0, 0), (None, None), (-1, None), ("3", None), (True, None)],
+    )
+    def test_a_total_that_is_not_a_count_is_unknown(self, raw, expected):
+        from card_digger.adapters.mercari import _found_count
+
+        assert _found_count(raw) == expected
+
+
+class TestSellerListingPage:
+    async def test_a_listing_page_entry_carries_no_condition(self):
+        """Mercari does not send one there, under any name (2026-11-20)."""
+        port, _ = adapter(
+            items_page=seller_items_page("seller_items/page_2_end.json")
+        )
+
+        page = await port.get_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert page.items
+        assert all(item.item_condition is None for item in page.items)
+
+
 class TestMissingResources:
     async def test_a_missing_item_is_not_found(self):
         port, _ = adapter(item=ABSENT)

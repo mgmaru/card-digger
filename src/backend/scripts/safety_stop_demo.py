@@ -126,6 +126,18 @@ class RefusesFirst:
         )
         return await self._answering.get_seller_items_page(seller_id, status, cursor)
 
+    async def search_seller_items_page(
+        self, seller_id: str, status: ListingStatus, cursor: str | None = None
+    ):
+        self._reaching_out(
+            Operation.SELLER_SOLD_OUT
+            if status is ListingStatus.SOLD_OUT
+            else Operation.SELLER_ON_SALE
+        )
+        return await self._answering.search_seller_items_page(
+            seller_id, status, cursor
+        )
+
 
 def refusing_marketplace(refuse_first: int = DEFAULT_REFUSE_FIRST) -> RefusesFirst:
     """The acceptance seed, behind a refusal that wears off."""
