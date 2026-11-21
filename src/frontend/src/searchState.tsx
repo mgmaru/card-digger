@@ -23,6 +23,11 @@ import {
 } from "react";
 
 import { ApiError, search as requestSearch } from "./api/client";
+import {
+  ANY_CONDITION,
+  conditionIdsUpTo,
+  type WorstCondition,
+} from "./itemConditions";
 import { conditionChoices } from "./searchQuery";
 import {
   EMPTY_FILTER_FORM,
@@ -147,7 +152,17 @@ export type SearchState = {
    */
   /** The band the current result was collected under, for the record to show. */
   band: PriceBand;
-  runSearch: (keyword: string, band: PriceBand) => Promise<void>;
+  /**
+   * The most worn condition the current result was collected under, `""` for
+   * any. Kept beside the band for the same reason: the record describes what
+   * was asked, and the form above may already say something else.
+   */
+  fetchCondition: WorstCondition;
+  runSearch: (
+    keyword: string,
+    band: PriceBand,
+    worstCondition?: WorstCondition,
+  ) => Promise<void>;
   setSort: (sort: SortKey) => void;
   setFilterForm: (values: FilterFormValues) => void;
 };
@@ -160,6 +175,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [band, setBand] = useState<PriceBand>(NO_BAND);
+  const [fetchCondition, setFetchCondition] = useState<WorstCondition>(ANY_CONDITION);
   const [sort, setSort] = useState<SortKey>(INITIAL_SORT);
   const [filterForm, setFilterForm] = useState<FilterFormValues>(
     EMPTY_FILTER_FORM,
@@ -178,47 +194,59 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   // search at a time; the backend does not rely on this holding.
   const inFlight = useRef(false);
 
-  const runSearch = useCallback(async (next: string, nextBand: PriceBand) => {
-    if (inFlight.current) {
-      return;
-    }
-    inFlight.current = true;
+  const runSearch = useCallback(
+    async (
+      next: string,
+      nextBand: PriceBand,
+      nextCondition: WorstCondition = ANY_CONDITION,
+    ) => {
+      if (inFlight.current) {
+        return;
+      }
+      inFlight.current = true;
 
-    setStatus("loading");
-    setKeyword(next);
-    setBand(nextBand);
-    // Section 5.2: a new search does not mix with the previous result.
-    setResult(null);
-    setError(null);
+      setStatus("loading");
+      setKeyword(next);
+      setBand(nextBand);
+      setFetchCondition(nextCondition);
+      // Section 5.2: a new search does not mix with the previous result.
+      setResult(null);
+      setError(null);
 
-    try {
-      const response = await requestSearch(next, nextBand);
-      setResult(response);
-      // The condition options are built from the result, so a grade chosen
-      // against the last one may not exist in this one. Left alone, the
-      // select would fall back to すべて while the filter kept removing
-      // listings — the screen would describe a filter it was not applying,
-      // which is the same failure that keeps `filterForm` out of the route.
-      // Every other field means the same thing whatever came back, so only
-      // this one is let go, and only when its grade is gone.
-      const offered = new Set(
-        conditionChoices(response.items).map((choice) => choice.id),
-      );
-      setFilterForm((form) =>
-        form.worstCondition === "" || offered.has(form.worstCondition)
-          ? form
-          : { ...form, worstCondition: "" },
-      );
-      setStatus("success");
-    } catch (cause) {
-      setError(
-        cause instanceof ApiError ? cause : new ApiError("unexpected"),
-      );
-      setStatus("error");
-    } finally {
-      inFlight.current = false;
-    }
-  }, []);
+      try {
+        const response = await requestSearch(
+          next,
+          nextBand,
+          conditionIdsUpTo(nextCondition),
+        );
+        setResult(response);
+        // The condition options are built from the result, so a grade chosen
+        // against the last one may not exist in this one. Left alone, the
+        // select would fall back to すべて while the filter kept removing
+        // listings — the screen would describe a filter it was not applying,
+        // which is the same failure that keeps `filterForm` out of the route.
+        // Every other field means the same thing whatever came back, so only
+        // this one is let go, and only when its grade is gone.
+        const offered = new Set(
+          conditionChoices(response.items).map((choice) => choice.id),
+        );
+        setFilterForm((form) =>
+          form.worstCondition === "" || offered.has(form.worstCondition)
+            ? form
+            : { ...form, worstCondition: "" },
+        );
+        setStatus("success");
+      } catch (cause) {
+        setError(
+          cause instanceof ApiError ? cause : new ApiError("unexpected"),
+        );
+        setStatus("error");
+      } finally {
+        inFlight.current = false;
+      }
+    },
+    [],
+  );
 
   const value = useMemo<SearchState>(
     () => ({
@@ -228,6 +256,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       error,
       sort,
       band,
+      fetchCondition,
       filterForm,
       filters,
       filterErrors,
@@ -242,6 +271,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       error,
       sort,
       band,
+      fetchCondition,
       filterForm,
       filters,
       filterErrors,

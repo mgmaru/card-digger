@@ -27,6 +27,11 @@ narrows that population, and the same budget then reaches further back into it
 — far enough, if the band is small enough, to run out of results altogether.
 `END_OF_RESULTS` is the only stop reason that means nothing was missed.
 
+**The condition is a second lever of the same kind.** Asking only for listings
+in good condition takes the worn ones out of the population before it is
+ordered, so the budget is not spent reading past them. Filtering by condition
+on the screen cannot do this: it only removes listings already collected.
+
 What comes back is never "the oldest listings on Mercari". It is the range this
 run happened to reach, and the metadata says so.
 """
@@ -34,6 +39,7 @@ run happened to reach, and the metadata says so.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 from card_digger.application.collection import (
     Collected,
@@ -69,6 +75,7 @@ async def collect_search(
     gate: RequestGate | None = None,
     price_min: int | None = None,
     price_max: int | None = None,
+    condition_ids: Sequence[str] = (),
     limits: CollectionLimits = SEARCH_LIMITS,
     old_listing_days: int = OLD_LISTING_DAYS,
 ) -> SearchCollection:
@@ -77,7 +84,11 @@ async def collect_search(
 
     async def fetch(cursor: str | None):
         page = await port.search_items_page(
-            keyword, cursor, price_min=price_min, price_max=price_max
+            keyword,
+            cursor,
+            price_min=price_min,
+            price_max=price_max,
+            condition_ids=tuple(condition_ids),
         )
         return page.items, page.page_info
 

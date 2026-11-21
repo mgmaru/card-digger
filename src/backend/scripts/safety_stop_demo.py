@@ -102,10 +102,15 @@ class RefusesFirst:
         *,
         price_min: int | None = None,
         price_max: int | None = None,
+        condition_ids=(),
     ):
         self._reaching_out(Operation.SEARCH)
         return await self._answering.search_items_page(
-            keyword, cursor, price_min=price_min, price_max=price_max
+            keyword,
+            cursor,
+            price_min=price_min,
+            price_max=price_max,
+            condition_ids=condition_ids,
         )
 
     async def get_item(self, item_id: str):

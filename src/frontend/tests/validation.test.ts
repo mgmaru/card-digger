@@ -79,11 +79,20 @@ describe("the question put to Mercari", () => {
     ).toBe(true);
   });
 
+  it("passes the condition through, and reads anything else as none", () => {
+    const chosen = validateSearch(query({ keyword: "ポケカ", worstCondition: "3" }));
+    const other = validateSearch(query({ keyword: "ポケカ", worstCondition: "9" }));
+
+    expect(chosen.ok && chosen.worstCondition).toBe("3");
+    expect(other.ok && other.worstCondition).toBe("");
+  });
+
   it("reports every bad field at once", () => {
     const result = validateSearch({
       keyword: "",
       minPriceYen: "x",
       maxPriceYen: "y",
+      worstCondition: "",
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;

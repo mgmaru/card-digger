@@ -222,7 +222,12 @@ export function FindSellersPage() {
     // search screen's own rule. A stand-in keyword keeps a keyword error from
     // being reported here as well as below.
     let band: PriceBand = NO_BAND;
-    const banded = validateSearch({ keyword: "x", minPriceYen, maxPriceYen });
+    const banded = validateSearch({
+      keyword: "x",
+      minPriceYen,
+      maxPriceYen,
+      worstCondition: "",
+    });
     if (banded.ok) {
       band = banded.band;
     } else {
@@ -238,7 +243,12 @@ export function FindSellersPage() {
     // because "one of these is too long" leaves the reader to find which.
     if (!found.keywords) {
       for (const keyword of typed) {
-        const checked = validateSearch({ keyword, minPriceYen: "", maxPriceYen: "" });
+        const checked = validateSearch({
+          keyword,
+          minPriceYen: "",
+          maxPriceYen: "",
+          worstCondition: "",
+        });
         if (!checked.ok && checked.errors.keyword) {
           found.keywords = `「${keyword.slice(0, 20)}」: ${checked.errors.keyword}`;
           break;

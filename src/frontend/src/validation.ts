@@ -19,6 +19,7 @@
  * these are written here, and they say what to do rather than what is wrong.
  */
 
+import { asWorstCondition, type WorstCondition } from "./itemConditions";
 import { isCalendarDate } from "./jst";
 import type { Filters, SaleFormatFilter } from "./searchState";
 
@@ -40,12 +41,15 @@ export type SearchFormValues = {
   keyword: string;
   minPriceYen: string;
   maxPriceYen: string;
+  /** The most worn condition to collect, as the select holds it. `""` is any. */
+  worstCondition: string;
 };
 
 export const EMPTY_SEARCH_FORM: SearchFormValues = {
   keyword: "",
   minPriceYen: "",
   maxPriceYen: "",
+  worstCondition: "",
 };
 
 export type PriceBand = {
@@ -106,7 +110,7 @@ function parseDate(raw: string): string | null | "invalid" {
 }
 
 export type SearchValidation =
-  | { ok: true; keyword: string; band: PriceBand }
+  | { ok: true; keyword: string; band: PriceBand; worstCondition: WorstCondition }
   | { ok: false; errors: SearchErrors };
 
 /**
@@ -145,6 +149,9 @@ export function validateSearch(values: SearchFormValues): SearchValidation {
     ok: true,
     keyword,
     band: { minPriceYen: min as number | null, maxPriceYen: max as number | null },
+    // A select cannot hold a value that is not one of its options, so there
+    // is nothing to tell the reader. A value from anywhere else is "any".
+    worstCondition: asWorstCondition(values.worstCondition),
   };
 }
 

@@ -11,6 +11,10 @@
  * cannot be reversed. Changing it therefore costs a collection, and a control
  * that costs one belongs next to the button that pays.
  *
+ * The condition is here for the same reason. Asked for, it takes the worn
+ * listings out of the population before Mercari orders it. The filter of the
+ * same name below the results is free and reaches no further.
+ *
  * The listing date and the sale format stay below with the results, where
  * they are free.
  *
@@ -20,6 +24,7 @@
 
 import { useId, type FormEvent } from "react";
 
+import { WORST_CONDITION_CHOICES } from "../itemConditions";
 import {
   KEYWORD_MAX_LENGTH,
   type SearchErrors,
@@ -145,6 +150,32 @@ export function SearchForm({
           />
           <span className={styles.unit}>円</span>
         </div>
+
+        {/* Here and not with the results, for the reason the band is here:
+            Mercari applies it before ordering and paging, so it changes what
+            the collection can reach, and changing it costs a collection. The
+            filter of the same name under the results only hides what was
+            already collected. */}
+        <div className={styles.field}>
+          {/* Not 商品の状態 alone: the filter under the results has that
+              name, and two controls with one name on one screen cannot be
+              told apart by somebody who hears them read out. */}
+          <label className={styles.label} htmlFor={field("condition")}>
+            取得する商品の状態
+          </label>
+          <select
+            id={field("condition")}
+            className={styles.condition}
+            value={values.worstCondition}
+            onChange={(event) => set("worstCondition", event.target.value)}
+          >
+            {WORST_CONDITION_CHOICES.map((choice) => (
+              <option key={choice.value} value={choice.value}>
+                {choice.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {(["keyword", "minPriceYen", "maxPriceYen"] as const)
@@ -165,6 +196,7 @@ export function SearchForm({
       <p className={styles.fixed}>{KEYWORD_SCOPE}</p>
       <p className={styles.fixed}>
         販売中の商品だけを取得します。価格を狭めるほど、更新されていない古い出品まで遡れます。
+        商品の状態を指定したときも同じで、その状態の出品だけを取得します。
       </p>
 
       {showExamples && (

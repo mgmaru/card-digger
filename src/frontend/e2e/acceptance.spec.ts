@@ -203,6 +203,51 @@ test("the ten step acceptance flow", async ({ page }) => {
 });
 
 /**
+ * The condition as part of the question, and not as a view of the answer.
+ *
+ * Asked for, it is applied by the marketplace before it pages, so the listings
+ * outside it are never collected. The filter of the same name under the
+ * results is exercised in the flow above and only hides what is on screen.
+ */
+test("collecting only listings in good condition", async ({ page }) => {
+  const searches: unknown[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/search")) {
+      searches.push(request.postDataJSON());
+    }
+  });
+
+  await page.goto("/");
+  await page.getByLabel("キーワード").fill(KEYWORD);
+  await page
+    .getByLabel("取得する商品の状態")
+    .selectOption({ label: "目立った傷や汚れなし以上" });
+  // Choosing changes the question. It is asked from the button.
+  expect(searches).toEqual([]);
+
+  await page.getByRole("button", { name: "検索" }).click();
+  const record = page.getByLabel("取得範囲");
+  await expect(record).toBeVisible();
+
+  // The backend was asked for three conditions, and collected only those:
+  // six of the twelve listings the keyword finds.
+  expect(searches).toEqual([
+    {
+      keyword: KEYWORD,
+      minPriceYen: null,
+      maxPriceYen: null,
+      conditionIds: ["1", "2", "3"],
+    },
+  ]);
+  await expect(card(page)).toHaveCount(6);
+  await expect(record).toContainText("Mercariから 6件");
+  await expect(record).toContainText("指定した商品の状態: 目立った傷や汚れなし以上");
+  // Narrowed by the marketplace, so nothing came back outside the condition.
+  await expect(record).not.toContainText("合わない出品");
+  await expect(card(page).getByText("傷や汚れあり")).toHaveCount(0);
+});
+
+/**
  * Section 3.3 asks for the main operations to be reachable by keyboard.
  *
  * Not a mouse-free version of the flow above: what is checked is that the

@@ -76,6 +76,11 @@ def _mercari_port() -> MercariAdapter:
             if call.kwargs.get("page_token"):
                 return search_results("search/by_seller_page_2_end.json")
             return search_results("search/page_1_has_next.json")
+        if call.kwargs.get("item_conditions") == [3]:
+            # Only listings in the condition asked for, as Mercari would.
+            return search_results("search/condition_3_end.json")
+        if call.kwargs.get("item_conditions"):
+            return search_results("search/empty_end.json")
         return (
             search_results("search/page_2_end.json")
             if call.kwargs.get("page_token")
@@ -186,6 +191,43 @@ class TestSearch:
     async def test_an_empty_keyword_is_invalid_input(self, port):
         with pytest.raises(MarketplaceError) as raised:
             await port.search_items_page("   ")
+
+        assert raised.value.code is ErrorCode.INVALID_INPUT
+
+
+class TestSearchByCondition:
+    """Asking only for listings in some conditions.
+
+    The mock narrows before it pages, as the marketplace does. Agreeing with
+    an implementation that narrowed afterwards would mean the acceptance flow
+    passes on a filter that reaches no further than the one on the screen.
+    """
+
+    async def test_only_listings_in_a_condition_asked_for_come_back(self, port):
+        page = await port.search_items_page(KEYWORD, condition_ids=("3",))
+
+        assert page.items
+        assert {item.item_condition.id for item in page.items} == {"3"}
+
+    async def test_a_condition_nothing_is_in_is_an_empty_page_and_not_an_error(self, port):
+        page = await port.search_items_page(KEYWORD, condition_ids=("6",))
+
+        assert page.items == ()
+        assert page.page_info.has_next is False
+
+    async def test_no_condition_is_any_condition(self, port):
+        with_none = await port.search_items_page(KEYWORD)
+        with_empty = await port.search_items_page(KEYWORD, condition_ids=())
+
+        assert [item.id for item in with_none.items] == [
+            item.id for item in with_empty.items
+        ]
+        assert with_none.items
+
+    @pytest.mark.parametrize("unknown", ["0", "7", "x"])
+    async def test_a_number_with_no_condition_is_invalid_input(self, port, unknown):
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_items_page(KEYWORD, condition_ids=(unknown,))
 
         assert raised.value.code is ErrorCode.INVALID_INPUT
 

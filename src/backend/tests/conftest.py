@@ -315,9 +315,16 @@ class ScriptedPort:
         *,
         price_min: int | None = None,
         price_max: int | None = None,
+        condition_ids: Sequence[str] = (),
     ):
+        # The conditions are recorded beside the arguments rather than among
+        # them, so the tests written before there was a condition still read
+        # the four they were written against.
         return self._next(
-            "search", (keyword, cursor, price_min, price_max), self._search
+            "search",
+            (keyword, cursor, price_min, price_max),
+            self._search,
+            {"condition_ids": tuple(condition_ids)},
         )
 
     async def get_item(self, item_id: str):
@@ -347,8 +354,14 @@ class ScriptedPort:
     def calls_to(self, method: str) -> list[Call]:
         return [call for call in self.calls if call.method == method]
 
-    def _next(self, method: str, args: tuple, answers: Sequence[Any]) -> Any:
-        self.calls.append(Call(method=method, args=args, kwargs={}))
+    def _next(
+        self,
+        method: str,
+        args: tuple,
+        answers: Sequence[Any],
+        kwargs: dict | None = None,
+    ) -> Any:
+        self.calls.append(Call(method=method, args=args, kwargs=dict(kwargs or {})))
         if not answers:
             raise AssertionError(f"the test prepared no answer for {method}")
         index = min(len(self.calls_to(method)) - 1, len(answers) - 1)
