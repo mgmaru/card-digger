@@ -51,6 +51,7 @@ upstream commit `20ba68fd42677997c4c91b4e4eb17c1e7e387efa`）で出力した構�
 | `search/missing_updated.json` | derived | `search/page_1_has_next.json` | 検索 | 更新日時欠落をParse Errorにする |
 | `search/missing_image.json` | derived | `search/page_1_has_next.json` | 検索 | 画像URL欠落をParse Errorにする |
 | `search/no_price.json` | derived | `search/page_1_has_next.json` | 検索 | `isNoPrice`のPlaceholder価格を実価格として扱わない |
+| `search/condition_3_end.json` | derived | `search/page_1_has_next.json` | 検索 | 商品の状態を指定した検索の応答。全件が指定した番号を持つ。**指定が効いた応答を観測したものではない**（値だけを変えた） |
 | `search/by_seller_page_2_end.json` | derived | `search/page_2_end.json` | 出品者を指定した検索 | 出品者を指定した検索の終端Page。1ページ目には`search/page_1_has_next.json`を使う（2件とも同じ出品者） |
 | `search/by_seller_sold_out_end.json` | derived | `search/statuses.json` | 出品者を指定した検索 | 売却済みの検索が`trading`を一緒に返し、`trading`のまま運ぶ。番号`6`の状態を読む |
 | `item/auction.json` | observed | — | 商品詳細 | `auction_info`の全Fieldを読み、`highest_bid`を価格にする |

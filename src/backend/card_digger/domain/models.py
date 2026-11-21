@@ -35,6 +35,14 @@ class SaleFormat(str, Enum):
     UNKNOWN = "unknown"
 
 
+#: The condition numbers the marketplace has. Six, `1` the least worn.
+#:
+#: Here, and not only in the adapter that knows their names, because asking
+#: for listings by condition is part of the port: every implementation and the
+#: API in front of them has to agree on which numbers can be asked for.
+ITEM_CONDITION_IDS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6")
+
+
 @dataclass(frozen=True)
 class ItemCondition:
     id: str | None

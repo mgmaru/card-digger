@@ -108,6 +108,84 @@ class TestSearchRequest:
         assert client.calls == []
 
 
+class TestSearchByCondition:
+    """Asking Mercari only for listings in some conditions.
+
+    Applied by Mercari before it orders and pages, like the price band. So the
+    collection budget is spent on listings in those conditions and reaches
+    further back among them, which filtering on the screen cannot do.
+    """
+
+    async def test_no_condition_is_sent_as_an_empty_list(self):
+        """How the API spells "any condition"."""
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_items_page("sample")
+
+        assert client.calls_to("search")[0].kwargs["item_conditions"] == []
+
+    async def test_the_conditions_are_sent_as_numbers(self):
+        port, client = adapter(search=search_results("search/condition_3_end.json"))
+
+        await port.search_items_page("sample", condition_ids=("1", "2", "3"))
+
+        assert client.calls_to("search")[0].kwargs["item_conditions"] == [1, 2, 3]
+
+    async def test_each_once_and_in_order_however_they_were_given(self):
+        port, client = adapter(search=search_results("search/condition_3_end.json"))
+
+        await port.search_items_page("sample", condition_ids=("3", "1", "3"))
+
+        assert client.calls_to("search")[0].kwargs["item_conditions"] == [1, 3]
+
+    async def test_they_are_sent_with_every_page(self):
+        """A second page without them would be a page of a different search."""
+        port, client = adapter(search=search_results("search/condition_3_end.json"))
+
+        await port.search_items_page("sample", "cursor-page-2", condition_ids=("3",))
+
+        sent = client.calls_to("search")[0].kwargs
+        assert sent["page_token"] == "cursor-page-2"
+        assert sent["item_conditions"] == [3]
+
+    async def test_they_go_with_the_price_band_and_not_instead_of_it(self):
+        port, client = adapter(search=search_results("search/condition_3_end.json"))
+
+        await port.search_items_page(
+            "sample", price_min=3000, price_max=5000, condition_ids=("3",)
+        )
+
+        sent = client.calls_to("search")[0].kwargs
+        assert (sent["price_min"], sent["price_max"]) == (3000, 5000)
+        assert sent["item_conditions"] == [3]
+
+    @pytest.mark.parametrize("unknown", ["0", "7", "x", "", "03"])
+    async def test_a_number_mercari_has_no_condition_for_never_reaches_it(self, unknown):
+        """Ignored, it would read as "any condition" to whoever asked for a few."""
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        with pytest.raises(MarketplaceError) as raised:
+            await port.search_items_page("sample", condition_ids=("3", unknown))
+
+        assert raised.value.code is ErrorCode.INVALID_INPUT
+        assert client.calls == []
+
+    def test_the_numbers_that_can_be_asked_for_are_the_ones_that_have_names(self):
+        """The port's list and the adapter's table are one set."""
+        from card_digger.adapters.mercari import ITEM_CONDITIONS
+        from card_digger.domain.models import ITEM_CONDITION_IDS
+
+        assert tuple(ITEM_CONDITIONS) == ITEM_CONDITION_IDS
+
+    async def test_a_seller_limited_search_asks_for_no_condition(self):
+        """The whole shelf is what a look counts. A condition would hide part."""
+        port, client = adapter(search=search_results("search/page_1_has_next.json"))
+
+        await port.search_seller_items_page(SELLER_ID, ListingStatus.ON_SALE)
+
+        assert "item_conditions" not in client.calls_to("search")[0].kwargs
+
+
 class TestSearchResponse:
     async def test_keeps_the_order_it_was_given(self):
         """The marketplace does not promise oldest first, and neither do we."""

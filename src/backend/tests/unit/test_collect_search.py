@@ -115,6 +115,33 @@ class TestPriceBand:
             ("sample", "p2", 3000, 5000),
         ]
 
+    async def test_the_conditions_go_with_every_page(self, clock, sleeper):
+        """Like the band: a page without them is a page of another search."""
+        clock.moment = NOW
+        port = ScriptedPort(
+            search=[
+                make_search_page(make_items(1), next_cursor="p2"),
+                make_search_page(make_items(1, start=2)),
+            ]
+        )
+
+        await collect_search(
+            port, "sample", clock=clock, sleeper=sleeper, condition_ids=["1", "2", "3"]
+        )
+
+        assert [call.kwargs["condition_ids"] for call in port.calls_to("search")] == [
+            ("1", "2", "3"),
+            ("1", "2", "3"),
+        ]
+
+    async def test_no_condition_is_passed_as_none(self, clock, sleeper):
+        clock.moment = NOW
+        port = ScriptedPort(search=[make_search_page(make_items(1))])
+
+        await collect_search(port, "sample", clock=clock, sleeper=sleeper)
+
+        assert port.calls_to("search")[0].kwargs["condition_ids"] == ()
+
     async def test_one_sided_bands_are_passed_through_as_they_are(
         self, clock, sleeper
     ):
