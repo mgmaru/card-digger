@@ -21,6 +21,8 @@
  * Each card still attaches it to the value itself.
  */
 
+import type { ReactNode } from "react";
+
 import { DORMANCY_AXIS_DAYS } from "../elapsed";
 import type { Item } from "../types/api";
 
@@ -30,9 +32,15 @@ import styles from "./ItemGrid.module.css";
 export function ItemGrid({
   items,
   collectedAt,
+  variant = "search",
+  sellerActions,
 }: {
   items: readonly Item[];
   collectedAt: string;
+  /** A search result, or one seller's listings read through the search. */
+  variant?: "search" | "shelf";
+  /** What each card offers about its listing's seller. Search results only. */
+  sellerActions?: (item: Item) => ReactNode;
 }) {
   // Section 5.6 says the latest auction price is on Mercari, not here. Worth
   // saying only when the reader is actually looking at one.
@@ -60,7 +68,13 @@ export function ItemGrid({
 
       <div className={styles.grid}>
         {items.map((item) => (
-          <ItemCard key={item.id} item={item} collectedAt={collectedAt} />
+          <ItemCard
+            key={item.id}
+            item={item}
+            collectedAt={collectedAt}
+            variant={variant}
+            sellerActions={sellerActions?.(item)}
+          />
         ))}
       </div>
     </>

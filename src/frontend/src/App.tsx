@@ -5,6 +5,7 @@ import { FindSellersPage } from "./pages/FindSellersPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SellerListsPage } from "./pages/SellerListsPage";
 import { SellerPage } from "./pages/SellerPage";
+import { SellerShelfPage } from "./pages/SellerShelfPage";
 import { SearchProvider } from "./searchState";
 import {
   SellerDiscoveryProvider,
@@ -88,6 +89,7 @@ export function AppRoutes() {
       <Routes>
         <Route path="/" element={<SearchPage />} />
         <Route path="/sellers/:sellerId" element={<SellerPage />} />
+        <Route path="/sellers/:sellerId/shelf" element={<SellerShelfPage />} />
         <Route path="/find-sellers" element={<FindSellersPage />} />
         <Route path="/seller-lists" element={<SellerListsPage />} />
       </Routes>

@@ -1,0 +1,29 @@
+/* 値は tokens.css の変数だけを使う。理由は docs/product/design-tokens.md。 */
+
+.action,
+.listed {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-note);
+}
+
+/* Cardは何十枚も並ぶ。墨で塗ったButtonが並ぶと、画像より先に目に入る。枠だけにする。 */
+.save {
+  background: none;
+  color: var(--ink);
+  border-color: var(--ink-quiet);
+  font-size: var(--text-note);
+}
+
+.save:hover {
+  background: var(--sheet);
+}
+
+.save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* どちらのリストにあるかは事実であって操作ではない。 */
+.listed {
+  color: var(--ink-quiet);
+}
