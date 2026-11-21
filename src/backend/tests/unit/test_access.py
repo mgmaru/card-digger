@@ -12,7 +12,13 @@ import asyncio
 import pytest
 from conftest import FrozenClock, RecordingSleeper
 
-from card_digger.application.access import MarketplaceAccess, search_key, seller_key
+from card_digger.application.access import (
+    MarketplaceAccess,
+    search_key,
+    seller_evaluation_key,
+    seller_key,
+    seller_shelf_key,
+)
 from card_digger.application.collection import (
     CONSECUTIVE_REFUSALS_BEFORE_STOP,
     SAFETY_STOP_COOLDOWN_SECONDS,
@@ -241,6 +247,13 @@ def _counting(calls: list):
 class TestKeys:
     def test_a_search_and_a_seller_of_the_same_name_are_different(self):
         assert search_key("x") != seller_key("x")
+
+    def test_a_shelf_is_not_an_evaluation_or_an_analysis_of_the_same_seller(self):
+        """Three questions of three depths. Joined, one would get another's answer."""
+        assert len({seller_shelf_key("1"), seller_evaluation_key("1"), seller_key("1")}) == 3
+
+    def test_two_sellers_shelves_are_two_collections(self):
+        assert seller_shelf_key("1") != seller_shelf_key("2")
 
     def test_different_keywords_are_different_collections(self):
         assert search_key("ポケカ") != search_key("ポケカ 引退品")

@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
 from conftest import (
     FrozenClock,
     RecordingSleeper,
@@ -360,6 +361,149 @@ class TestSellerEvaluation:
         # sold. Only the brief look moved to the search.
         assert len(port.calls_to("seller_items:on_sale")) == 1
         assert len(port.calls_to("seller_shelf:on_sale")) == 1
+
+
+class TestSellerShelf:
+    """What one seller has for sale, opened from a listing.
+
+    The reader found something worth a second look. What they pay to see the
+    rest of that person's shelf is one request, and the answer is the
+    listings themselves, each with its condition.
+    """
+
+    URL = f"/api/sellers/{SELLER_ID}/shelf"
+
+    def test_it_spends_one_request_and_it_is_the_search_limited_to_the_seller(self):
+        port = shelf(on_sale=make_items(3))
+
+        response = client(port).get(self.URL)
+
+        assert response.status_code == 200
+        # No profile, no sold listings, no item detail, no listing page.
+        assert [call.method for call in port.calls] == ["seller_shelf:on_sale"]
+
+    def test_it_returns_the_listings_with_their_conditions(self):
+        port = shelf(
+            on_sale=(
+                graded("m000000000001", "1", "新品、未使用"),
+                graded("m000000000002", "4", "やや傷や汚れあり"),
+                graded("m000000000003", None),
+            )
+        )
+
+        body = client(port).get(self.URL).json()
+
+        assert [item["id"] for item in body["items"]] == [
+            "m000000000001",
+            "m000000000002",
+            "m000000000003",
+        ]
+        assert [item["itemCondition"] for item in body["items"]] == [
+            {"id": "1", "name": "新品、未使用"},
+            {"id": "4", "name": "やや傷や汚れあり"},
+            None,
+        ]
+
+    def test_the_exact_field_set(self):
+        """The id asked about, and nothing the marketplace said about them."""
+        body = client(shelf(on_sale=make_items(1))).get(self.URL).json()
+
+        assert set(body) == {"sellerId", "items", "meta", "foundCount"}
+        assert body["sellerId"] == SELLER_ID
+
+    def test_it_says_how_many_there_are_beside_the_page_it_read(self):
+        port = shelf(on_sale=make_items(3), more_on_sale=True, on_sale_found=1152)
+
+        body = client(port).get(self.URL).json()
+
+        assert len(body["items"]) == 3
+        assert body["foundCount"] == 1152
+        # One page, and said so: there is more than is on the screen.
+        assert body["meta"]["stopReason"] == "max_pages"
+        assert body["meta"]["truncated"] is True
+        assert len(port.calls) == 1
+
+    def test_a_whole_search_page_is_returned(self):
+        body = client(shelf(on_sale=make_items(120))).get(self.URL).json()
+
+        assert len(body["items"]) == 120
+        assert body["meta"]["discardedByLimitCount"] == 0
+
+    def test_nothing_for_sale_is_an_answer_and_not_an_error(self):
+        """Or nobody by that id. A search cannot say which, and neither can this."""
+        response = client(shelf()).get(self.URL)
+
+        assert response.status_code == 200
+        assert response.json()["items"] == []
+        assert response.json()["meta"]["reachedEnd"] is True
+
+    @pytest.mark.parametrize("seller_id", ["%20", "1%202", "x" * 65])
+    def test_an_id_that_is_not_one_is_the_callers_mistake(self, seller_id):
+        port = shelf(on_sale=make_items(1))
+
+        response = client(port).get(f"/api/sellers/{seller_id}/shelf")
+
+        assert response.status_code == 422
+        assert response.json() == {
+            "detail": {"code": "invalid_input", "field": "sellerId"}
+        }
+        assert port.calls == []
+
+    def test_a_refusal_is_a_failed_collection_with_nothing_in_it(self):
+        port = ScriptedPort(
+            seller=SELLER,
+            shelf_pages={
+                ListingStatus.ON_SALE: [
+                    MarketplaceError(ErrorCode.FORBIDDEN_403, Operation.SELLER_ON_SALE)
+                ]
+            },
+        )
+
+        response = client(port).get(self.URL)
+
+        assert response.status_code == 502
+        assert response.json()["meta"]["errors"] == [
+            {"code": "forbidden_403", "operation": "seller_on_sale"}
+        ]
+
+    def test_refusals_count_toward_the_same_stop_as_everything_else(self):
+        """Three in a row, across sellers, and the fourth is not sent."""
+        port = ScriptedPort(
+            shelf_pages={
+                ListingStatus.ON_SALE: [
+                    MarketplaceError(ErrorCode.RATE_LIMITED_429, Operation.SELLER_ON_SALE)
+                ]
+            },
+        )
+        app = client(port)
+
+        for seller_id in ("1", "2", "3"):
+            app.get(f"/api/sellers/{seller_id}/shelf")
+        fourth = app.get("/api/sellers/4/shelf")
+
+        assert len(port.calls) == 3
+        assert fourth.status_code == 503
+        assert int(fourth.headers["Retry-After"]) > 0
+
+    def test_it_is_not_joined_to_a_look_at_the_same_seller(self):
+        """A shelf returns listings and an evaluation returns none."""
+        port = shelf(on_sale=make_items(2))
+        app = client(port)
+
+        on_shelf = app.get(self.URL).json()
+        evaluation = app.get(f"/api/sellers/{SELLER_ID}/evaluation").json()
+
+        assert len(on_shelf["items"]) == 2
+        assert "items" not in evaluation
+        # Asked twice, because they are two questions.
+        assert len(port.calls_to("seller_shelf:on_sale")) == 2
+
+    def test_the_sellers_lists_are_untouched(self):
+        lists = InMemorySellerLists()
+
+        client(shelf(on_sale=make_items(1)), lists=lists).get(self.URL)
+
+        assert lists.entries() == ()
 
 
 class TestSellerLists:

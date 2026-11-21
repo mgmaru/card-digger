@@ -16,7 +16,10 @@ from conftest import (
     make_shelf_page,
 )
 
-from card_digger.application.analyze_seller import analyze_seller
+from card_digger.application.analyze_seller import (
+    analyze_seller,
+    collect_seller_shelf,
+)
 from card_digger.application.collection import (
     CONSECUTIVE_REFUSALS_BEFORE_STOP,
     SELLER_EVALUATION_LIMITS,
@@ -540,3 +543,69 @@ class TestALookAcrossManySellers:
             SELLER_EVALUATION_LIMITS.max_duration_seconds
             == SELLER_ITEMS_LIMITS.max_duration_seconds
         )
+
+
+class TestOneSellersShelf:
+    """What a seller has for sale, for a reader who came from one listing."""
+
+    async def test_it_is_one_request_through_the_search(self, clock, sleeper):
+        port = shelf_port(
+            on_sale=[make_shelf_page(make_items(3), ListingStatus.ON_SALE)],
+            sold_out=[],
+        )
+
+        collection = await collect_seller_shelf(
+            port, SELLER_ID, clock=clock, sleeper=sleeper
+        )
+
+        assert [call.method for call in port.calls] == ["seller_shelf:on_sale"]
+        assert collection.status is ListingStatus.ON_SALE
+        assert len(collection.items) == 3
+
+    async def test_it_does_not_ask_who_the_seller_is(self, clock, sleeper):
+        """The profile would double the cost of a look taken because it is cheap."""
+        port = shelf_port(
+            on_sale=[make_shelf_page((), ListingStatus.ON_SALE)], sold_out=[]
+        )
+
+        await collect_seller_shelf(port, SELLER_ID, clock=clock, sleeper=sleeper)
+
+        assert port.calls_to("seller") == []
+
+    async def test_it_stops_after_one_page_and_says_there_is_more(self, clock, sleeper):
+        port = shelf_port(
+            on_sale=[
+                make_shelf_page(
+                    make_items(120),
+                    ListingStatus.ON_SALE,
+                    next_cursor="p2",
+                    found_count=1152,
+                ),
+                make_shelf_page(make_items(120, start=121), ListingStatus.ON_SALE),
+            ],
+            sold_out=[],
+        )
+
+        collection = await collect_seller_shelf(
+            port, SELLER_ID, clock=clock, sleeper=sleeper
+        )
+
+        assert len(port.calls) == 1
+        assert len(collection.items) == 120
+        assert collection.found_count == 1152
+        assert collection.meta.stop_reason is CollectionStopReason.MAX_PAGES
+        assert collection.meta.truncated is True
+
+    async def test_it_waits_its_turn_like_any_other_request(self, clock, sleeper):
+        """A gate shared with a search just made still spaces this one."""
+        gate = RequestGate(clock, sleeper)
+        port = shelf_port(
+            on_sale=[make_shelf_page(make_items(1), ListingStatus.ON_SALE)],
+            sold_out=[],
+        )
+        await collect_seller_shelf(port, SELLER_ID, clock=clock, sleeper=sleeper, gate=gate)
+
+        await collect_seller_shelf(port, SELLER_ID, clock=clock, sleeper=sleeper, gate=gate)
+
+        assert sleeper.total >= 2.0
+

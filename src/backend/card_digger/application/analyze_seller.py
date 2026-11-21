@@ -17,6 +17,7 @@ from card_digger.application.collection import (
     Collected,
     CollectionLimits,
     RequestGate,
+    SELLER_EVALUATION_LIMITS,
     SELLER_ITEMS_LIMITS,
     collect_pages,
 )
@@ -141,6 +142,39 @@ async def analyze_seller(
             if ask_whether_inactive
             else None
         ),
+    )
+
+
+async def collect_seller_shelf(
+    port: MarketplacePort,
+    seller_id: str,
+    *,
+    clock: Clock,
+    sleeper: Sleeper,
+    gate: RequestGate | None = None,
+    limits: CollectionLimits = SELLER_EVALUATION_LIMITS,
+) -> SellerItemsCollection:
+    """What one seller has for sale, with each listing's condition. One page.
+
+    For a reader who found a listing worth a second look and wants to see what
+    else that person is selling. One request: no profile, no sold listings, no
+    item detail. The listings are read through the search limited to the
+    seller, which is what carries their condition and holds up to 120 where
+    the seller's own listing page holds 30.
+
+    **Nothing here says whether the seller exists.** A search cannot tell "no
+    such seller" from "nothing for sale", so both come back as nothing
+    collected. The profile is what could tell, and asking for it would double
+    the cost of a look the reader took because it was cheap.
+    """
+    return await _collect_status(
+        port,
+        seller_id,
+        ListingStatus.ON_SALE,
+        gate=gate or RequestGate(clock, sleeper),
+        clock=clock,
+        limits=limits,
+        through_search=True,
     )
 
 
