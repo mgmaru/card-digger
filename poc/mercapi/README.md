@@ -304,7 +304,10 @@ uv run python ../../poc/mercapi/seller_condition_probe.py --seller-id <出品者
 poc/mercapi/.venv/bin/python poc/mercapi/seller_condition_probe.py --seller-id <出品者ID> --seller-id-as-int
 ```
 
-**まだ実行していません。**結果が出たら、ここと[出品者探索 実装仕様](../../docs/product/seller-discovery-spec.md)へ書きます。
+結果は[出品者の出品を、状態付きで読めるか — 観測結果](seller-condition-result.md)。判定は
+**一覧（`items/get_items`）は状態を送っていない**（項目名42個に無い）、
+**検索は`sellerId`で出品者を絞れ、状態が付く**（160 / 160）、
+**一覧の出品を検索も返した**（販売中30 / 30、売却済み30 / 30）でした。**出品者1人、1回の実行です。**
 
 ## テスト
 
@@ -338,6 +341,7 @@ poc/mercapi/.venv/bin/python -m unittest discover -s poc/mercapi -p 'test*.py' -
 - `photos-result.md`: 2026-09-05の商品画像の枚数と描画速度の観測結果
 - `seller_condition_probe.py`: 出品者の出品一覧が状態を持つか、出品者を指定した検索が効くかを観測するランナー
 - `test_seller_condition_probe.py`: 項目名の記録、絞り込みの判定、一覧との突き合わせ、通信しない通し実行の単体テスト
+- `seller-condition-result.md`: 2026-11-20の、出品者の出品と商品の状態の観測結果
 - `auction-result.md`: 2026-08-31のAuction追加検証結果
 - `requirements.txt`: mercapiの固定コミットと直接依存
 - `result.md`: 2026-08-30実測結果とSellerページング追加検証
