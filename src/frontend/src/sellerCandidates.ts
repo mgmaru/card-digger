@@ -21,6 +21,7 @@ import type {
   Item,
   SellerEvaluationResponse,
   SellerListEntry,
+  ShelfConditions,
 } from "./types/api";
 
 export type ConditionCount = { id: string; name: string; count: number };
@@ -136,11 +137,68 @@ export function cardShare(evaluation: SellerEvaluationResponse): CardShare | nul
   };
 }
 
+/**
+ * The most worn grade still counted as 美品, as Mercari's number.
+ *
+ * `3` is 目立った傷や汚れなし, so 美品 is that grade and the two better ones.
+ * The reader drew the line there (2026-11-20): cards are mostly listed as
+ * 目立った傷や汚れなし, and a line at 新品、未使用 would leave almost nobody.
+ */
+export const FINE_UP_TO_RANK = 3;
+
+/**
+ * How many of the listings a look read are 美品, with what that rests on.
+ *
+ * **Of the seller's own shelf, not of what a search happened to match.** A
+ * look reads one page of what they have for sale and one of what they sold,
+ * through the search limited to them, and that is where each listing says how
+ * worn it is (出品者探索 §5.7).
+ *
+ * A count and not a share: the reader asked for whoever lists many. The
+ * number read is kept beside it because 12 of 12 and 12 of 120 are different
+ * sellers.
+ */
+export type FineShelf = {
+  fineCount: number;
+  /** How many listings were read. At most a page. */
+  analyzedCount: number;
+  /** How many Mercari says there are, or `null`. Shown when it is more. */
+  foundCount: number | null;
+  /** Listings with no grade that could be placed. Not counted as 美品. */
+  unknownCount: number;
+};
+
+export function fineShelf(conditions: ShelfConditions): FineShelf {
+  return {
+    fineCount: conditions.counts
+      // The id is a number for every grade the backend placed. One that is
+      // not would be NaN here, which is not at or under the line.
+      .filter((grade) => Number(grade.id) <= FINE_UP_TO_RANK)
+      .reduce((sum, grade) => sum + grade.count, 0),
+    analyzedCount: conditions.analyzedItemCount,
+    foundCount: conditions.foundCount,
+    unknownCount: conditions.unknownCount,
+  };
+}
+
+/**
+ * How many 美品 a seller has for sale, or `null` when nobody has looked.
+ *
+ * For sale, not sold: the order this feeds is "who to go and look at", and
+ * what was sold cannot be bought. What they sold is shown beside it.
+ */
+export function fineOnSale(record: EvaluationRecord | undefined): number | null {
+  return record?.status === "done"
+    ? fineShelf(record.evaluation.onSaleConditions).fineCount
+    : null;
+}
+
 export type CandidateSort =
   | "found"
   | "cardShare"
   | "cardShareHigh"
   | "goodRatings"
+  | "fineOnSale"
   | "condition"
   | "hits";
 
@@ -149,6 +207,7 @@ export const CANDIDATE_SORT_LABELS: Record<CandidateSort, string> = {
   cardShare: "カードの割合が低い順",
   cardShareHigh: "カードの割合が高い順",
   goodRatings: "良い評価が多い順",
+  fineOnSale: "販売中の美品が多い順",
   condition: "一致した出品の状態が良い順",
   hits: "一致した出品が多い順",
 };
@@ -158,6 +217,7 @@ export const CANDIDATE_SORT_ORDER: CandidateSort[] = [
   "cardShare",
   "cardShareHigh",
   "goodRatings",
+  "fineOnSale",
   "condition",
   "hits",
 ];
@@ -239,6 +299,12 @@ export function withGoodRatings(
  * seller with one mint card and one damaged one is not a seller of mint cards.
  * A seller with no grade that could be placed comes last, and is not treated
  * as worn.
+ *
+ * By 美品 for sale, the seller with the most comes first. It answers the
+ * other question from the order by condition, and over a different set of
+ * listings: that one goes by the single most worn listing a search matched,
+ * this one counts over the seller's own shelf. A seller nobody has looked at
+ * comes last and is not treated as having none.
  */
 export function sortCandidates(
   candidates: readonly SellerCandidate[],
@@ -269,6 +335,11 @@ export function sortCandidates(
         return (
           (goodRatings(evaluations.get(b.sellerId)) ?? -1) -
             (goodRatings(evaluations.get(a.sellerId)) ?? -1) || found(a, b)
+        );
+      case "fineOnSale":
+        return (
+          (fineOnSale(evaluations.get(b.sellerId)) ?? -1) -
+            (fineOnSale(evaluations.get(a.sellerId)) ?? -1) || found(a, b)
         );
       case "condition":
         return (

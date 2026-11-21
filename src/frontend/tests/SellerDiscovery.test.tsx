@@ -28,6 +28,7 @@ import type {
   SellerAssessment,
   SellerEvaluationResponse,
   SellerListEntry,
+  ShelfConditions,
 } from "../src/types/api";
 
 const mocks = vi.hoisted(() => ({
@@ -91,6 +92,33 @@ const RESULT: SearchResponse = {
   meta: META,
 };
 
+/** The grades on one status of a shelf, as a look reports them. */
+function grades(
+  counts: Record<string, number> = {},
+  { found = null, unknown = 0 }: { found?: number | null; unknown?: number } = {},
+): ShelfConditions {
+  const names: Record<string, string> = {
+    "1": "新品、未使用",
+    "2": "未使用に近い",
+    "3": "目立った傷や汚れなし",
+    "4": "やや傷や汚れあり",
+    "5": "傷や汚れあり",
+    "6": "全体的に状態が悪い",
+  };
+  const listed = Object.entries(counts).map(([id, count]) => ({
+    id,
+    name: names[id] ?? "",
+    count,
+  }));
+  return {
+    analyzedItemCount: listed.reduce((sum, grade) => sum + grade.count, 0) + unknown,
+    foundCount: found,
+    counts: listed,
+    unknownCount: unknown,
+  };
+}
+
+
 function evaluation(
   sellerId: string,
   name: string,
@@ -129,6 +157,8 @@ function evaluation(
     },
     onSaleMeta: { ...META, stopReason: "max_pages", reachedEnd: false, truncated: true },
     soldOutMeta: META,
+    onSaleConditions: grades(),
+    soldOutConditions: grades(),
   };
 }
 
@@ -330,13 +360,14 @@ describe("the 出品者 tab", () => {
     await searchAndOpenSellers();
 
     // 商品の状態 alone read as something about the seller. The first two
-    // lines are about the listings this search found; the last two are about
-    // the seller.
+    // lines are about the listings this search found; the last three are
+    // about the seller.
     const shop = within(rows()[0] as HTMLElement);
     expect(shop.getAllByRole("term").map((term) => term.textContent)).toEqual([
       "一致した出品",
       "一致した出品の状態",
       "カードの割合",
+      "美品の出品",
       "評価",
     ]);
     expect(shop.getAllByRole("definition")[1]).toHaveTextContent(
@@ -413,6 +444,103 @@ describe("looking at the sellers", () => {
     const shop = rows()[0] as HTMLElement;
     expect(shop).toHaveTextContent("カードの割合100.0%カード 20件 / 20件");
     expect(home).toHaveTextContent("良い 10・普通 2・悪い 0");
+  });
+
+  describe("美品の出品", () => {
+    /** shop sells little that is worn; home a mixture; gone was not rated. */
+    beforeEach(() => {
+      const withShelves: Record<string, SellerEvaluationResponse> = {
+        shop: {
+          ...(LOOKS.shop as SellerEvaluationResponse),
+          onSaleConditions: grades({ "1": 3, "3": 72, "4": 30, "6": 12 }, { found: 1152 }),
+          soldOutConditions: grades({ "1": 9, "3": 19, "5": 15 }),
+        },
+        home: {
+          ...(LOOKS.home as SellerEvaluationResponse),
+          onSaleConditions: grades({ "2": 1, "3": 4, "5": 4 }, { unknown: 1, found: 10 }),
+          soldOutConditions: grades({ "4": 12 }),
+        },
+        gone: LOOKS.gone as SellerEvaluationResponse,
+      };
+      mocks.sellerEvaluation.mockImplementation(async (id: string) => withShelves[id]);
+    });
+
+    it("is not shown as a number before anybody has looked", async () => {
+      await searchAndOpenSellers();
+
+      const shop = within(rows()[0] as HTMLElement);
+      expect(shop.getAllByRole("definition")[3]).toHaveTextContent(/^-$/);
+    });
+
+    it("counts 目立った傷や汚れなし and better, for sale and sold apart", async () => {
+      const user = await searchAndOpenSellers();
+      await user.click(lookButton());
+      await screen.findByText("調べられる出品者は全員調べました");
+
+      const shop = rows()[0] as HTMLElement;
+      // 3 + 72 of the 117 read are 美品. The 1,152 is how many there are.
+      expect(shop).toHaveTextContent("販売中 75件 / 117件（全1,152件）");
+      expect(shop).toHaveTextContent("売却済み 28件 / 43件");
+    });
+
+    it("leaves the total out when the whole shelf was read", async () => {
+      const user = await searchAndOpenSellers();
+      await user.click(lookButton());
+      await screen.findByText("調べられる出品者は全員調べました");
+
+      const home = rows()[1] as HTMLElement;
+      // Ten found, ten read. Saying 全10件 beside / 10件 would say it twice.
+      expect(home).toHaveTextContent("販売中 5件 / 10件");
+      expect(home).not.toHaveTextContent("全10件");
+    });
+
+    it("names the listings with no grade, which are read and cannot be counted", async () => {
+      const user = await searchAndOpenSellers();
+      await user.click(lookButton());
+      await screen.findByText("調べられる出品者は全員調べました");
+
+      expect(rows()[1]).toHaveTextContent("販売中 5件 / 10件・状態不明 1件");
+      expect(rows()[0]).not.toHaveTextContent("状態不明");
+    });
+
+    it("says none of nothing for a seller with nothing listed", async () => {
+      const user = await searchAndOpenSellers();
+      await user.click(lookButton());
+      await screen.findByText("調べられる出品者は全員調べました");
+
+      expect(rows()[2]).toHaveTextContent("販売中 0件 / 0件売却済み 0件 / 0件");
+    });
+
+    it("sorts by how many are for sale, and asks nobody again", async () => {
+      const user = await searchAndOpenSellers();
+      await user.click(lookButton());
+      await screen.findByText("調べられる出品者は全員調べました");
+
+      await user.selectOptions(screen.getByLabelText("並び順"), "fineOnSale");
+
+      // 75, 5, 0. By count: the reader asked for whoever lists many.
+      expect(rowNames()).toEqual(["カード専門店", "ゆうママ", "引っ越し中"]);
+      expect(mocks.sellerEvaluation).toHaveBeenCalledTimes(3);
+    });
+
+    it("does not move anybody before there is a count to sort by", async () => {
+      const user = await searchAndOpenSellers();
+
+      await user.selectOptions(screen.getByLabelText("並び順"), "fineOnSale");
+
+      expect(rowNames()).toEqual(["Seller shop", "Seller home", "Seller gone"]);
+      expect(mocks.sellerEvaluation).not.toHaveBeenCalled();
+    });
+
+    it("says where the line is, and that the count is of a page", async () => {
+      await searchAndOpenSellers();
+
+      const notes = screen.getByText(/「美品の出品」は/);
+      expect(notes).toHaveTextContent("「目立った傷や汚れなし」以上");
+      expect(notes).toHaveTextContent("最大120件");
+      expect(notes).toHaveTextContent("カード以外の出品も含みます");
+      expect(notes).toHaveTextContent("状態が不明の出品は数えません");
+    });
   });
 
   it("sorts by the share of cards once there is one to sort by", async () => {

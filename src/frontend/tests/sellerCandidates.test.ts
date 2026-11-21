@@ -15,6 +15,9 @@ import {
   type EvaluationRecord,
   evaluationSeconds,
   excludedSellerIds,
+  FINE_UP_TO_RANK,
+  fineOnSale,
+  fineShelf,
   isOwedALook,
   sellerCandidates,
   sortCandidates,
@@ -25,6 +28,7 @@ import type {
   Item,
   SellerEvaluationResponse,
   SellerListEntry,
+  ShelfConditions,
 } from "../src/types/api";
 
 const GRADES: Record<string, string> = {
@@ -237,6 +241,100 @@ describe("who is still owed a look", () => {
     [{ status: "gone" }, false],
   ] as [EvaluationRecord | undefined, boolean][])("%j → %s", (record, owed) => {
     expect(isOwedALook(record)).toBe(owed);
+  });
+});
+
+describe("美品 on a seller's shelf", () => {
+  const shelf = (
+    counts: [string, number][],
+    extra: Partial<ShelfConditions> = {},
+  ): ShelfConditions => ({
+    analyzedItemCount: counts.reduce((sum, [, count]) => sum + count, 0),
+    foundCount: null,
+    counts: counts.map(([id, count]) => ({ id, name: `grade ${id}`, count })),
+    unknownCount: 0,
+    ...extra,
+  });
+  const lookedAtShelf = (onSale: ShelfConditions): EvaluationRecord => ({
+    status: "done",
+    evaluation: { onSaleConditions: onSale } as SellerEvaluationResponse,
+  });
+
+  it("draws the line at 目立った傷や汚れなし", () => {
+    // The reader's line. 新品、未使用 alone would leave almost nobody.
+    expect(FINE_UP_TO_RANK).toBe(3);
+  });
+
+  it("counts the three grades at and above the line", () => {
+    const fine = fineShelf(
+      shelf([
+        ["1", 3],
+        ["2", 2],
+        ["3", 72],
+        ["4", 30],
+        ["5", 7],
+        ["6", 5],
+      ]),
+    );
+
+    expect(fine.fineCount).toBe(77);
+    expect(fine.analyzedCount).toBe(119);
+  });
+
+  it("counts none when everything is worn", () => {
+    expect(fineShelf(shelf([["4", 10]])).fineCount).toBe(0);
+  });
+
+  it("does not count a listing with no grade, and keeps it in what was read", () => {
+    const fine = fineShelf(shelf([["3", 4]], { analyzedItemCount: 6, unknownCount: 2 }));
+
+    expect(fine.fineCount).toBe(4);
+    expect(fine.analyzedCount).toBe(6);
+    expect(fine.unknownCount).toBe(2);
+  });
+
+  it("does not take a grade it cannot read for a good one", () => {
+    expect(fineShelf(shelf([["x", 5]])).fineCount).toBe(0);
+  });
+
+  it("carries the total Mercari reported, and not a guess when there is none", () => {
+    expect(fineShelf(shelf([["3", 1]], { foundCount: 1152 })).foundCount).toBe(1152);
+    expect(fineShelf(shelf([["3", 1]])).foundCount).toBeNull();
+  });
+
+  it("is unknown for a seller nobody has looked at, and not zero", () => {
+    expect(fineOnSale(undefined)).toBeNull();
+    expect(fineOnSale({ status: "failed" })).toBeNull();
+    expect(fineOnSale(lookedAtShelf(shelf([["4", 3]])))).toBe(0);
+  });
+
+  it("orders by how many are for sale, most first", () => {
+    const candidates = sellerCandidates([
+      item("a", "few"),
+      item("b", "nobody-looked"),
+      item("c", "many"),
+      item("d", "none"),
+    ]);
+    const evaluations = new Map<string, EvaluationRecord>([
+      ["few", lookedAtShelf(shelf([["3", 2]]))],
+      ["many", lookedAtShelf(shelf([["1", 40], ["5", 60]]))],
+      ["none", lookedAtShelf(shelf([["5", 9]]))],
+    ]);
+
+    // Not looked at comes after a seller looked at with none: unknown is not
+    // fewer than zero, it is just not known.
+    expect(ids(sortCandidates(candidates, "fineOnSale", evaluations))).toEqual([
+      "many",
+      "few",
+      "none",
+      "nobody-looked",
+    ]);
+  });
+
+  it("leaves the order found alone when nobody has been looked at", () => {
+    const candidates = sellerCandidates([item("a", "s1"), item("b", "s2")]);
+
+    expect(ids(sortCandidates(candidates, "fineOnSale", new Map()))).toEqual(["s1", "s2"]);
   });
 });
 

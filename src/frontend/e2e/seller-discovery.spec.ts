@@ -78,6 +78,17 @@ test("looking at the sellers behind a result, then saving one and excluding one"
   await expect(one).toContainText("一致した出品10件");
   await expect(one).toContainText(/カードの割合\s*\d+\.\d%\s*カード \d+件 \/ \d+件/);
   await expect(one).toContainText("良い 245・普通 2・悪い 0");
+  // Counted over the seller's own shelf, which the look read through the
+  // search limited to them: one page of 30 here, of the 104 they have for
+  // sale. One listing on that page reports no condition.
+  await expect(one).toContainText("販売中 18件 / 30件（全104件）・状態不明 1件");
+  await expect(one).toContainText("売却済み 8件 / 12件");
+
+  // --- Ordering by 美品 for sale asks nobody again -------------------------
+  await page.getByLabel("並び順").selectOption({ label: "販売中の美品が多い順" });
+  await expect(rows(page).first()).toContainText("seller-sample-1");
+  await page.getByLabel("並び順").selectOption({ label: "検索結果に出た順" });
+  expect(looks).toHaveLength(2);
 
   // --- Saving and excluding go through to the backend ----------------------
   await page.getByRole("button", { name: "seller-sample-2を保存する" }).click();
