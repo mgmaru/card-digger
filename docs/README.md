@@ -44,7 +44,8 @@ docs/
 │   ├── ssh-key-setup.md
 │   ├── test-policy.md
 │   ├── windows-deploy-checks.md
-│   └── windows-deploy-task-checks.md
+│   ├── windows-deploy-task-checks.md
+│   └── windows-tailscale-serve-checks.md
 ├── adr/
 │   ├── 0001-run-on-home-windows-via-tailscale.md
 │   ├── 0002-switch-deploy-target-by-configuration.md
@@ -62,7 +63,9 @@ docs/
 │   ├── 2026-11-09-what-a-reverse-proxy-is.md
 │   ├── 2026-11-09-why-ssh-on-all-addresses-is-risky.md
 │   ├── 2026-11-10-what-a-junction-is.md
-│   └── 2026-11-10-why-switch-releases-through-current.md
+│   ├── 2026-11-10-why-switch-releases-through-current.md
+│   ├── 2026-11-15-what-a-reload-throws-away.md
+│   └── 2026-11-16-how-hashrouter-and-caddy-work.md
 ├── retrospectives/
 │   └── 2026-09-01-verification-pitfalls.md
 └── phase-0/
@@ -116,6 +119,9 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [windows-deploy-task-checks.md](development/windows-deploy-task-checks.md):
   デプロイの作業をタスクの中で行えるか（ADR 0003 論点5の見直し）を、家のWindowsで確かめる手順。タスクの中の`uv sync`、
   デプロイ用のタスクからuvicornのタスクを止めて起動すること、版の名前をファイルで渡すこと
+- [windows-tailscale-serve-checks.md](development/windows-tailscale-serve-checks.md):
+  `tailscale serve`で画面とAPIを振り分けられるか（ADR 0002 論点1のC）を、家のWindowsで確かめる手順。画面の配信、
+  `/api`のパス、SPA fallback、`current`を通した配信と向け直し
 
 ### `adr/`
 
@@ -174,6 +180,13 @@ Phaseをまたいで利用する開発・依存更新・Repository運用の手�
 - [2026-11-10-why-switch-releases-through-current.md](questions/2026-11-10-why-switch-releases-through-current.md):
   `current`は何を切り替えるのか。デプロイの手順、タスクの設定を書き換える場合との違い、ほかのやり方（その場で上書き、
   名前の付け替え、`current.txt`、シンボリックリンク、Blue-Green）で何が起きるか、`current`の弱点
+- [2026-11-15-what-a-reload-throws-away.md](questions/2026-11-15-what-a-reload-throws-away.md):
+  再読み込みでBrowserは何を捨てるのか。SPA fallbackと転送の違い、`dist/`に無いパス、画面の型とAPI、
+  画面の404とAPIの404、キャッシュとHTMLの指示、MPA・SSRとの違い、リンクやボタンでは捨てないこと、本当に無いパス
+- [2026-11-16-how-hashrouter-and-caddy-work.md](questions/2026-11-16-how-hashrouter-and-caddy-work.md):
+  `HashRouter`とCaddyは、それぞれどうやってSPA fallbackの穴を扱うのか。フラグメントが送られない理由、ルーターが`#`の後ろを読む仕組み、
+  画面の中の移動と再読み込みの流れ、画面の住所とデータの住所、Card Diggerで変える場所。Caddyの置き場所、Caddyfileの読み方、
+  `try_files`の中で起きること、キャッシュの指示、Windowsで要ること、2つの違い（明示か、ブラウザーの性質に頼るか）
 
 書き方の約束。
 
